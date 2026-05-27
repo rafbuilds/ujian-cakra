@@ -1,60 +1,54 @@
 """
-db.py — Database connection helper
-Fallback ke simple connection jika pool gagal
+db.py — Database connection dengan support DATABASE_URL (Supabase/Render)
 """
 import os
 import psycopg2
 import psycopg2.extras
+from psycopg2 import pool as pg_pool
+from urllib.parse import urlparse
 
-def _get_config():
-    return dict(
-        host     = os.environ.get("DB_HOST", "localhost"),
-        port     = os.environ.get("DB_PORT", "5433"),
-        dbname   = os.environ.get("DB_NAME", "ujian_smaba"),
-        user     = os.environ.get("DB_USER", "postgres"),
-        password = os.environ.get("DB_PASSWORD", "postgres"),
-        cursor_factory = psycopg2.extras.RealDictCursor
-    )
-
-# Connection pool
 _pool = None
 
 def get_pool():
     global _pool
     if _pool is None:
-        from psycopg2 import pool as pg_pool
-        _pool = pg_pool.ThreadedConnectionPool(
-            minconn=2, maxconn=10,
-            **_get_config()
-        )
+        database_url = os.environ.get("DATABASE_URL")
+        if database_url:
+            # Parse DATABASE_URL dari Supabase/Render
+            r = urlparse(database_url)
+            _pool = pg_pool.ThreadedConnectionPool(
+                minconn=1,
+                maxconn=5,
+                host     = r.hostname,
+                port     = r.port or 5432,
+                dbname   = r.path.lstrip('/'),
+                user     = r.username,
+                password = r.password,
+                sslmode  = 'require',
+                cursor_factory = psycopg2.extras.RealDictCursor
+            )
+        else:
+            # Local development fallback
+            _pool = pg_pool.ThreadedConnectionPool(
+                minconn=2,
+                maxconn=10,
+                host     = os.environ.get("DB_HOST", "localhost"),
+                port     = int(os.environ.get("DB_PORT", "5433")),
+                dbname   = os.environ.get("DB_NAME", "ujian_smaba"),
+                user     = os.environ.get("DB_USER", "postgres"),
+                password = os.environ.get("DB_PASSWORD", "postgres"),
+                cursor_factory = psycopg2.extras.RealDictCursor
+            )
     return _pool
 
 def get_db():
-    try:
-        return get_pool().getconn()
-    except Exception:
-        # Fallback: koneksi langsung
-        return psycopg2.connect(**_get_config())
+    return get_pool().getconn()
 
 def release_db(conn):
-    try:
-        get_pool().putconn(conn)
-    except Exception:
-        try:
-            conn.close()
-        except Exception:
-            pass
+    get_pool().putconn(conn)
 
 def query(sql, params=None, fetch="all"):
-    conn = None
-    use_pool = True
-    try:
-        pool = get_pool()
-        conn = pool.getconn()
-    except Exception:
-        use_pool = False
-        conn = psycopg2.connect(**_get_config())
-
+    conn = get_db()
     try:
         cur = conn.cursor()
         cur.execute(sql, params or ())
@@ -62,12 +56,8 @@ def query(sql, params=None, fetch="all"):
         if fetch == "one":  return cur.fetchone()
         if fetch == "none": return None
         return cur.fetchall()
+    except Exception:
+        conn.rollback()
+        raise
     finally:
-        if conn:
-            if use_pool:
-                try:
-                    get_pool().putconn(conn)
-                except Exception:
-                    conn.close()
-            else:
-                conn.close()
+        release_db(conn)
