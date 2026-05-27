@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Pengawas Live — Ujian Online</title>
+<link rel="stylesheet" href="../style.css"/>
+<style>
+.mon-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:1.25rem}
+.mon-card{background:var(--white);border:.5px solid var(--border);border-radius:14px;padding:1rem;text-align:center}
+.mon-num{font-size:32px;font-weight:700;line-height:1}
+.mon-label{font-size:12px;color:var(--muted);margin-top:4px;font-weight:500}
+.mon-submitted{color:var(--green3)} .mon-online{color:var(--amber)} .mon-offline{color:var(--muted)}
+.stu-row{display:flex;align-items:center;gap:12px;padding:.875rem 1rem;border-bottom:.5px solid #f0ede5;transition:background .15s}
+.stu-row:hover{background:#fafaf8} .stu-row:last-child{border-bottom:none}
+.stu-avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0}
+.stu-avatar.submitted{background:#eaf3de;color:#3b6d11}
+.stu-avatar.online{background:#faeeda;color:#854f0b}
+.stu-avatar.offline{background:var(--light);color:var(--muted)}
+.status-dot{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:5px}
+.dot-submitted{background:var(--green3)} .dot-online{background:var(--amber)} .dot-offline{background:#b4b2a9}
+.prog-bar{height:5px;background:var(--border);border-radius:99px;overflow:hidden;margin-top:3px;width:80px}
+.prog-fill{height:100%;border-radius:99px;background:var(--green3)}
+.violation-badge{background:#fcebeb;color:var(--red2);padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600}
+.refresh-dot{width:8px;height:8px;border-radius:50%;background:var(--green3);animation:blink 2s infinite;display:inline-block;margin-right:5px}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+.select-exam{background:var(--white);border:.5px solid var(--border);border-radius:14px;padding:1.25rem;margin-bottom:1.25rem}
+</style>
+</head>
+<body>
+<div class="app-shell">
+  <nav class="sidebar">
+    <div class="sb-logo"><div class="sb-logo-title">📋 Ujian Online</div><div class="sb-logo-sub">SMAN 1 Batangan</div></div>
+    <div class="sb-nav">
+      <div class="sb-section">Menu</div>
+      <a href="guru-dashboard.html" class="sb-item" id="nav-dashboard">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" stroke-linecap="round" stroke-linejoin="round"/><polyline points="9 22 9 12 15 12 15 22" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Dashboard
+      </a>
+      <a href="guru-ujian.html" class="sb-item" id="nav-ujian">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" stroke-linecap="round"/></svg>
+        Daftar Ujian
+      </a>
+      <a href="guru-pengawas.html" class="sb-item" id="nav-pengawas">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M15 10l4.553-2.069A1 1 0 0121 8.82V15.18a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" stroke-linecap="round"/></svg>
+        Pengawas Live
+      </a>
+      <a href="guru-nilai.html" class="sb-item" id="nav-nilai">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="18" y1="20" x2="18" y2="10" stroke-linecap="round"/><line x1="12" y1="20" x2="12" y2="4" stroke-linecap="round"/><line x1="6" y1="20" x2="6" y2="14" stroke-linecap="round"/></svg>
+        Nilai & Rekap
+      </a>
+      <a href="guru-siswa.html" class="sb-item" id="nav-siswa">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke-linecap="round"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke-linecap="round"/></svg>
+        Data Siswa
+      </a>
+    </div>
+
+    <div class="sb-user">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <div class="sb-avatar" id="sb-avatar">G</div>
+        <div><div class="sb-user-name" id="sb-user-name">Guru</div><div class="sb-user-role">Guru Pengampu</div></div>
+      </div>
+      <button class="sb-logout" onclick="Auth.logout()">⏻ Keluar</button>
+    </div>
+  </nav>
+
+  <div class="main-wrap">
+    <div class="topbar">
+      <div class="topbar-title">Pengawas Live</div>
+      <div class="topbar-right" id="topbar-actions">
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+          <span id="sound-icon">🔔</span>
+          <input type="checkbox" id="sound-toggle" checked style="display:none" onchange="toggleSound()"/>
+          Suara
+        </label>
+        <button class="btn btn-secondary btn-sm" onclick="loadMonitor()">↺ Refresh</button>
+      </div>
+    </div>
+
+    <div class="page-main">
+      <!-- Pilih ujian -->
+      <div class="select-exam">
+        <div style="font-size:13px;font-weight:600;color:var(--muted);margin-bottom:.75rem">Pilih Ujian yang Dipantau</div>
+        <select class="form-control" id="exam-select" onchange="onExamSelect(this.value)">
+          <option value="">— Pilih ujian aktif —</option>
+        </select>
+      </div>
+
+      <div id="monitor-content" style="display:none">
+        <!-- Stat -->
+        <div class="mon-grid" id="mon-stat"></div>
+
+        <!-- Timer -->
+        <div class="card" id="timer-card" style="display:none;text-align:center;padding:1rem">
+          <div style="font-size:13px;color:var(--muted);margin-bottom:4px">Waktu Tersisa</div>
+          <div id="timer-display" style="font-size:32px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--green)">—</div>
+        </div>
+
+        <!-- Action buttons -->
+        <div style="display:flex;gap:10px;margin-bottom:1rem;flex-wrap:wrap" id="action-btns"></div>
+
+        <!-- Student table -->
+        <div class="card" style="padding:0;overflow:hidden">
+          <div style="padding:.875rem 1rem;border-bottom:.5px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+            <div style="font-weight:600;font-size:14px">
+              <span class="refresh-dot"></span>Monitor Siswa
+              <span style="font-size:12px;color:var(--muted);font-weight:400" id="last-refresh"></span>
+            </div>
+            <input type="text" placeholder="Cari nama..." id="stu-search" oninput="filterStudents()" style="padding:6px 10px;border:1px solid var(--border2);border-radius:8px;font-size:12px;width:200px"/>
+          </div>
+          <div id="stu-table"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="../config.js"></script>
+<script src="../components/api.js"></script>
+<script src="../components/auth.js"></script>
+<script src="../components/common.js"></script>
+<script>
+if(!Auth.requireRole(['guru','admin'])) throw new Error();
+UI.initSidebar();
+
+let currentExamId=null, monitorData=null, autoRefresh=null, soundOn=true;
+const prevViolations={};
+
+async function init() {
+  try {
+    const exams = await API.get('/api/exams');
+    const active = exams.filter(e=>['published','ongoing','finished'].includes(e.status));
+    const sel = document.getElementById('exam-select');
+    sel.innerHTML='<option value="">— Pilih ujian aktif —</option>'+
+      active.map(e=>`<option value="${e.id}">${e.title} — ${e.status==='ongoing'?'🟢 Berlangsung':e.status==='published'?'📋 Terbuka':'✅ Selesai'}</option>`).join('');
+
+    // URL param
+    const id=new URLSearchParams(location.search).get('id');
+    if(id && active.find(e=>e.id===id)) { sel.value=id; onExamSelect(id); }
+  } catch { UI.toast('Gagal memuat ujian','error'); }
+}
+
+function onExamSelect(id) {
+  currentExamId=id;
+  clearInterval(autoRefresh);
+  if(!id){document.getElementById('monitor-content').style.display='none';return;}
+  document.getElementById('monitor-content').style.display='block';
+  loadMonitor();
+  autoRefresh=setInterval(loadMonitor,5000);
+}
+
+async function loadMonitor() {
+  if(!currentExamId) return;
+  try {
+    const d=await API.get(`/api/exams/${currentExamId}/monitor`);
+    monitorData=d;
+    renderMonitor(d);
+    document.getElementById('last-refresh').textContent=` · ${new Date().toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit',second:'2-digit'})}`;
+    // Cek pelanggaran baru
+    checkViolations(d.students);
+  } catch { UI.toast('Gagal memuat data monitor','warn'); }
+}
+
+function checkViolations(students) {
+  students.forEach(s=>{
+    const prev=prevViolations[s.student_id]||0;
+    if(s.tab_violations>prev){
+      playAlert(); 
+      prevViolations[s.student_id]=s.tab_violations;
+    }
+  });
+}
+
+function playAlert() {
+  if(!soundOn) return;
+  try {
+    const ctx=new(window.AudioContext||window.webkitAudioContext)();
+    [0,.2,.4].forEach(t=>{
+      const o=ctx.createOscillator(), g=ctx.createGain();
+      o.connect(g); g.connect(ctx.destination);
+      o.frequency.value=880; o.type='sine';
+      g.gain.setValueAtTime(.4,ctx.currentTime+t);
+      g.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+t+.15);
+      o.start(ctx.currentTime+t); o.stop(ctx.currentTime+t+.15);
+    });
+  } catch {}
+}
+function toggleSound() {
+  soundOn=document.getElementById('sound-toggle').checked;
+  document.getElementById('sound-icon').textContent=soundOn?'🔔':'🔕';
+}
+
+function renderMonitor(d) {
+  const {summary,students,exam}=d;
+  document.getElementById('mon-stat').innerHTML=`
+    <div class="mon-card"><div class="mon-num mon-submitted">${summary.submitted}</div><div class="mon-label">✅ Submit</div></div>
+    <div class="mon-card"><div class="mon-num mon-online">${summary.online}</div><div class="mon-label">🟡 Online</div></div>
+    <div class="mon-card"><div class="mon-num mon-offline">${summary.offline}</div><div class="mon-label">⭕ Belum Masuk</div></div>
+  `;
+
+  // Timer
+  if(exam.status==='ongoing' && exam.expires_at) {
+    const rem=Math.max(0,(new Date(exam.expires_at)-Date.now())/1000);
+    const mm=String(Math.floor(rem/60)).padStart(2,'0');
+    const ss=String(Math.floor(rem%60)).padStart(2,'0');
+    document.getElementById('timer-card').style.display='block';
+    const td=document.getElementById('timer-display');
+    td.textContent=`${mm}:${ss}`;
+    td.style.color=rem>300?'var(--green)':rem>60?'var(--amber)':'var(--red)';
+  }
+
+  // Action buttons
+  document.getElementById('action-btns').innerHTML=`
+    ${exam.status==='ongoing'?`<button class="btn btn-danger btn-sm" onclick="finishExam()">⏹ Selesaikan Ujian</button>`:''}
+    ${exam.status==='finished'?`<button class="btn btn-success btn-sm" onclick="publishResults()">📢 Publish Nilai ke Siswa</button>`:''}
+  `;
+
+  renderStudentTable(students);
+}
+
+function filterStudents() {
+  if(!monitorData) return;
+  const q=document.getElementById('stu-search').value.toLowerCase();
+  const filtered=monitorData.students.filter(s=>s.name.toLowerCase().includes(q)||s.class_name.toLowerCase().includes(q));
+  renderStudentTable(filtered);
+}
+
+function renderStudentTable(students) {
+  const el=document.getElementById('stu-table');
+  if(!students.length){el.innerHTML='<div class="empty-state" style="padding:2rem"><div class="empty-text">Tidak ada siswa</div></div>';return;}
+  el.innerHTML=`
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <thead><tr style="background:var(--green)">
+        <th style="color:#fff;padding:9px 12px;text-align:left;font-size:12px">#</th>
+        <th style="color:#fff;padding:9px 12px;text-align:left;font-size:12px">Nama Siswa</th>
+        <th style="color:#fff;padding:9px 12px;text-align:left;font-size:12px">Kelas</th>
+        <th style="color:#fff;padding:9px 12px;text-align:left;font-size:12px">Status</th>
+        <th style="color:#fff;padding:9px 12px;text-align:left;font-size:12px">Progress</th>
+        <th style="color:#fff;padding:9px 12px;text-align:left;font-size:12px">Pelanggaran</th>
+        <th style="color:#fff;padding:9px 12px;text-align:left;font-size:12px">Submit</th>
+      </tr></thead>
+      <tbody>
+        ${students.map((s,i)=>`
+          <tr style="border-bottom:.5px solid #f0ede5;${i%2===0?'':'background:#fafaf8'}">
+            <td style="padding:9px 12px">${i+1}</td>
+            <td style="padding:9px 12px">
+              <div style="display:flex;align-items:center;gap:8px">
+                <div class="stu-avatar ${s.status}">${(s.name||'?')[0]}</div>
+                <div style="font-weight:500">${s.name}</div>
+              </div>
+            </td>
+            <td style="padding:9px 12px;font-size:12px;color:var(--muted)">${s.class_name}</td>
+            <td style="padding:9px 12px">
+              <span class="status-dot dot-${s.status}"></span>
+              ${{submitted:'Submit',online:'Online',offline:'Belum'}[s.status]}
+            </td>
+            <td style="padding:9px 12px">
+              <div>${s.answered||0}/${s.total_q||0}</div>
+              <div class="prog-bar"><div class="prog-fill" style="width:${s.total_q?((s.answered||0)/s.total_q*100):0}%"></div></div>
+            </td>
+            <td style="padding:9px 12px">
+              ${s.tab_violations>0?`<span class="violation-badge">⚠ ${s.tab_violations}x</span>`:'<span style="color:var(--muted);font-size:12px">—</span>'}
+            </td>
+            <td style="padding:9px 12px;font-size:12px;color:${s.submitted_at?'var(--green3)':'var(--muted)'}">
+              ${s.submitted_at?UI.fmtTime(s.submitted_at):'—'}
+            </td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+async function finishExam() {
+  UI.confirm('Selesaikan Ujian','Ujian akan ditutup. Siswa yang belum submit akan di-auto-submit.',async()=>{
+    await API.post(`/api/exams/${currentExamId}/finish`);
+    UI.toast('Ujian diselesaikan','success'); loadMonitor();
+  });
+}
+async function publishResults() {
+  await API.post(`/api/exams/${currentExamId}/publish-results`);
+  UI.toast('✅ Nilai dipublish ke siswa','success');
+}
+
+init();
+</script>
+</body>
+</html>

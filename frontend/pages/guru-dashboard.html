@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Dashboard Guru — Ujian Online</title>
+<link rel="stylesheet" href="../style.css"/>
+<style>
+.exam-card{background:var(--white);border:.5px solid var(--border);border-radius:14px;padding:1.125rem 1.25rem;display:flex;align-items:center;gap:14px;cursor:pointer;transition:all .15s;margin-bottom:10px}
+.exam-card:hover{border-color:var(--green3);box-shadow:var(--shadow2);transform:translateY(-2px)}
+.exam-icon{width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.exam-info{flex:1}
+.exam-title{font-weight:600;font-size:15px;margin-bottom:3px}
+.exam-meta{font-size:12px;color:var(--muted);display:flex;gap:10px;flex-wrap:wrap}
+.exam-actions{display:flex;gap:6px;align-items:center}
+.quick-card{background:var(--white);border:.5px solid var(--border);border-radius:14px;padding:1.25rem;cursor:pointer;transition:all .2s;text-align:center;text-decoration:none;display:block}
+.quick-card:hover{border-color:var(--green3);transform:translateY(-3px);box-shadow:var(--shadow2)}
+.quick-icon{font-size:32px;margin-bottom:.75rem}
+.quick-title{font-weight:600;font-size:14px;color:var(--text)}
+.quick-sub{font-size:12px;color:var(--muted);margin-top:3px}
+.onboard-card{background:linear-gradient(135deg,var(--green),var(--green2));border-radius:16px;padding:1.5rem;margin-bottom:1.5rem;display:flex;align-items:center;gap:1.25rem}
+.onboard-text{color:rgba(255,255,255,.85);font-size:13px;line-height:1.6;margin-top:.25rem}
+</style>
+</head>
+<body>
+<div class="app-shell">
+  <nav class="sidebar">
+    <div class="sb-logo"><div class="sb-logo-title">📋 Ujian Online</div><div class="sb-logo-sub">SMAN 1 Batangan</div></div>
+    <div class="sb-nav">
+      <div class="sb-section">Menu</div>
+      <a href="guru-dashboard.html" class="sb-item" id="nav-dashboard">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" stroke-linecap="round" stroke-linejoin="round"/><polyline points="9 22 9 12 15 12 15 22" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Dashboard
+      </a>
+      <a href="guru-ujian.html" class="sb-item" id="nav-ujian">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" stroke-linecap="round"/></svg>
+        Daftar Ujian
+      </a>
+      <a href="guru-pengawas.html" class="sb-item" id="nav-pengawas">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M15 10l4.553-2.069A1 1 0 0121 8.82V15.18a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" stroke-linecap="round"/></svg>
+        Pengawas Live
+      </a>
+      <a href="guru-nilai.html" class="sb-item" id="nav-nilai">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="18" y1="20" x2="18" y2="10" stroke-linecap="round"/><line x1="12" y1="20" x2="12" y2="4" stroke-linecap="round"/><line x1="6" y1="20" x2="6" y2="14" stroke-linecap="round"/></svg>
+        Nilai & Rekap
+      </a>
+      <a href="guru-siswa.html" class="sb-item" id="nav-siswa">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke-linecap="round"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke-linecap="round"/></svg>
+        Data Siswa
+      </a>
+    </div>
+
+    <div class="sb-user">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <div class="sb-avatar" id="sb-avatar">G</div>
+        <div><div class="sb-user-name" id="sb-user-name">Guru</div><div class="sb-user-role">Guru Pengampu</div></div>
+      </div>
+      <button class="sb-logout" onclick="Auth.logout()">⏻ Keluar</button>
+    </div>
+  </nav>
+
+  <div class="main-wrap">
+    <div class="topbar">
+      <div class="topbar-title" id="topbar-greeting">Selamat datang</div>
+      <div class="topbar-right">
+        <span style="font-size:12px;color:var(--muted)" id="top-date"></span>
+        <a href="guru-ujian.html" class="btn btn-primary btn-sm">+ Buat Ujian</a>
+      </div>
+    </div>
+
+    <div class="page-main">
+      <!-- Onboarding jika belum ada ujian -->
+      <div id="onboard-banner" style="display:none">
+        <div class="onboard-card">
+          <div style="font-size:48px">🎉</div>
+          <div>
+            <div style="font-weight:700;font-size:16px;color:#fff">Selamat datang di Ujian Online!</div>
+            <div class="onboard-text">Mulai dengan membuat ujian pertamamu. Import soal dari Word atau CSV, atur waktu dan kelas peserta, lalu buka sesi untuk siswa.</div>
+            <a href="guru-ujian.html" class="btn btn-sm" style="background:#fff;color:var(--green);margin-top:.875rem">Buat Ujian Pertama →</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stat -->
+      <div class="stat-grid" id="stat-grid">
+        <div class="stat-card"><div class="loading-spinner" style="width:24px;height:24px;margin:4px 0"></div></div>
+        <div class="stat-card"></div><div class="stat-card"></div><div class="stat-card"></div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.25rem">
+        <!-- Quick actions -->
+        <div>
+          <div style="font-weight:600;font-size:14px;color:var(--muted);margin-bottom:.75rem;letter-spacing:.3px">AKSES CEPAT</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <a href="guru-ujian.html?action=new" class="quick-card">
+              <div class="quick-icon">📝</div>
+              <div class="quick-title">Buat Ujian</div>
+              <div class="quick-sub">Ujian baru dari awal</div>
+            </a>
+            <a href="guru-soal.html" class="quick-card">
+              <div class="quick-icon">📚</div>
+              <div class="quick-title">Bank Soal</div>
+              <div class="quick-sub">Import & kelola soal</div>
+            </a>
+            <a href="guru-pengawas.html" class="quick-card">
+              <div class="quick-icon">👁️</div>
+              <div class="quick-title">Pengawas Live</div>
+              <div class="quick-sub">Monitor ujian aktif</div>
+            </a>
+            <a href="guru-nilai.html" class="quick-card">
+              <div class="quick-icon">📊</div>
+              <div class="quick-title">Lihat Nilai</div>
+              <div class="quick-sub">Rekap & export Excel</div>
+            </a>
+          </div>
+        </div>
+
+        <!-- Ujian aktif/upcoming -->
+        <div>
+          <div style="font-weight:600;font-size:14px;color:var(--muted);margin-bottom:.75rem;letter-spacing:.3px">UJIAN AKTIF & MENDATANG</div>
+          <div id="active-exams"><div class="loading-spinner"></div></div>
+        </div>
+      </div>
+
+      <!-- Ujian terbaru -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title" style="margin:0">Ujian Terbaru</div>
+          <a href="guru-ujian.html" style="font-size:13px;color:var(--green);font-weight:600">Lihat semua →</a>
+        </div>
+        <div id="recent-exams"><div class="loading-spinner"></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="../config.js"></script>
+<script src="../components/api.js"></script>
+<script src="../components/auth.js"></script>
+<script src="../components/common.js"></script>
+<script>
+if(!Auth.requireRole(['guru','admin'])) throw new Error();
+UI.initSidebar();
+const user = Auth.getUser();
+document.getElementById('topbar-greeting').textContent = `Halo, ${user?.name?.split(' ')[0] || 'Guru'} 👋`;
+document.getElementById('top-date').textContent = new Date().toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long'});
+
+async function loadDashboard() {
+  try {
+    const exams = await API.get('/api/exams');
+    const total    = exams.length;
+    const ongoing  = exams.filter(e=>e.status==='ongoing').length;
+    const finished = exams.filter(e=>e.status==='finished').length;
+    const draft    = exams.filter(e=>e.status==='draft').length;
+
+    if(!total) document.getElementById('onboard-banner').style.display='block';
+
+    document.getElementById('stat-grid').innerHTML = `
+      <div class="stat-card" style="border-left:4px solid var(--green3)">
+        <div class="stat-num">${total}</div><div class="stat-label">Total Ujian</div>
+      </div>
+      <div class="stat-card" style="border-left:4px solid #ef9f27">
+        <div class="stat-num">${ongoing}</div><div class="stat-label">Berlangsung</div>
+      </div>
+      <div class="stat-card" style="border-left:4px solid #378add">
+        <div class="stat-num">${finished}</div><div class="stat-label">Selesai</div>
+      </div>
+      <div class="stat-card" style="border-left:4px solid var(--muted)">
+        <div class="stat-num">${draft}</div><div class="stat-label">Draft</div>
+      </div>
+    `;
+
+    // Ujian aktif
+    const active = exams.filter(e=>['published','ongoing'].includes(e.status));
+    const aEl = document.getElementById('active-exams');
+    if(!active.length) {
+      aEl.innerHTML='<div class="empty-state" style="padding:1.5rem"><div class="empty-icon" style="font-size:32px">📭</div><div class="empty-text">Tidak ada ujian aktif</div></div>';
+    } else {
+      aEl.innerHTML = active.slice(0,4).map(e=>`
+        <a href="guru-soal.html?id=${e.id}" class="exam-card" style="text-decoration:none">
+          <div class="exam-icon" style="background:${e.status==='ongoing'?'#eaf3de':'#e6f1fb'}">${e.status==='ongoing'?'🟢':'📋'}</div>
+          <div class="exam-info">
+            <div class="exam-title">${e.title}</div>
+            <div class="exam-meta">
+              <span>⏱ ${e.duration_minutes} menit</span>
+              <span>📝 ${e.question_count||0} soal</span>
+            </div>
+          </div>
+          ${UI.examStatusBadge(e.status)}
+        </a>
+      `).join('');
+    }
+
+    // Ujian terbaru
+    const recent = [...exams].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).slice(0,6);
+    const rEl = document.getElementById('recent-exams');
+    if(!recent.length) {
+      rEl.innerHTML='<div class="empty-state"><div class="empty-icon">📝</div><div class="empty-text">Belum ada ujian. <a href="guru-ujian.html" style="color:var(--green)">Buat sekarang</a></div></div>';
+    } else {
+      rEl.innerHTML = recent.map(e=>`
+        <a href="guru-soal.html?id=${e.id}" class="exam-card" style="text-decoration:none">
+          <div class="exam-icon" style="background:var(--green4)">📋</div>
+          <div class="exam-info">
+            <div class="exam-title">${e.title}</div>
+            <div class="exam-meta">
+              <span>${e.subject_name||'—'}</span>
+              <span>·</span>
+              <span>${e.question_count||0} soal</span>
+              <span>·</span>
+              <span>${e.classes?.map(c=>c.name).join(', ')||'Belum ada kelas'}</span>
+              <span>·</span>
+              <span>${UI.fmtDT(e.start_at)}</span>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">${UI.examStatusBadge(e.status)}</div>
+        </a>
+      `).join('');
+    }
+  } catch(e) { UI.toast('Gagal memuat dashboard','error'); }
+}
+loadDashboard();
+</script>
+</body>
+</html>

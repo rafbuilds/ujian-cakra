@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Data Siswa — Ujian Online</title>
+<link rel="stylesheet" href="../style.css"/>
+<style>
+.stu-card{background:var(--white);border:.5px solid var(--border);border-radius:12px;padding:1rem 1.25rem;display:flex;align-items:center;gap:12px;margin-bottom:8px;transition:all .15s}
+.stu-card:hover{border-color:var(--green3);box-shadow:var(--shadow)}
+.stu-av{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#fff;flex-shrink:0}
+.history-row{display:flex;align-items:center;justify-content:space-between;padding:.75rem 0;border-bottom:.5px solid #f0ede5}
+.history-row:last-child{border-bottom:none}
+.score-chip{display:inline-block;padding:3px 10px;border-radius:20px;font-size:13px;font-weight:700}
+.score-a{background:#eaf3de;color:#3b6d11}.score-b{background:#e6f1fb;color:#185fa5}
+.score-c{background:#faeeda;color:#854f0b}.score-d{background:#fcebeb;color:var(--red2)}
+</style>
+</head>
+<body>
+<div class="app-shell">
+  <nav class="sidebar">
+    <div class="sb-logo"><div class="sb-logo-title">📋 Ujian Online</div><div class="sb-logo-sub">SMAN 1 Batangan</div></div>
+    <div class="sb-nav">
+      <div class="sb-section">Menu</div>
+      <a href="guru-dashboard.html" class="sb-item" id="nav-dashboard">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" stroke-linecap="round" stroke-linejoin="round"/><polyline points="9 22 9 12 15 12 15 22" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Dashboard
+      </a>
+      <a href="guru-ujian.html" class="sb-item" id="nav-ujian">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" stroke-linecap="round"/></svg>
+        Daftar Ujian
+      </a>
+      <a href="guru-pengawas.html" class="sb-item" id="nav-pengawas">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M15 10l4.553-2.069A1 1 0 0121 8.82V15.18a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" stroke-linecap="round"/></svg>
+        Pengawas Live
+      </a>
+      <a href="guru-nilai.html" class="sb-item" id="nav-nilai">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="18" y1="20" x2="18" y2="10" stroke-linecap="round"/><line x1="12" y1="20" x2="12" y2="4" stroke-linecap="round"/><line x1="6" y1="20" x2="6" y2="14" stroke-linecap="round"/></svg>
+        Nilai & Rekap
+      </a>
+      <a href="guru-siswa.html" class="sb-item" id="nav-siswa">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke-linecap="round"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke-linecap="round"/></svg>
+        Data Siswa
+      </a>
+    </div>
+
+    <div class="sb-user">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <div class="sb-avatar" id="sb-avatar">G</div>
+        <div><div class="sb-user-name" id="sb-user-name">Guru</div><div class="sb-user-role">Guru Pengampu</div></div>
+      </div>
+      <button class="sb-logout" onclick="Auth.logout()">⏻ Keluar</button>
+    </div>
+  </nav>
+
+  <div class="main-wrap">
+    <div class="topbar">
+      <div class="topbar-title">Data Siswa</div>
+    </div>
+    <div class="page-main">
+      <div class="stat-grid" style="grid-template-columns:repeat(3,1fr)">
+        <div class="stat-card"><div class="stat-num" id="st-total">—</div><div class="stat-label">Total Siswa</div></div>
+        <div class="stat-card"><div class="stat-num" id="st-classes">—</div><div class="stat-label">Kelas Diajar</div></div>
+        <div class="stat-card"><div class="stat-num" id="st-avg">—</div><div class="stat-label">Rata-rata / Kelas</div></div>
+      </div>
+
+      <!-- Import section -->
+      <div class="card" style="padding:1rem 1.25rem;margin-bottom:1rem">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+          <div>
+            <div style="font-weight:600;font-size:14px">Import Data Siswa</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:2px">Upload Excel atau CSV — format: nama, nisn, kelas, email</div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-secondary btn-sm" onclick="downloadTemplate()">⬇ Template</button>
+            <label class="btn btn-primary btn-sm" style="cursor:pointer">
+              ⬆ Import File
+              <input type="file" id="import-file" accept=".xlsx,.xls,.csv" style="display:none" onchange="importSiswa(this)"/>
+            </label>
+          </div>
+        </div>
+        <div id="import-result" style="display:none;margin-top:.75rem"></div>
+      </div>
+
+      <div style="display:flex;gap:10px;margin-bottom:1rem;flex-wrap:wrap">
+        <select class="form-control" id="filter-class" onchange="filterSiswa()" style="width:auto">
+          <option value="">Semua Kelas</option>
+        </select>
+        <div style="flex:1;position:relative">
+          <input class="form-control" id="search-siswa" placeholder="🔍 Cari nama siswa..." oninput="filterSiswa()"/>
+        </div>
+      </div>
+
+      <div id="siswa-list"><div class="loading-spinner"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal detail siswa -->
+<div id="modal-siswa" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:center;justify-content:center;padding:1rem;backdrop-filter:blur(4px)">
+  <div style="background:#fff;border-radius:20px;padding:0;max-width:480px;width:100%;max-height:90vh;overflow-y:auto">
+    <div style="background:linear-gradient(135deg,var(--green),var(--green2));padding:1.5rem;border-radius:20px 20px 0 0;display:flex;align-items:center;gap:14px">
+      <div id="ms-avatar" style="width:56px;height:56px;border-radius:50%;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;color:#fff;flex-shrink:0"></div>
+      <div>
+        <div id="ms-name" style="font-weight:700;font-size:18px;color:#fff"></div>
+        <div id="ms-class" style="font-size:13px;color:rgba(255,255,255,.7);margin-top:2px"></div>
+        <div id="ms-email" style="font-size:12px;color:rgba(255,255,255,.55)"></div>
+      </div>
+      <button onclick="closeModal()" style="margin-left:auto;background:rgba(255,255,255,.15);border:none;color:#fff;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:16px">✕</button>
+    </div>
+    <div style="padding:1.25rem">
+      <div style="font-weight:600;font-size:14px;color:var(--muted);margin-bottom:.75rem;letter-spacing:.3px">RIWAYAT UJIAN</div>
+      <div id="ms-history"><div class="loading-spinner" style="width:24px;height:24px;margin:1rem auto"></div></div>
+    </div>
+  </div>
+</div>
+
+<script src="../config.js"></script>
+<script src="../components/api.js"></script>
+<script src="../components/auth.js"></script>
+<script src="../components/common.js"></script>
+<script>
+if(!Auth.requireRole(['guru','admin'])) throw new Error();
+UI.initSidebar();
+
+let allSiswa=[];
+
+async function load() {
+  try {
+    const r=await API.get('/api/guru/siswa');
+    allSiswa=r.students||[];
+    const classes=[...new Set(allSiswa.map(s=>s.class_name).filter(Boolean))].sort();
+
+    document.getElementById('st-total').textContent=allSiswa.length;
+    document.getElementById('st-classes').textContent=classes.length;
+    document.getElementById('st-avg').textContent=classes.length?Math.round(allSiswa.length/classes.length):'—';
+
+    const sel=document.getElementById('filter-class');
+    sel.innerHTML='<option value="">Semua Kelas</option>'+classes.map(c=>`<option value="${c}">${c}</option>`).join('');
+    renderSiswa(allSiswa);
+  } catch { UI.toast('Gagal memuat data siswa','error'); }
+}
+
+function filterSiswa() {
+  const cls=document.getElementById('filter-class').value;
+  const q=document.getElementById('search-siswa').value.toLowerCase();
+  renderSiswa(allSiswa.filter(s=>(!cls||s.class_name===cls)&&(!q||s.name.toLowerCase().includes(q))));
+}
+
+const colors=['#0f4c35','#1a6b4a','#185fa5','#854f0b','#a32d2d','#5b2d8e'];
+function getColor(str){let h=0;for(let c of str)h=c.charCodeAt(0)+((h<<5)-h);return colors[Math.abs(h)%colors.length];}
+
+function renderSiswa(data) {
+  const el=document.getElementById('siswa-list');
+  if(!data.length){
+    el.innerHTML='<div class="empty-state"><div class="empty-icon">👤</div><div class="empty-text">Tidak ada siswa ditemukan</div></div>';
+    return;
+  }
+  // Group by class
+  const byClass={};
+  data.forEach(s=>{const k=s.class_name||'Tidak ada kelas';if(!byClass[k])byClass[k]=[];byClass[k].push(s);});
+  el.innerHTML=Object.entries(byClass).sort(([a],[b])=>a.localeCompare(b)).map(([cls,students])=>`
+    <div style="margin-bottom:1.25rem">
+      <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:.5rem;letter-spacing:.5px;text-transform:uppercase">${cls} — ${students.length} siswa</div>
+      ${students.map(s=>`
+        <div class="stu-card" onclick="showDetail('${s.id}')">
+          <div class="stu-av" style="background:${getColor(s.name)}">${s.name[0]}</div>
+          <div style="flex:1">
+            <div style="font-weight:500;font-size:14px">${s.name}</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:2px">${s.nisn?'NISN: '+s.nisn:'—'} · ${s.email||'Belum ada akun'}</div>
+          </div>
+          <div style="text-align:right">
+            <span class="badge ${s.email?'badge-green':'badge-gray'}">${s.email?'Login OK':'Belum Login'}</span>
+            ${s.avg_score!=null?`<div style="font-size:13px;font-weight:700;color:var(--green3);margin-top:4px">Rata-rata: ${s.avg_score.toFixed(1)}</div>`:''}
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `).join('');
+}
+
+async function downloadTemplate() {
+  try { await API.download('/api/template-siswa', 'template_import_siswa.xlsx'); }
+  catch { UI.toast('Gagal download template','error'); }
+}
+
+async function importSiswa(input) {
+  const file = input.files[0]; if(!file) return;
+  UI.loading(true, 'Mengimport data siswa...');
+  try {
+    const fd = new FormData(); fd.append('file', file);
+    const r = await API.upload('/api/guru/siswa/import', fd);
+    const el = document.getElementById('import-result');
+    el.style.display = 'block';
+    el.innerHTML = `<div style="background:var(--green4);border:1px solid rgba(29,158,117,.3);border-radius:8px;padding:.75rem 1rem;font-size:13px;color:#0f6e56">
+      ✅ <strong>${r.saved}</strong> siswa berhasil diimport${r.errors?.length ? ` · ${r.errors.length} gagal` : ''}
+    </div>`;
+    await load();
+  } catch(e) {
+    UI.toast(e.error || 'Gagal import', 'error');
+  } finally {
+    UI.loading(false); input.value = '';
+  }
+}
+
+async function showDetail(id) {
+  const s=allSiswa.find(x=>x.id===id); if(!s) return;
+  document.getElementById('ms-avatar').textContent=s.name[0];
+  document.getElementById('ms-name').textContent=s.name;
+  document.getElementById('ms-class').textContent=s.class_name||'—';
+  document.getElementById('ms-email').textContent=s.email||'Belum punya akun';
+  document.getElementById('modal-siswa').style.display='flex';
+  document.getElementById('ms-history').innerHTML='<div class="loading-spinner" style="width:24px;height:24px;margin:1rem auto"></div>';
+  try {
+    const r=await API.get(`/api/siswa/${id}/history`);
+    const hist=r.history||[];
+    if(!hist.length){
+      document.getElementById('ms-history').innerHTML='<div class="empty-state" style="padding:1rem"><div class="empty-text">Belum mengikuti ujian apapun</div></div>';
+      return;
+    }
+    const sc=v=>v>=90?'score-a':v>=75?'score-b':v>=60?'score-c':'score-d';
+    document.getElementById('ms-history').innerHTML=hist.map(h=>`
+      <div class="history-row">
+        <div>
+          <div style="font-weight:500;font-size:14px">${h.exam_title}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px">${UI.fmtDT(h.submitted_at||h.created_at)}</div>
+        </div>
+        ${h.score!=null?`<span class="score-chip ${sc(h.score)}">${h.score.toFixed(1)}</span>`:'<span class="badge badge-gray">Belum Submit</span>'}
+      </div>
+    `).join('');
+  } catch { document.getElementById('ms-history').innerHTML='<div class="empty-text" style="padding:1rem">Gagal memuat riwayat</div>'; }
+}
+
+function closeModal(){ document.getElementById('modal-siswa').style.display='none'; }
+load();
+</script>
+</body>
+</html>

@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Nilai & Rekap — Ujian Online</title>
+<link rel="stylesheet" href="../style.css"/>
+<style>
+.score-chip{display:inline-block;padding:4px 12px;border-radius:20px;font-size:13px;font-weight:700}
+.score-a{background:#eaf3de;color:#3b6d11}
+.score-b{background:#e6f1fb;color:#185fa5}
+.score-c{background:#faeeda;color:#854f0b}
+.score-d{background:#fcebeb;color:var(--red2)}
+.dist-bar-wrap{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.dist-bar{height:20px;border-radius:4px;min-width:4px;transition:width .4s;display:flex;align-items:center;justify-content:flex-end;padding-right:6px}
+.dist-label{font-size:12px;font-weight:600;color:#fff}
+.dist-key{font-size:12px;color:var(--muted);width:60px;flex-shrink:0}
+.dist-count{font-size:12px;color:var(--muted);width:30px;text-align:right}
+</style>
+</head>
+<body>
+<div class="app-shell">
+  <nav class="sidebar">
+    <div class="sb-logo"><div class="sb-logo-title">📋 Ujian Online</div><div class="sb-logo-sub">SMAN 1 Batangan</div></div>
+    <div class="sb-nav">
+      <div class="sb-section">Menu</div>
+      <a href="guru-dashboard.html" class="sb-item" id="nav-dashboard">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" stroke-linecap="round" stroke-linejoin="round"/><polyline points="9 22 9 12 15 12 15 22" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Dashboard
+      </a>
+      <a href="guru-ujian.html" class="sb-item" id="nav-ujian">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" stroke-linecap="round"/></svg>
+        Daftar Ujian
+      </a>
+      <a href="guru-pengawas.html" class="sb-item" id="nav-pengawas">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M15 10l4.553-2.069A1 1 0 0121 8.82V15.18a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" stroke-linecap="round"/></svg>
+        Pengawas Live
+      </a>
+      <a href="guru-nilai.html" class="sb-item" id="nav-nilai">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="18" y1="20" x2="18" y2="10" stroke-linecap="round"/><line x1="12" y1="20" x2="12" y2="4" stroke-linecap="round"/><line x1="6" y1="20" x2="6" y2="14" stroke-linecap="round"/></svg>
+        Nilai & Rekap
+      </a>
+      <a href="guru-siswa.html" class="sb-item" id="nav-siswa">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke-linecap="round"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke-linecap="round"/></svg>
+        Data Siswa
+      </a>
+    </div>
+
+    <div class="sb-user">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <div class="sb-avatar" id="sb-avatar">G</div>
+        <div><div class="sb-user-name" id="sb-user-name">Guru</div><div class="sb-user-role">Guru Pengampu</div></div>
+      </div>
+      <button class="sb-logout" onclick="Auth.logout()">⏻ Keluar</button>
+    </div>
+  </nav>
+
+  <div class="main-wrap">
+    <div class="topbar">
+      <div class="topbar-title">Nilai & Rekap</div>
+      <div class="topbar-right" id="export-btn-wrap" style="display:none">
+        <button class="btn btn-secondary btn-sm" onclick="exportExcel()">⬇ Export Excel</button>
+      </div>
+    </div>
+
+    <div class="page-main">
+      <!-- Pilih ujian -->
+      <div class="card">
+        <div style="font-size:13px;font-weight:600;color:var(--muted);margin-bottom:.75rem">Pilih Ujian</div>
+        <select class="form-control" id="exam-select" onchange="loadNilai(this.value)">
+          <option value="">— Pilih ujian selesai —</option>
+        </select>
+      </div>
+
+      <div id="nilai-content" style="display:none">
+        <!-- Ringkasan -->
+        <div class="stat-grid" id="summary-stats"></div>
+
+        <!-- Distribusi nilai -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">
+          <div class="card">
+            <div class="card-title">Distribusi Nilai</div>
+            <div id="dist-chart"></div>
+          </div>
+          <div class="card">
+            <div class="card-title">Analisis Per Soal</div>
+            <div id="soal-analysis" style="max-height:260px;overflow-y:auto"></div>
+          </div>
+        </div>
+
+        <!-- Tabel nilai -->
+        <div class="card" style="padding:0;overflow:hidden">
+          <div style="padding:.875rem 1rem;border-bottom:.5px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+            <div style="font-weight:600;font-size:14px">Daftar Nilai Siswa</div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <select id="filter-class-nilai" class="form-control" style="padding:6px 10px;font-size:12px" onchange="filterTable()">
+                <option value="">Semua Kelas</option>
+              </select>
+              <input id="search-nilai" type="text" placeholder="Cari nama..." oninput="filterTable()"
+                style="padding:6px 10px;border:1px solid var(--border2);border-radius:8px;font-size:12px;width:160px"/>
+            </div>
+          </div>
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr>
+                <th>#</th><th>Nama Siswa</th><th>Kelas</th>
+                <th>Benar</th><th>Salah</th><th>Kosong</th>
+                <th>Nilai</th><th>Status Submit</th><th>Pelanggaran</th>
+              </tr></thead>
+              <tbody id="nilai-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="../config.js"></script>
+<script src="../components/api.js"></script>
+<script src="../components/auth.js"></script>
+<script src="../components/common.js"></script>
+<script>
+if(!Auth.requireRole(['guru','admin'])) throw new Error();
+UI.initSidebar();
+let nilaiData=[], currentExamId=null;
+
+async function init() {
+  const exams=await API.get('/api/exams');
+  const done=exams.filter(e=>['finished','ongoing'].includes(e.status));
+  const sel=document.getElementById('exam-select');
+  sel.innerHTML='<option value="">— Pilih ujian —</option>'+
+    done.map(e=>`<option value="${e.id}">${e.title}</option>`).join('');
+  const id=new URLSearchParams(location.search).get('id');
+  if(id){ sel.value=id; loadNilai(id); }
+}
+
+async function loadNilai(examId) {
+  if(!examId){document.getElementById('nilai-content').style.display='none';return;}
+  currentExamId=examId;
+  UI.loading(true,'Memuat data nilai...');
+  try {
+    const r=await API.get(`/api/exams/${examId}/results`);
+    nilaiData=r.results||[];
+    document.getElementById('nilai-content').style.display='block';
+    document.getElementById('export-btn-wrap').style.display='flex';
+    renderSummary(r);
+    renderDist(r);
+    renderSoalAnalysis(r.question_stats||[]);
+    renderTable(nilaiData);
+    // Filter kelas
+    const classes=[...new Set(nilaiData.map(s=>s.class_name).filter(Boolean))].sort();
+    const fc=document.getElementById('filter-class-nilai');
+    fc.innerHTML='<option value="">Semua Kelas</option>'+classes.map(c=>`<option>${c}</option>`).join('');
+  } catch(e){UI.toast('Gagal memuat nilai','error');}
+  finally{UI.loading(false);}
+}
+
+function renderSummary(r) {
+  const {summary}=r;
+  document.getElementById('summary-stats').innerHTML=`
+    <div class="stat-card"><div class="stat-num">${summary.total_students}</div><div class="stat-label">Total Peserta</div></div>
+    <div class="stat-card"><div class="stat-num mon-submitted">${summary.submitted}</div><div class="stat-label">Submit</div></div>
+    <div class="stat-card" style="border-left:4px solid var(--green3)">
+      <div class="stat-num" style="color:var(--green3)">${summary.avg_score?.toFixed(1)||'—'}</div>
+      <div class="stat-label">Rata-rata Nilai</div>
+    </div>
+    <div class="stat-card" style="border-left:4px solid var(--amber)">
+      <div class="stat-num" style="color:var(--amber)">${summary.pass_rate?.toFixed(0)||0}%</div>
+      <div class="stat-label">Lulus (≥75)</div>
+    </div>
+  `;
+}
+
+function renderDist(r) {
+  const dist=r.score_distribution||{};
+  const ranges=[
+    {label:'90–100',key:'a',color:'#1d9e75'},
+    {label:'75–89', key:'b',color:'#378add'},
+    {label:'60–74', key:'c',color:'#ef9f27'},
+    {label:'< 60',  key:'d',color:'#e24b4a'},
+  ];
+  const maxVal=Math.max(...ranges.map(x=>dist[x.key]||0),1);
+  document.getElementById('dist-chart').innerHTML=ranges.map(x=>`
+    <div class="dist-bar-wrap">
+      <div class="dist-key">${x.label}</div>
+      <div class="dist-bar" style="background:${x.color};width:${((dist[x.key]||0)/maxVal*180)}px">
+        ${(dist[x.key]||0)>0?`<div class="dist-label">${dist[x.key]}</div>`:''}
+      </div>
+      <div class="dist-count">${dist[x.key]||0}</div>
+    </div>
+  `).join('');
+}
+
+function renderSoalAnalysis(stats) {
+  const el=document.getElementById('soal-analysis');
+  if(!stats.length){el.innerHTML='<div class="empty-text" style="padding:1rem">Belum ada data</div>';return;}
+  el.innerHTML=`<table style="width:100%;font-size:12px;border-collapse:collapse">
+    <thead><tr style="background:var(--light)">
+      <th style="padding:6px 8px;text-align:left">Soal</th>
+      <th style="padding:6px 8px;text-align:center">Benar</th>
+      <th style="padding:6px 8px;text-align:center">%</th>
+    </tr></thead>
+    <tbody>${stats.map((s,i)=>`
+      <tr style="border-bottom:.5px solid #f0ede5">
+        <td style="padding:6px 8px">Soal ${i+1}</td>
+        <td style="padding:6px 8px;text-align:center">${s.correct}</td>
+        <td style="padding:6px 8px;text-align:center">
+          <div style="display:flex;align-items:center;gap:4px">
+            <div style="height:5px;background:var(--border);border-radius:99px;width:60px;overflow:hidden">
+              <div style="height:100%;background:${s.pct>=75?'var(--green3)':s.pct>=50?'var(--amber)':'var(--red)'};width:${s.pct}%;border-radius:99px"></div>
+            </div>
+            ${s.pct?.toFixed(0)}%
+          </div>
+        </td>
+      </tr>
+    `).join('')}</tbody>
+  </table>`;
+}
+
+function scoreClass(v) { return v>=90?'score-a':v>=75?'score-b':v>=60?'score-c':'score-d'; }
+
+function renderTable(data) {
+  const tbody=document.getElementById('nilai-tbody');
+  if(!data.length){tbody.innerHTML='<tr><td colspan="9"><div class="empty-state"><div class="empty-text">Belum ada nilai</div></div></td></tr>';return;}
+  tbody.innerHTML=data.map((s,i)=>`
+    <tr>
+      <td>${i+1}</td>
+      <td><div style="font-weight:500">${s.name}</div></td>
+      <td style="font-size:12px">${s.class_name||'—'}</td>
+      <td style="text-align:center;color:var(--green3);font-weight:600">${s.correct_count??'—'}</td>
+      <td style="text-align:center;color:var(--red);font-weight:600">${s.wrong_count??'—'}</td>
+      <td style="text-align:center;color:var(--muted)">${s.empty_count??'—'}</td>
+      <td style="text-align:center">
+        ${s.score!=null?`<span class="score-chip ${scoreClass(s.score)}">${s.score.toFixed(1)}</span>`:'<span style="color:var(--muted)">—</span>'}
+      </td>
+      <td>${s.submitted_at?`<span class="badge badge-green">Submit ${UI.fmtTime(s.submitted_at)}</span>`:`<span class="badge badge-gray">Belum</span>`}</td>
+      <td style="text-align:center">${s.tab_violations>0?`<span style="color:var(--red2);font-weight:600">${s.tab_violations}x</span>`:'—'}</td>
+    </tr>
+  `).join('');
+}
+
+function filterTable() {
+  const cls=document.getElementById('filter-class-nilai').value;
+  const q=document.getElementById('search-nilai').value.toLowerCase();
+  renderTable(nilaiData.filter(s=>
+    (!cls||s.class_name===cls)&&(!q||s.name.toLowerCase().includes(q))
+  ));
+}
+
+async function exportExcel() {
+  try { await API.download(`/api/exams/${currentExamId}/export-nilai`,'rekap_nilai.xlsx'); }
+  catch { UI.toast('Gagal export Excel','error'); }
+}
+
+init();
+</script>
+</body>
+</html>
