@@ -1034,6 +1034,36 @@ def exam_results(exam_id):
         'question_stats': q_stats,
     })
 
+@app.route("/api/sessions/<session_id>/detail", methods=["GET"])
+@require_guru
+def session_detail(session_id):
+    """Detail jawaban siswa per soal untuk guru."""
+    sess = query("SELECT * FROM exam_sessions WHERE id=%s", (session_id,), fetch="one")
+    if not sess:
+        return jsonify({"error": "Sesi tidak ditemukan"}), 404
+
+    questions = query("""
+        SELECT q.id, q.content, q.order_num,
+               a.option_id as student_option_id,
+               ao.label as student_label, ao.content as student_answer,
+               ao.is_correct as is_correct,
+               co.label as correct_label, co.content as correct_answer
+        FROM questions q
+        LEFT JOIN answers a ON a.question_id = q.id AND a.session_id = %s
+        LEFT JOIN options ao ON ao.id = a.option_id
+        LEFT JOIN options co ON co.question_id = q.id AND co.is_correct = true
+        WHERE q.exam_id = %s
+        ORDER BY q.order_num, q.created_at
+    """, (session_id, sess["exam_id"]))
+
+    result = query("SELECT * FROM results WHERE session_id=%s", (session_id,), fetch="one")
+
+    return jsonify({
+        "questions": [dict(q) for q in questions],
+        "result": dict(result) if result else None,
+        "session": dict(sess),
+    })
+
 @app.route("/api/exams/<exam_id>/export", methods=["GET"])
 @require_guru
 def export_results(exam_id):
