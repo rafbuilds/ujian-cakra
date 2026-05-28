@@ -156,20 +156,45 @@ def get_classes():
 @app.route("/api/subjects", methods=["GET"])
 @require_guru
 def get_subjects():
-    # Guru hanya lihat mapel miliknya, admin lihat semua
-    if request.user_role == "admin":
-        rows = query("""
-            SELECT s.*, u.name as teacher_name
-            FROM subjects s LEFT JOIN users u ON s.teacher_id=u.id
-            ORDER BY s.name
-        """)
-    else:
-        rows = query("""
-            SELECT s.*, u.name as teacher_name
-            FROM subjects s LEFT JOIN users u ON s.teacher_id=u.id
-            WHERE s.teacher_id=%s ORDER BY s.name
-        """, (request.user_id,))
+    # Semua guru bisa lihat semua mapel
+    rows = query("SELECT * FROM subjects ORDER BY name")
     return jsonify([dict(r) for r in rows])
+
+@app.route("/api/subjects", methods=["POST"])
+@require_guru
+def create_subject():
+    data = request.json or {}
+    name = data.get("name","").strip()
+    if not name:
+        return jsonify({"error": "Nama mapel wajib diisi"}), 400
+    existing = query("SELECT id FROM subjects WHERE LOWER(name)=%s", (name.lower(),), fetch="one")
+    if existing:
+        return jsonify({"error": "Mapel sudah ada"}), 409
+    sid = str(uuid.uuid4())
+    query("INSERT INTO subjects (id, name) VALUES (%s,%s)", (sid, name), fetch="none")
+    sub = query("SELECT * FROM subjects WHERE id=%s", (sid,), fetch="one")
+    return jsonify(dict(sub)), 201
+
+@app.route("/api/subjects/<subject_id>", methods=["PATCH"])
+@require_guru
+def update_subject(subject_id):
+    data = request.json or {}
+    name = data.get("name","").strip()
+    if not name:
+        return jsonify({"error": "Nama mapel wajib diisi"}), 400
+    query("UPDATE subjects SET name=%s WHERE id=%s", (name, subject_id), fetch="none")
+    sub = query("SELECT * FROM subjects WHERE id=%s", (subject_id,), fetch="one")
+    return jsonify(dict(sub))
+
+@app.route("/api/subjects/<subject_id>", methods=["DELETE"])
+@require_admin
+def delete_subject(subject_id):
+    # Cek apakah dipakai ujian
+    used = query("SELECT COUNT(*) as n FROM exams WHERE subject_id=%s", (subject_id,), fetch="one")
+    if used and used["n"] > 0:
+        return jsonify({"error": f"Mapel masih dipakai {used['n']} ujian"}), 400
+    query("DELETE FROM subjects WHERE id=%s", (subject_id,), fetch="none")
+    return jsonify({"ok": True})
 
 @app.route("/api/subjects", methods=["POST"])
 @require_guru
@@ -1404,6 +1429,49 @@ def admin_create_user():
     return jsonify(dict(user)), 201
 
 # ═══════════════════════════════════════════════════════════
+#  GURU — KELAS DIAMPU
+# ═══════════════════════════════════════════════════════════
+
+@app.route("/api/guru/taught-classes", methods=["GET"])
+@require_guru
+def get_taught_classes():
+    """Ambil kelas yang diampu guru ini."""
+    rows = query("""
+        SELECT c.* FROM classes c
+        JOIN guru_classes gc ON gc.class_id = c.id
+        WHERE gc.teacher_id = %s
+        ORDER BY c.grade, LENGTH(c.id), c.id
+    """, (request.user_id,))
+    return jsonify([dict(r) for r in rows])
+
+@app.route("/api/guru/taught-classes", methods=["POST"])
+@require_guru
+def add_taught_class():
+    """Tambah kelas yang diampu."""
+    data = request.json or {}
+    class_id = data.get("class_id","").strip()
+    if not class_id:
+        return jsonify({"error": "class_id wajib diisi"}), 400
+    # Cek kelas ada
+    cls = query("SELECT id FROM classes WHERE id=%s", (class_id,), fetch="one")
+    if not cls:
+        return jsonify({"error": "Kelas tidak ditemukan"}), 404
+    # Insert (ignore kalau sudah ada)
+    query("""
+        INSERT INTO guru_classes (teacher_id, class_id)
+        VALUES (%s, %s) ON CONFLICT DO NOTHING
+    """, (request.user_id, class_id), fetch="none")
+    return jsonify({"ok": True})
+
+@app.route("/api/guru/taught-classes/<class_id>", methods=["DELETE"])
+@require_guru
+def remove_taught_class(class_id):
+    """Hapus kelas dari daftar diampu."""
+    query("DELETE FROM guru_classes WHERE teacher_id=%s AND class_id=%s",
+          (request.user_id, class_id), fetch="none")
+    return jsonify({"ok": True})
+
+# ═══════════════════════════════════════════════════════════
 #  GURU — DATA SISWA & RIWAYAT
 # ═══════════════════════════════════════════════════════════
 
@@ -1658,5 +1726,5 @@ def export_nilai(exam_id):
     return send_file(buf, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                      as_attachment=True, download_name=filename)
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+if __name__ == "__main__":
+    app.run(debug=True, host="0.0.0.0", port=5000)
