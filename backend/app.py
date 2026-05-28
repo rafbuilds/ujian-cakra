@@ -196,21 +196,7 @@ def delete_subject(subject_id):
     query("DELETE FROM subjects WHERE id=%s", (subject_id,), fetch="none")
     return jsonify({"ok": True})
 
-@app.route("/api/subjects", methods=["POST"])
-@require_guru
-def create_subject():
-    data = request.json or {}
-    name = data.get("name","").strip()
-    if not name:
-        return jsonify({"error": "Nama mapel wajib diisi"}), 400
-    sid = str(uuid.uuid4())
-    query("INSERT INTO subjects (id,name,teacher_id) VALUES (%s,%s,%s)",
-          (sid, name, request.user_id), fetch="none")
-    return jsonify({"id": sid, "name": name}), 201
 
-# ═══════════════════════════════════════════════════════════
-#  UJIAN — CRUD
-# ═══════════════════════════════════════════════════════════
 @app.route("/api/exams", methods=["GET"])
 @require_guru
 def list_exams():
