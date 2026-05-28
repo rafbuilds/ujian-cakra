@@ -156,9 +156,44 @@ def get_classes():
 @app.route("/api/subjects", methods=["GET"])
 @require_guru
 def get_subjects():
-    # Semua guru bisa lihat semua mapel
     rows = query("SELECT * FROM subjects ORDER BY name")
     return jsonify([dict(r) for r in rows])
+
+@app.route("/api/subjects", methods=["POST"])
+@require_guru
+def create_subject():
+    data = request.json or {}
+    name = data.get("name","").strip()
+    if not name:
+        return jsonify({"error": "Nama mapel wajib diisi"}), 400
+    existing = query("SELECT id FROM subjects WHERE LOWER(name)=LOWER(%s)", (name,), fetch="one")
+    if existing:
+        return jsonify({"error": "Mapel sudah ada"}), 409
+    sub = query("""
+        INSERT INTO subjects (id, name) VALUES (%s, %s) RETURNING *
+    """, (str(uuid.uuid4()), name), fetch="one")
+    return jsonify(dict(sub)), 201
+
+@app.route("/api/subjects/<subject_id>", methods=["PATCH"])
+@require_guru
+def update_subject(subject_id):
+    data = request.json or {}
+    name = data.get("name","").strip()
+    if not name:
+        return jsonify({"error": "Nama mapel wajib diisi"}), 400
+    query("UPDATE subjects SET name=%s WHERE id=%s", (name, subject_id), fetch="none")
+    sub = query("SELECT * FROM subjects WHERE id=%s", (subject_id,), fetch="one")
+    return jsonify(dict(sub))
+
+@app.route("/api/subjects/<subject_id>", methods=["DELETE"])
+@require_guru
+def delete_subject(subject_id):
+    # Cek apakah dipakai di ujian
+    used = query("SELECT id FROM exams WHERE subject_id=%s LIMIT 1", (subject_id,), fetch="one")
+    if used:
+        return jsonify({"error": "Mapel masih dipakai di ujian, tidak bisa dihapus"}), 400
+    query("DELETE FROM subjects WHERE id=%s", (subject_id,), fetch="none")
+    return jsonify({"ok": True})
 
 @app.route("/api/subjects", methods=["POST"])
 @require_guru
@@ -196,7 +231,21 @@ def delete_subject(subject_id):
     query("DELETE FROM subjects WHERE id=%s", (subject_id,), fetch="none")
     return jsonify({"ok": True})
 
+@app.route("/api/subjects", methods=["POST"])
+@require_guru
+def create_subject():
+    data = request.json or {}
+    name = data.get("name","").strip()
+    if not name:
+        return jsonify({"error": "Nama mapel wajib diisi"}), 400
+    sid = str(uuid.uuid4())
+    query("INSERT INTO subjects (id,name,teacher_id) VALUES (%s,%s,%s)",
+          (sid, name, request.user_id), fetch="none")
+    return jsonify({"id": sid, "name": name}), 201
 
+# ═══════════════════════════════════════════════════════════
+#  UJIAN — CRUD
+# ═══════════════════════════════════════════════════════════
 @app.route("/api/exams", methods=["GET"])
 @require_guru
 def list_exams():
