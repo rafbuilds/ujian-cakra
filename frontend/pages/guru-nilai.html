@@ -7,15 +7,24 @@
 <link rel="stylesheet" href="../style.css"/>
 <style>
 .score-chip{display:inline-block;padding:4px 12px;border-radius:20px;font-size:13px;font-weight:700}
-.score-a{background:#eaf3de;color:#3b6d11}
-.score-b{background:#e6f1fb;color:#185fa5}
-.score-c{background:#faeeda;color:#854f0b}
-.score-d{background:#fcebeb;color:var(--red2)}
-.dist-bar-wrap{display:flex;align-items:center;gap:10px;margin-bottom:6px}
-.dist-bar{height:20px;border-radius:4px;min-width:4px;transition:width .4s;display:flex;align-items:center;justify-content:flex-end;padding-right:6px}
-.dist-label{font-size:12px;font-weight:600;color:#fff}
-.dist-key{font-size:12px;color:var(--muted);width:60px;flex-shrink:0}
-.dist-count{font-size:12px;color:var(--muted);width:30px;text-align:right}
+.score-a{background:#eaf3de;color:#3b6d11}.score-b{background:#e6f1fb;color:#185fa5}
+.score-c{background:#faeeda;color:#854f0b}.score-d{background:#fcebeb;color:var(--red2)}
+.dist-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.dist-bar{height:22px;border-radius:6px;min-width:4px;transition:width .4s;display:flex;align-items:center;padding:0 8px}
+.stu-row{display:flex;align-items:center;gap:12px;padding:.875rem 1rem;border-bottom:.5px solid #f0ede5;cursor:pointer;transition:background .15s}
+.stu-row:hover{background:#f5f9f6}
+.stu-row:last-child{border-bottom:none}
+/* Modal detail */
+.modal-detail{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:200;align-items:flex-start;justify-content:flex-end;padding:0}
+.modal-detail.show{display:flex}
+.detail-panel{background:#fff;width:520px;height:100vh;overflow-y:auto;box-shadow:-8px 0 40px rgba(0,0,0,.15);display:flex;flex-direction:column}
+.detail-header{background:linear-gradient(135deg,var(--green),var(--green2));padding:1.5rem;flex-shrink:0}
+.q-detail-row{padding:1rem 1.25rem;border-bottom:.5px solid #f0ede5}
+.q-detail-row:last-child{border-bottom:none}
+.ans-correct{background:#eaf3de;border-radius:8px;padding:6px 12px;font-size:13px;color:#3b6d11;font-weight:500}
+.ans-wrong{background:#fcebeb;border-radius:8px;padding:6px 12px;font-size:13px;color:var(--red2);font-weight:500}
+.ans-empty{background:var(--light);border-radius:8px;padding:6px 12px;font-size:13px;color:var(--muted)}
+.stat-mini{background:var(--light);border-radius:10px;padding:.625rem 1rem;text-align:center}
 </style>
 </head>
 <body>
@@ -24,32 +33,13 @@
     <div class="sb-logo"><div class="sb-logo-title">📋 Ujian Online</div><div class="sb-logo-sub">SMAN 1 Batangan</div></div>
     <div class="sb-nav">
       <div class="sb-section">Menu</div>
-      <a href="guru-dashboard.html" class="sb-item" id="nav-dashboard">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" stroke-linecap="round" stroke-linejoin="round"/><polyline points="9 22 9 12 15 12 15 22" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        Dashboard
-      </a>
-      <a href="guru-ujian.html" class="sb-item" id="nav-ujian">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" stroke-linecap="round"/></svg>
-        Daftar Ujian
-      </a>
-      <a href="guru-pengawas.html" class="sb-item" id="nav-pengawas">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M15 10l4.553-2.069A1 1 0 0121 8.82V15.18a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" stroke-linecap="round"/></svg>
-        Pengawas Live
-      </a>
-      <a href="guru-nilai.html" class="sb-item" id="nav-nilai">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="18" y1="20" x2="18" y2="10" stroke-linecap="round"/><line x1="12" y1="20" x2="12" y2="4" stroke-linecap="round"/><line x1="6" y1="20" x2="6" y2="14" stroke-linecap="round"/></svg>
-        Nilai & Rekap
-      </a>
-      <a href="guru-mapel.html" class="sb-item" id="nav-mapel">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" stroke-linecap="round"/></svg>
-        Mata Pelajaran
-      </a>
-      <a href="guru-siswa.html" class="sb-item" id="nav-siswa">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke-linecap="round"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke-linecap="round"/></svg>
-        Data Siswa
-      </a>
+      <a href="guru-dashboard.html" class="sb-item" id="nav-dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" stroke-linecap="round" stroke-linejoin="round"/><polyline points="9 22 9 12 15 12 15 22" stroke-linecap="round" stroke-linejoin="round"/></svg>Dashboard</a>
+      <a href="guru-ujian.html" class="sb-item" id="nav-ujian"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" stroke-linecap="round"/></svg>Daftar Ujian</a>
+      <a href="guru-pengawas.html" class="sb-item" id="nav-pengawas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M15 10l4.553-2.069A1 1 0 0121 8.82V15.18a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" stroke-linecap="round"/></svg>Pengawas Live</a>
+      <a href="guru-nilai.html" class="sb-item active" id="nav-nilai"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="18" y1="20" x2="18" y2="10" stroke-linecap="round"/><line x1="12" y1="20" x2="12" y2="4" stroke-linecap="round"/><line x1="6" y1="20" x2="6" y2="14" stroke-linecap="round"/></svg>Nilai & Rekap</a>
+      <a href="guru-siswa.html" class="sb-item" id="nav-siswa"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke-linecap="round"/><circle cx="9" cy="7" r="4"/></svg>Data Siswa</a>
+      <a href="guru-mapel.html" class="sb-item" id="nav-mapel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" stroke-linecap="round"/></svg>Mata Pelajaran</a>
     </div>
-
     <div class="sb-user">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
         <div class="sb-avatar" id="sb-avatar">G</div>
@@ -62,7 +52,7 @@
   <div class="main-wrap">
     <div class="topbar">
       <div class="topbar-title">Nilai & Rekap</div>
-      <div class="topbar-right" id="export-btn-wrap" style="display:none">
+      <div class="topbar-right" id="export-wrap" style="display:none">
         <button class="btn btn-secondary btn-sm" onclick="exportExcel()">⬇ Export Excel</button>
       </div>
     </div>
@@ -72,50 +62,70 @@
       <div class="card">
         <div style="font-size:13px;font-weight:600;color:var(--muted);margin-bottom:.75rem">Pilih Ujian</div>
         <select class="form-control" id="exam-select" onchange="loadNilai(this.value)">
-          <option value="">— Pilih ujian selesai —</option>
+          <option value="">— Pilih ujian —</option>
         </select>
       </div>
 
       <div id="nilai-content" style="display:none">
-        <!-- Ringkasan -->
+        <!-- Summary cards -->
         <div class="stat-grid" id="summary-stats"></div>
 
-        <!-- Distribusi nilai -->
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">
+          <!-- Distribusi -->
           <div class="card">
             <div class="card-title">Distribusi Nilai</div>
             <div id="dist-chart"></div>
+            <div style="margin-top:1rem;padding-top:.75rem;border-top:.5px solid var(--border)">
+              <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:.5rem">LEGENDA</div>
+              <div style="display:flex;gap:12px;flex-wrap:wrap">
+                <span style="font-size:11px;display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;background:#1d9e75;border-radius:3px;display:inline-block"></span>A (90–100)</span>
+                <span style="font-size:11px;display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;background:#378add;border-radius:3px;display:inline-block"></span>B (75–89)</span>
+                <span style="font-size:11px;display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;background:#ef9f27;border-radius:3px;display:inline-block"></span>C (60–74)</span>
+                <span style="font-size:11px;display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;background:#e24b4a;border-radius:3px;display:inline-block"></span>D (<60)</span>
+              </div>
+            </div>
           </div>
+
+          <!-- Analisis soal -->
           <div class="card">
-            <div class="card-title">Analisis Per Soal</div>
-            <div id="soal-analysis" style="max-height:260px;overflow-y:auto"></div>
+            <div class="card-title">Tingkat Kesulitan Soal</div>
+            <div id="soal-chart" style="max-height:240px;overflow-y:auto"></div>
           </div>
         </div>
 
-        <!-- Tabel nilai -->
+        <!-- Daftar nilai -->
         <div class="card" style="padding:0;overflow:hidden">
-          <div style="padding:.875rem 1rem;border-bottom:.5px solid var(--border);display:flex;align-items:center;justify-content:space-between">
-            <div style="font-weight:600;font-size:14px">Daftar Nilai Siswa</div>
-            <div style="display:flex;gap:8px;align-items:center">
-              <select id="filter-class-nilai" class="form-control" style="padding:6px 10px;font-size:12px" onchange="filterTable()">
+          <div style="padding:.875rem 1rem;border-bottom:.5px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+            <div style="font-weight:600;font-size:14px">Daftar Nilai Siswa <span style="color:var(--muted);font-weight:400;font-size:13px">— klik siswa untuk lihat detail jawaban</span></div>
+            <div style="display:flex;gap:8px">
+              <select id="filter-kelas" class="form-control" style="padding:6px 10px;font-size:12px" onchange="filterTable()">
                 <option value="">Semua Kelas</option>
               </select>
-              <input id="search-nilai" type="text" placeholder="Cari nama..." oninput="filterTable()"
-                style="padding:6px 10px;border:1px solid var(--border2);border-radius:8px;font-size:12px;width:160px"/>
+              <input id="search-siswa" type="text" placeholder="Cari nama..." oninput="filterTable()"
+                style="padding:6px 10px;border:1px solid var(--border2);border-radius:8px;font-size:12px;width:150px"/>
             </div>
           </div>
-          <div class="tbl-wrap">
-            <table>
-              <thead><tr>
-                <th>#</th><th>Nama Siswa</th><th>Kelas</th>
-                <th>Benar</th><th>Salah</th><th>Kosong</th>
-                <th>Nilai</th><th>Status Submit</th><th>Pelanggaran</th>
-              </tr></thead>
-              <tbody id="nilai-tbody"></tbody>
-            </table>
-          </div>
+          <div id="nilai-list"></div>
         </div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- Panel detail jawaban siswa (slide dari kanan) -->
+<div class="modal-detail" id="modal-detail" onclick="closeDetail(event)">
+  <div class="detail-panel" id="detail-panel">
+    <div class="detail-header">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+        <div style="font-weight:700;font-size:16px;color:#fff">Detail Jawaban Siswa</div>
+        <button onclick="closeDetailPanel()" style="background:rgba(255,255,255,.2);border:none;color:#fff;width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:16px">✕</button>
+      </div>
+      <div id="detail-stu-info"></div>
+      <div id="detail-stats" style="display:flex;gap:8px;margin-top:1rem"></div>
+    </div>
+    <div style="padding:1rem;flex:1">
+      <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:.75rem;letter-spacing:.3px">RINCIAN JAWABAN PER SOAL</div>
+      <div id="detail-questions"><div class="loading-spinner" style="margin:2rem auto;width:28px;height:28px"></div></div>
     </div>
   </div>
 </div>
@@ -127,134 +137,206 @@
 <script>
 if(!Auth.requireRole(['guru','admin'])) throw new Error();
 UI.initSidebar();
+
 let nilaiData=[], currentExamId=null;
 
 async function init() {
-  const exams=await API.get('/api/exams');
-  const done=exams.filter(e=>['finished','ongoing'].includes(e.status));
-  const sel=document.getElementById('exam-select');
-  sel.innerHTML='<option value="">— Pilih ujian —</option>'+
-    done.map(e=>`<option value="${e.id}">${e.title}</option>`).join('');
-  const id=new URLSearchParams(location.search).get('id');
+  const exams = await API.get('/api/exams');
+  const sel = document.getElementById('exam-select');
+  sel.innerHTML = '<option value="">— Pilih ujian —</option>' +
+    exams.map(e=>`<option value="${e.id}">${e.title} — ${e.status}</option>`).join('');
+  const id = new URLSearchParams(location.search).get('id');
   if(id){ sel.value=id; loadNilai(id); }
 }
 
 async function loadNilai(examId) {
-  if(!examId){document.getElementById('nilai-content').style.display='none';return;}
-  currentExamId=examId;
+  if(!examId){ document.getElementById('nilai-content').style.display='none'; return; }
+  currentExamId = examId;
   UI.loading(true,'Memuat data nilai...');
   try {
-    const r=await API.get(`/api/exams/${examId}/results`);
-    nilaiData=r.results||[];
+    const r = await API.get(`/api/exams/${examId}/results`);
+    nilaiData = r.results||[];
     document.getElementById('nilai-content').style.display='block';
-    document.getElementById('export-btn-wrap').style.display='flex';
-    renderSummary(r);
-    renderDist(r);
-    renderSoalAnalysis(r.question_stats||[]);
+    document.getElementById('export-wrap').style.display='flex';
+    renderSummary(r.summary||{});
+    renderDist(r.score_distribution||{});
+    renderSoalChart(r.question_stats||[]);
     renderTable(nilaiData);
     // Filter kelas
-    const classes=[...new Set(nilaiData.map(s=>s.class_name).filter(Boolean))].sort();
-    const fc=document.getElementById('filter-class-nilai');
-    fc.innerHTML='<option value="">Semua Kelas</option>'+classes.map(c=>`<option>${c}</option>`).join('');
-  } catch(e){UI.toast('Gagal memuat nilai','error');}
-  finally{UI.loading(false);}
+    const kelas = [...new Set(nilaiData.map(s=>s.class_name).filter(Boolean))].sort();
+    document.getElementById('filter-kelas').innerHTML = '<option value="">Semua Kelas</option>' +
+      kelas.map(k=>`<option>${k}</option>`).join('');
+  } catch(e){ UI.toast('Gagal memuat nilai','error'); }
+  finally{ UI.loading(false); }
 }
 
-function renderSummary(r) {
-  const {summary}=r;
-  document.getElementById('summary-stats').innerHTML=`
-    <div class="stat-card"><div class="stat-num">${summary.total_students}</div><div class="stat-label">Total Peserta</div></div>
-    <div class="stat-card"><div class="stat-num mon-submitted">${summary.submitted}</div><div class="stat-label">Submit</div></div>
-    <div class="stat-card" style="border-left:4px solid var(--green3)">
-      <div class="stat-num" style="color:var(--green3)">${summary.avg_score?.toFixed(1)||'—'}</div>
-      <div class="stat-label">Rata-rata Nilai</div>
-    </div>
-    <div class="stat-card" style="border-left:4px solid var(--amber)">
-      <div class="stat-num" style="color:var(--amber)">${summary.pass_rate?.toFixed(0)||0}%</div>
-      <div class="stat-label">Lulus (≥75)</div>
-    </div>
+function renderSummary(s) {
+  const avg = s.avg_score!=null ? s.avg_score.toFixed(1) : '—';
+  document.getElementById('summary-stats').innerHTML = `
+    <div class="stat-card"><div class="stat-num">${s.total_students||0}</div><div class="stat-label">Total Peserta</div></div>
+    <div class="stat-card" style="border-left:4px solid var(--green3)"><div class="stat-num" style="color:var(--green3)">${s.submitted||0}</div><div class="stat-label">Sudah Submit</div></div>
+    <div class="stat-card" style="border-left:4px solid #378add"><div class="stat-num" style="color:#378add">${avg}</div><div class="stat-label">Rata-rata Nilai</div></div>
+    <div class="stat-card" style="border-left:4px solid var(--amber)"><div class="stat-num" style="color:var(--amber)">${(s.pass_rate||0).toFixed(0)}%</div><div class="stat-label">Lulus (≥75)</div></div>
   `;
 }
 
-function renderDist(r) {
-  const dist=r.score_distribution||{};
-  const ranges=[
-    {label:'90–100',key:'a',color:'#1d9e75'},
-    {label:'75–89', key:'b',color:'#378add'},
-    {label:'60–74', key:'c',color:'#ef9f27'},
-    {label:'< 60',  key:'d',color:'#e24b4a'},
-  ];
-  const maxVal=Math.max(...ranges.map(x=>dist[x.key]||0),1);
-  document.getElementById('dist-chart').innerHTML=ranges.map(x=>`
-    <div class="dist-bar-wrap">
-      <div class="dist-key">${x.label}</div>
-      <div class="dist-bar" style="background:${x.color};width:${((dist[x.key]||0)/maxVal*180)}px">
-        ${(dist[x.key]||0)>0?`<div class="dist-label">${dist[x.key]}</div>`:''}
+function renderDist(dist) {
+  const ranges=[{l:'90–100',k:'a',c:'#1d9e75'},{l:'75–89',k:'b',c:'#378add'},{l:'60–74',k:'c',c:'#ef9f27'},{l:'<60',k:'d',c:'#e24b4a'}];
+  const max = Math.max(...ranges.map(x=>dist[x.k]||0),1);
+  document.getElementById('dist-chart').innerHTML = ranges.map(x=>`
+    <div class="dist-row">
+      <div style="width:52px;font-size:12px;color:var(--muted);flex-shrink:0">${x.l}</div>
+      <div class="dist-bar" style="background:${x.c};width:${Math.max(8,(dist[x.k]||0)/max*180)}px">
+        ${(dist[x.k]||0)>0?`<span style="font-size:11px;font-weight:700;color:#fff">${dist[x.k]}</span>`:''}
       </div>
-      <div class="dist-count">${dist[x.key]||0}</div>
+      <div style="font-size:12px;color:var(--muted);width:24px">${dist[x.k]||0}</div>
     </div>
   `).join('');
 }
 
-function renderSoalAnalysis(stats) {
-  const el=document.getElementById('soal-analysis');
-  if(!stats.length){el.innerHTML='<div class="empty-text" style="padding:1rem">Belum ada data</div>';return;}
-  el.innerHTML=`<table style="width:100%;font-size:12px;border-collapse:collapse">
-    <thead><tr style="background:var(--light)">
-      <th style="padding:6px 8px;text-align:left">Soal</th>
-      <th style="padding:6px 8px;text-align:center">Benar</th>
-      <th style="padding:6px 8px;text-align:center">%</th>
-    </tr></thead>
-    <tbody>${stats.map((s,i)=>`
-      <tr style="border-bottom:.5px solid #f0ede5">
-        <td style="padding:6px 8px">Soal ${i+1}</td>
-        <td style="padding:6px 8px;text-align:center">${s.correct}</td>
-        <td style="padding:6px 8px;text-align:center">
-          <div style="display:flex;align-items:center;gap:4px">
-            <div style="height:5px;background:var(--border);border-radius:99px;width:60px;overflow:hidden">
-              <div style="height:100%;background:${s.pct>=75?'var(--green3)':s.pct>=50?'var(--amber)':'var(--red)'};width:${s.pct}%;border-radius:99px"></div>
-            </div>
-            ${s.pct?.toFixed(0)}%
-          </div>
-        </td>
-      </tr>
-    `).join('')}</tbody>
-  </table>`;
+function renderSoalChart(stats) {
+  const el = document.getElementById('soal-chart');
+  if(!stats.length){el.innerHTML='<div class="empty-text" style="padding:1rem;font-size:13px">Belum ada data</div>';return;}
+  el.innerHTML = stats.map((s,i)=>{
+    const pct = s.pct||0;
+    const color = pct>=75?'#1d9e75':pct>=50?'#ef9f27':'#e24b4a';
+    const label = pct>=75?'Mudah':pct>=50?'Sedang':'Sulit';
+    return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:.5px solid #f5f5f5">
+      <div style="font-size:12px;color:var(--muted);width:44px;flex-shrink:0">Soal ${i+1}</div>
+      <div style="flex:1;height:8px;background:var(--border);border-radius:99px;overflow:hidden">
+        <div style="height:100%;background:${color};width:${pct}%;border-radius:99px"></div>
+      </div>
+      <div style="font-size:11px;font-weight:600;color:${color};width:44px;text-align:right">${pct}%</div>
+      <div style="font-size:10px;color:var(--muted);width:36px">${label}</div>
+    </div>`;
+  }).join('');
 }
 
-function scoreClass(v) { return v>=90?'score-a':v>=75?'score-b':v>=60?'score-c':'score-d'; }
+function scoreClass(v){return v>=90?'score-a':v>=75?'score-b':v>=60?'score-c':'score-d';}
 
 function renderTable(data) {
-  const tbody=document.getElementById('nilai-tbody');
-  if(!data.length){tbody.innerHTML='<tr><td colspan="9"><div class="empty-state"><div class="empty-text">Belum ada nilai</div></div></td></tr>';return;}
-  tbody.innerHTML=data.map((s,i)=>`
-    <tr>
-      <td>${i+1}</td>
-      <td><div style="font-weight:500">${s.name}</div></td>
-      <td style="font-size:12px">${s.class_name||'—'}</td>
-      <td style="text-align:center;color:var(--green3);font-weight:600">${s.correct_count??'—'}</td>
-      <td style="text-align:center;color:var(--red);font-weight:600">${s.wrong_count??'—'}</td>
-      <td style="text-align:center;color:var(--muted)">${s.empty_count??'—'}</td>
-      <td style="text-align:center">
-        ${s.score!=null?`<span class="score-chip ${scoreClass(s.score)}">${s.score.toFixed(1)}</span>`:'<span style="color:var(--muted)">—</span>'}
-      </td>
-      <td>${s.submitted_at?`<span class="badge badge-green">Submit ${UI.fmtTime(s.submitted_at)}</span>`:`<span class="badge badge-gray">Belum</span>`}</td>
-      <td style="text-align:center">${s.tab_violations>0?`<span style="color:var(--red2);font-weight:600">${s.tab_violations}x</span>`:'—'}</td>
-    </tr>
+  const el = document.getElementById('nilai-list');
+  if(!data.length){
+    el.innerHTML='<div class="empty-state" style="padding:2rem"><div class="empty-text">Belum ada data nilai</div></div>';return;
+  }
+  el.innerHTML = data.map((s,i)=>`
+    <div class="stu-row" onclick="showDetail('${s.student_id||s.id}','${currentExamId}')">
+      <div style="width:28px;height:28px;border-radius:8px;background:var(--green4);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--green);flex-shrink:0">${i+1}</div>
+      <div style="width:36px;height:36px;border-radius:50%;background:var(--green);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:14px;flex-shrink:0">${(s.name||'?')[0]}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:500;font-size:14px">${s.name}</div>
+        <div style="font-size:12px;color:var(--muted)">${s.class_name||'—'}</div>
+      </div>
+      <!-- Benar/Salah/Kosong -->
+      <div style="display:flex;gap:12px;align-items:center">
+        <div style="text-align:center">
+          <div style="font-size:15px;font-weight:700;color:var(--green3)">${s.correct_count??'—'}</div>
+          <div style="font-size:10px;color:var(--muted)">Benar</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:15px;font-weight:700;color:var(--red)">${s.wrong_count??'—'}</div>
+          <div style="font-size:10px;color:var(--muted)">Salah</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:15px;font-weight:700;color:var(--muted)">${s.empty_count??'—'}</div>
+          <div style="font-size:10px;color:var(--muted)">Kosong</div>
+        </div>
+      </div>
+      <!-- Nilai -->
+      <div style="margin-left:12px">
+        ${s.score!=null?`<span class="score-chip ${scoreClass(s.score)}" style="font-size:16px">${parseFloat(s.score).toFixed(1)}</span>`
+          :`<span style="font-size:13px;color:var(--muted)">Belum submit</span>`}
+      </div>
+      ${s.tab_violations>0?`<span style="font-size:11px;background:#fcebeb;color:var(--red2);padding:2px 8px;border-radius:6px;font-weight:600;margin-left:6px">⚠ ${s.tab_violations}x</span>`:''}
+      <div style="color:var(--muted);font-size:18px;margin-left:8px">›</div>
+    </div>
   `).join('');
 }
 
 function filterTable() {
-  const cls=document.getElementById('filter-class-nilai').value;
-  const q=document.getElementById('search-nilai').value.toLowerCase();
-  renderTable(nilaiData.filter(s=>
-    (!cls||s.class_name===cls)&&(!q||s.name.toLowerCase().includes(q))
-  ));
+  const kelas = document.getElementById('filter-kelas').value;
+  const q = document.getElementById('search-siswa').value.toLowerCase();
+  renderTable(nilaiData.filter(s=>(!kelas||s.class_name===kelas)&&(!q||s.name.toLowerCase().includes(q))));
+}
+
+// ── Detail Panel ─────────────────────────────────────────────
+async function showDetail(studentId, examId) {
+  // Cari session_id dari nilaiData
+  const stu = nilaiData.find(s=>(s.student_id||s.id)===studentId);
+  if(!stu) return;
+
+  document.getElementById('modal-detail').classList.add('show');
+  document.getElementById('detail-stu-info').innerHTML = `
+    <div style="font-weight:700;font-size:17px;color:#fff">${stu.name}</div>
+    <div style="font-size:13px;color:rgba(255,255,255,.65);margin-top:2px">${stu.class_name||'—'} · Submit: ${stu.submitted_at?UI.fmtTime(stu.submitted_at):'Belum'}</div>
+  `;
+  document.getElementById('detail-stats').innerHTML = `
+    <div class="stat-mini" style="flex:1"><div style="font-size:22px;font-weight:700;color:#fff">${stu.correct_count??'—'}</div><div style="font-size:11px;color:rgba(255,255,255,.6)">Benar</div></div>
+    <div class="stat-mini" style="flex:1"><div style="font-size:22px;font-weight:700;color:#fff">${stu.wrong_count??'—'}</div><div style="font-size:11px;color:rgba(255,255,255,.6)">Salah</div></div>
+    <div class="stat-mini" style="flex:1"><div style="font-size:22px;font-weight:700;color:#fff">${stu.empty_count??'—'}</div><div style="font-size:11px;color:rgba(255,255,255,.6)">Kosong</div></div>
+    <div class="stat-mini" style="flex:1"><div style="font-size:22px;font-weight:700;color:#fff">${stu.score!=null?parseFloat(stu.score).toFixed(1):'—'}</div><div style="font-size:11px;color:rgba(255,255,255,.6)">Nilai</div></div>
+  `;
+  document.getElementById('detail-questions').innerHTML = '<div class="loading-spinner" style="margin:2rem auto;width:28px;height:28px"></div>';
+
+  // Ambil detail dari session
+  try {
+    // Cari session_id via monitor data
+    const monitor = await API.get(`/api/exams/${examId}/monitor`);
+    const stuMon = monitor.students?.find(s=>s.student_id===studentId||s.name===stu.name);
+    if(!stuMon?.session_id) {
+      document.getElementById('detail-questions').innerHTML='<div style="padding:1.5rem;color:var(--muted);font-size:13px;text-align:center">Siswa belum memulai ujian</div>';
+      return;
+    }
+    const detail = await API.get(`/api/sessions/${stuMon.session_id}/detail`);
+    renderDetailQuestions(detail.questions||[]);
+  } catch(e) {
+    document.getElementById('detail-questions').innerHTML='<div style="padding:1.5rem;color:var(--red2);font-size:13px">Gagal memuat detail jawaban</div>';
+  }
+}
+
+function renderDetailQuestions(questions) {
+  if(!questions.length){
+    document.getElementById('detail-questions').innerHTML='<div style="padding:1.5rem;color:var(--muted);font-size:13px;text-align:center">Belum ada jawaban</div>';
+    return;
+  }
+  document.getElementById('detail-questions').innerHTML = questions.map((q,i)=>{
+    const isEmpty = !q.student_option_id;
+    const isCorrect = q.is_correct;
+    let statusIcon = isEmpty ? '⬜' : isCorrect ? '✅' : '❌';
+    let answerHtml;
+    if(isEmpty) {
+      answerHtml = `<span class="ans-empty">Tidak dijawab</span>`;
+    } else if(isCorrect) {
+      answerHtml = `<span class="ans-correct">${q.student_label}. ${q.student_answer}</span>`;
+    } else {
+      answerHtml = `
+        <span class="ans-wrong">${q.student_label}. ${q.student_answer}</span>
+        <div style="font-size:11px;color:var(--muted);margin-top:5px">Seharusnya: <strong style="color:var(--green3)">${q.correct_label}. ${q.correct_answer||'—'}</strong></div>
+      `;
+    }
+    return `<div class="q-detail-row">
+      <div style="display:flex;gap:8px;align-items:flex-start">
+        <span style="font-size:16px;flex-shrink:0;margin-top:2px">${statusIcon}</span>
+        <div style="flex:1">
+          <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:4px">SOAL ${i+1}</div>
+          <div style="font-size:13px;color:var(--text);margin-bottom:8px;line-height:1.5">${q.content}</div>
+          ${answerHtml}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function closeDetailPanel() {
+  document.getElementById('modal-detail').classList.remove('show');
+}
+function closeDetail(e) {
+  if(e.target===document.getElementById('modal-detail')) closeDetailPanel();
 }
 
 async function exportExcel() {
   try { await API.download(`/api/exams/${currentExamId}/export-nilai`,'rekap_nilai.xlsx'); }
-  catch { UI.toast('Gagal export Excel','error'); }
+  catch { UI.toast('Gagal export','error'); }
 }
 
 init();
