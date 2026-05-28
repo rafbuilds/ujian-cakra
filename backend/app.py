@@ -972,15 +972,67 @@ def publish_results(exam_id):
 @app.route("/api/exams/<exam_id>/results", methods=["GET"])
 @require_guru
 def exam_results(exam_id):
+    # Ambil semua siswa yang punya sesi di ujian ini + hasil nilainya
     rows = query("""
-        SELECT r.*, u.name as student_name, u.nisn, c.name as class_name
-        FROM results r
-        JOIN users   u ON r.student_id = u.id
-        LEFT JOIN classes c ON u.class_id = c.id
-        WHERE r.exam_id=%s
+        SELECT
+            u.id as student_id, u.name, u.nisn,
+            c.name as class_name,
+            es.submitted_at, es.tab_violations,
+            r.score, r.correct_count, r.wrong_count, r.empty_count
+        FROM exam_sessions es
+        JOIN users u ON u.id = es.student_id
+        LEFT JOIN classes c ON c.id = u.class_id
+        LEFT JOIN results r ON r.session_id = es.id
+        WHERE es.exam_id = %s
         ORDER BY c.grade, LENGTH(c.id), c.id, u.name
     """, (exam_id,))
-    return jsonify([dict(r) for r in rows])
+
+    # Hitung summary
+    all_rows = [dict(r) for r in rows]
+    submitted = [r for r in all_rows if r.get('submitted_at')]
+    scores = [float(r['score']) for r in submitted if r.get('score') is not None]
+
+    # Distribusi nilai
+    dist = {'a':0,'b':0,'c':0,'d':0}
+    for s in scores:
+        if s >= 90: dist['a'] += 1
+        elif s >= 75: dist['b'] += 1
+        elif s >= 60: dist['c'] += 1
+        else: dist['d'] += 1
+
+    # Analisis per soal
+    questions = query("""
+        SELECT q.id, q.content,
+               COUNT(a.id) FILTER (WHERE o.is_correct=true) as correct,
+               COUNT(a.id) as total
+        FROM questions q
+        LEFT JOIN answers a ON a.question_id = q.id
+            AND a.session_id IN (SELECT id FROM exam_sessions WHERE exam_id=%s)
+        LEFT JOIN options o ON o.id = a.option_id
+        WHERE q.exam_id=%s
+        GROUP BY q.id, q.content
+        ORDER BY q.order_num
+    """, (exam_id, exam_id))
+
+    q_stats = []
+    for q in questions:
+        total = q['total'] or 1
+        pct = round((q['correct'] or 0) / total * 100, 1)
+        q_stats.append({'correct': q['correct'] or 0, 'total': total, 'pct': pct})
+
+    summary = {
+        'total_students': len(all_rows),
+        'submitted': len(submitted),
+        'avg_score': round(sum(scores)/len(scores), 1) if scores else None,
+        'pass_rate': round(len([s for s in scores if s >= 75])/len(scores)*100, 1) if scores else 0,
+    }
+
+    return jsonify({
+        'results': all_rows,
+        'summary': summary,
+        'score_distribution': dist,
+        'question_stats': q_stats,
+    })
 
 @app.route("/api/exams/<exam_id>/export", methods=["GET"])
 @require_guru
