@@ -335,7 +335,7 @@ def update_exam(exam_id):
               "instructions","status","subject_id"]
     for f in fields:
         if f in data:
-            query(f"UPDATE exams SET {f}=%s, updated_at=NOW() WHERE id=%s",
+            query(f"UPDATE exams SET {f}=%s WHERE id=%s",
                   (data[f], exam_id), fetch="none")
     if "class_ids" in data:
         query("DELETE FROM exam_classes WHERE exam_id=%s", (exam_id,), fetch="none")
