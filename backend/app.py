@@ -1420,6 +1420,33 @@ def admin_create_user():
     return jsonify(dict(user)), 201
 
 # ═══════════════════════════════════════════════════════════
+#  EXIT CODE — Guru generate kode untuk izinkan siswa keluar
+# ═══════════════════════════════════════════════════════════
+
+@app.route("/api/exams/<exam_id>/exit-code", methods=["POST"])
+@require_guru
+def generate_exit_code(exam_id):
+    """Guru generate kode 6 digit untuk izinkan siswa keluar."""
+    import random
+    code = str(random.randint(100000, 999999))
+    # Simpan di exam sebagai exit_code
+    query("UPDATE exams SET exit_code=%s WHERE id=%s", (code, exam_id), fetch="none")
+    return jsonify({"code": code})
+
+@app.route("/api/sessions/<session_id>/validate-exit", methods=["POST"])
+@require_auth
+def validate_exit_code(session_id):
+    """Siswa validasi kode keluar dari guru."""
+    data = request.json or {}
+    code = data.get("code","").strip()
+    sess = query("SELECT es.*, e.exit_code FROM exam_sessions es JOIN exams e ON e.id=es.exam_id WHERE es.id=%s", (session_id,), fetch="one")
+    if not sess:
+        return jsonify({"error": "Sesi tidak ditemukan"}), 404
+    if not sess.get("exit_code") or sess["exit_code"] != code:
+        return jsonify({"valid": False, "error": "Kode salah atau belum digenerate guru"}), 400
+    return jsonify({"valid": True})
+
+# ═══════════════════════════════════════════════════════════
 #  GURU — KELAS DIAMPU
 # ═══════════════════════════════════════════════════════════
 
