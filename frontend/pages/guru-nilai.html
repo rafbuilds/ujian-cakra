@@ -6,25 +6,37 @@
 <title>Nilai & Rekap — Ujian Online</title>
 <link rel="stylesheet" href="../style.css"/>
 <style>
-.score-chip{display:inline-block;padding:4px 12px;border-radius:20px;font-size:13px;font-weight:700}
-.score-a{background:#eaf3de;color:#3b6d11}.score-b{background:#e6f1fb;color:#185fa5}
-.score-c{background:#faeeda;color:#854f0b}.score-d{background:#fcebeb;color:var(--red2)}
-.dist-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
-.dist-bar{height:22px;border-radius:6px;min-width:4px;transition:width .4s;display:flex;align-items:center;padding:0 8px}
-.stu-row{display:flex;align-items:center;gap:12px;padding:.875rem 1rem;border-bottom:.5px solid #f0ede5;cursor:pointer;transition:background .15s}
-.stu-row:hover{background:#f5f9f6}
-.stu-row:last-child{border-bottom:none}
-/* Modal detail */
-.modal-detail{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:200;align-items:flex-start;justify-content:flex-end;padding:0}
+/* Card siswa personal */
+.stu-card{background:#fff;border:.5px solid var(--border);border-radius:16px;padding:1rem 1.25rem;cursor:pointer;transition:all .2s;margin-bottom:10px;display:flex;align-items:center;gap:14px}
+.stu-card:hover{border-color:var(--green3);box-shadow:0 4px 20px rgba(15,76,53,.1);transform:translateY(-2px)}
+.stu-avatar{width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#fff;flex-shrink:0;position:relative}
+.stu-badge{position:absolute;bottom:-2px;right:-2px;width:18px;height:18px;border-radius:50%;border:2px solid #fff;font-size:9px;display:flex;align-items:center;justify-content:center}
+.score-ring{width:56px;height:56px;flex-shrink:0}
+.progress-bar-thin{height:6px;background:var(--border);border-radius:99px;overflow:hidden;margin-top:4px}
+.progress-bar-fill{height:100%;border-radius:99px;transition:width .6s ease}
+/* Distribusi bubble */
+.grade-bubble{width:60px;height:60px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:800}
+/* Detail panel */
+.modal-detail{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:200;align-items:flex-start;justify-content:flex-end;backdrop-filter:blur(3px)}
 .modal-detail.show{display:flex}
-.detail-panel{background:#fff;width:520px;height:100vh;overflow-y:auto;box-shadow:-8px 0 40px rgba(0,0,0,.15);display:flex;flex-direction:column}
-.detail-header{background:linear-gradient(135deg,var(--green),var(--green2));padding:1.5rem;flex-shrink:0}
-.q-detail-row{padding:1rem 1.25rem;border-bottom:.5px solid #f0ede5}
-.q-detail-row:last-child{border-bottom:none}
-.ans-correct{background:#eaf3de;border-radius:8px;padding:6px 12px;font-size:13px;color:#3b6d11;font-weight:500}
-.ans-wrong{background:#fcebeb;border-radius:8px;padding:6px 12px;font-size:13px;color:var(--red2);font-weight:500}
-.ans-empty{background:var(--light);border-radius:8px;padding:6px 12px;font-size:13px;color:var(--muted)}
-.stat-mini{background:var(--light);border-radius:10px;padding:.625rem 1rem;text-align:center}
+.detail-panel{background:#fff;width:500px;height:100vh;overflow-y:auto;box-shadow:-10px 0 50px rgba(0,0,0,.15)}
+.detail-hero{background:linear-gradient(145deg,#0a3323,#0f4c35,#1a6b4a);padding:1.75rem;position:relative;overflow:hidden}
+.detail-hero::before{content:'';position:absolute;top:-60px;right:-60px;width:200px;height:200px;background:rgba(255,255,255,.05);border-radius:50%}
+.q-item{padding:1rem 1.25rem;border-bottom:.5px solid #f0ede5;display:flex;gap:12px;align-items:flex-start}
+.q-item:last-child{border-bottom:none}
+.q-status{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;margin-top:2px}
+.q-status.correct{background:#eaf3de}
+.q-status.wrong{background:#fcebeb}
+.q-status.empty{background:var(--light)}
+.ans-pill{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;font-size:12px;font-weight:600;margin-top:6px}
+.ans-pill.correct{background:#eaf3de;color:#3b6d11}
+.ans-pill.wrong{background:#fcebeb;color:var(--red2)}
+.ans-pill.empty{background:var(--light);color:var(--muted)}
+.correct-ans{font-size:11px;color:var(--green3);margin-top:4px;font-weight:500}
+/* Rank badge */
+.rank-1{background:linear-gradient(135deg,#FFD700,#FFA500);color:#fff}
+.rank-2{background:linear-gradient(135deg,#C0C0C0,#A0A0A0);color:#fff}
+.rank-3{background:linear-gradient(135deg,#CD7F32,#B8600B);color:#fff}
 </style>
 </head>
 <body>
@@ -58,74 +70,85 @@
     </div>
 
     <div class="page-main">
-      <!-- Pilih ujian -->
       <div class="card">
-        <div style="font-size:13px;font-weight:600;color:var(--muted);margin-bottom:.75rem">Pilih Ujian</div>
         <select class="form-control" id="exam-select" onchange="loadNilai(this.value)">
           <option value="">— Pilih ujian —</option>
         </select>
       </div>
 
       <div id="nilai-content" style="display:none">
-        <!-- Summary cards -->
-        <div class="stat-grid" id="summary-stats"></div>
 
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">
-          <!-- Distribusi -->
-          <div class="card">
-            <div class="card-title">Distribusi Nilai</div>
-            <div id="dist-chart"></div>
-            <div style="margin-top:1rem;padding-top:.75rem;border-top:.5px solid var(--border)">
-              <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:.5rem">LEGENDA</div>
-              <div style="display:flex;gap:12px;flex-wrap:wrap">
-                <span style="font-size:11px;display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;background:#1d9e75;border-radius:3px;display:inline-block"></span>A (90–100)</span>
-                <span style="font-size:11px;display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;background:#378add;border-radius:3px;display:inline-block"></span>B (75–89)</span>
-                <span style="font-size:11px;display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;background:#ef9f27;border-radius:3px;display:inline-block"></span>C (60–74)</span>
-                <span style="font-size:11px;display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;background:#e24b4a;border-radius:3px;display:inline-block"></span>D (<60)</span>
-              </div>
-            </div>
+        <!-- Hero summary -->
+        <div style="background:linear-gradient(135deg,#0a3323,#0f4c35,#1a6b4a);border-radius:18px;padding:1.5rem 2rem;margin-bottom:1rem;display:flex;align-items:center;gap:2rem;flex-wrap:wrap">
+          <div>
+            <div id="exam-title-hero" style="font-size:20px;font-weight:700;color:#fff"></div>
+            <div id="exam-sub-hero" style="font-size:13px;color:rgba(255,255,255,.55);margin-top:3px"></div>
           </div>
-
-          <!-- Analisis soal -->
-          <div class="card">
-            <div class="card-title">Tingkat Kesulitan Soal</div>
-            <div id="soal-chart" style="max-height:240px;overflow-y:auto"></div>
+          <div style="display:flex;gap:1.5rem;flex-wrap:wrap">
+            <div style="text-align:center"><div id="h-total" style="font-size:32px;font-weight:800;color:#fff">—</div><div style="font-size:11px;color:rgba(255,255,255,.5)">Peserta</div></div>
+            <div style="text-align:center"><div id="h-avg" style="font-size:32px;font-weight:800;color:#4ade80">—</div><div style="font-size:11px;color:rgba(255,255,255,.5)">Rata-rata</div></div>
+            <div style="text-align:center"><div id="h-pass" style="font-size:32px;font-weight:800;color:#facc15">—</div><div style="font-size:11px;color:rgba(255,255,255,.5)">Lulus</div></div>
+            <div style="text-align:center"><div id="h-top" style="font-size:32px;font-weight:800;color:#60a5fa">—</div><div style="font-size:11px;color:rgba(255,255,255,.5)">Tertinggi</div></div>
           </div>
         </div>
 
-        <!-- Daftar nilai -->
-        <div class="card" style="padding:0;overflow:hidden">
-          <div style="padding:.875rem 1rem;border-bottom:.5px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
-            <div style="font-weight:600;font-size:14px">Daftar Nilai Siswa <span style="color:var(--muted);font-weight:400;font-size:13px">— klik siswa untuk lihat detail jawaban</span></div>
-            <div style="display:flex;gap:8px">
-              <select id="filter-kelas" class="form-control" style="padding:6px 10px;font-size:12px" onchange="filterTable()">
-                <option value="">Semua Kelas</option>
-              </select>
-              <input id="search-siswa" type="text" placeholder="Cari nama..." oninput="filterTable()"
-                style="padding:6px 10px;border:1px solid var(--border2);border-radius:8px;font-size:12px;width:150px"/>
-            </div>
+        <!-- Distribusi grade bubbles + bar soal -->
+        <div style="display:grid;grid-template-columns:auto 1fr;gap:1rem;margin-bottom:1rem">
+          <div class="card" style="padding:1.25rem">
+            <div style="font-size:13px;font-weight:600;color:var(--muted);margin-bottom:1rem;letter-spacing:.3px">SEBARAN NILAI</div>
+            <div style="display:flex;gap:10px;justify-content:center" id="grade-bubbles"></div>
           </div>
-          <div id="nilai-list"></div>
+          <div class="card">
+            <div style="font-size:13px;font-weight:600;color:var(--muted);margin-bottom:.75rem;letter-spacing:.3px">SOAL PALING SULIT</div>
+            <div id="hard-soal"></div>
+          </div>
         </div>
+
+        <!-- Filter + search -->
+        <div style="display:flex;gap:10px;margin-bottom:.875rem;align-items:center">
+          <select id="filter-kelas" class="form-control" style="width:auto" onchange="filterTable()">
+            <option value="">Semua Kelas</option>
+          </select>
+          <select id="filter-status" class="form-control" style="width:auto" onchange="filterTable()">
+            <option value="">Semua Status</option>
+            <option value="submit">Sudah Submit</option>
+            <option value="belum">Belum Submit</option>
+          </select>
+          <input id="search-stu" type="text" placeholder="🔍 Cari nama siswa..." oninput="filterTable()"
+            style="flex:1;max-width:280px;padding:8px 12px;border:1px solid var(--border2);border-radius:9px;font-size:13px"/>
+          <div id="count-label" style="font-size:13px;color:var(--muted);margin-left:auto"></div>
+        </div>
+
+        <!-- Kartu siswa personal -->
+        <div id="stu-cards"></div>
       </div>
     </div>
   </div>
 </div>
 
-<!-- Panel detail jawaban siswa (slide dari kanan) -->
-<div class="modal-detail" id="modal-detail" onclick="closeDetail(event)">
-  <div class="detail-panel" id="detail-panel">
-    <div class="detail-header">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
-        <div style="font-weight:700;font-size:16px;color:#fff">Detail Jawaban Siswa</div>
-        <button onclick="closeDetailPanel()" style="background:rgba(255,255,255,.2);border:none;color:#fff;width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:16px">✕</button>
+<!-- Detail Panel -->
+<div class="modal-detail" id="modal-detail" onclick="if(event.target===this)closeDetail()">
+  <div class="detail-panel">
+    <div class="detail-hero">
+      <button onclick="closeDetail()" style="position:absolute;top:1rem;right:1rem;background:rgba(255,255,255,.15);border:none;color:#fff;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:16px;z-index:1">✕</button>
+      <div style="position:relative;z-index:1">
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:1.25rem">
+          <div id="dp-avatar" style="width:60px;height:60px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;color:#fff;border:3px solid rgba(255,255,255,.3)"></div>
+          <div>
+            <div id="dp-name" style="font-size:20px;font-weight:700;color:#fff"></div>
+            <div id="dp-class" style="font-size:13px;color:rgba(255,255,255,.6)"></div>
+            <div id="dp-time" style="font-size:12px;color:rgba(255,255,255,.45);margin-top:2px"></div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px" id="dp-stats"></div>
       </div>
-      <div id="detail-stu-info"></div>
-      <div id="detail-stats" style="display:flex;gap:8px;margin-top:1rem"></div>
     </div>
-    <div style="padding:1rem;flex:1">
-      <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:.75rem;letter-spacing:.3px">RINCIAN JAWABAN PER SOAL</div>
-      <div id="detail-questions"><div class="loading-spinner" style="margin:2rem auto;width:28px;height:28px"></div></div>
+    <div style="padding:1.25rem">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.875rem">
+        <div style="font-size:13px;font-weight:600;color:var(--muted);letter-spacing:.3px">JAWABAN PER SOAL</div>
+        <div id="dp-score-summary" style="font-size:13px;color:var(--muted)"></div>
+      </div>
+      <div id="dp-questions"></div>
     </div>
   </div>
 </div>
@@ -138,205 +161,242 @@
 if(!Auth.requireRole(['guru','admin'])) throw new Error();
 UI.initSidebar();
 
-let nilaiData=[], currentExamId=null;
+let nilaiData=[], currentExamId=null, monitorData=null;
+const COLORS=['#0f4c35','#1a6b4a','#185fa5','#854f0b','#a32d2d','#5b2d8e','#0e6b6b','#6b3d0e'];
+const getColor = n => COLORS[n.charCodeAt(0)%COLORS.length];
 
 async function init() {
   const exams = await API.get('/api/exams');
   const sel = document.getElementById('exam-select');
-  sel.innerHTML = '<option value="">— Pilih ujian —</option>' +
+  sel.innerHTML='<option value="">— Pilih ujian —</option>'+
     exams.map(e=>`<option value="${e.id}">${e.title} — ${e.status}</option>`).join('');
-  const id = new URLSearchParams(location.search).get('id');
-  if(id){ sel.value=id; loadNilai(id); }
+  const id=new URLSearchParams(location.search).get('id');
+  if(id){sel.value=id;loadNilai(id);}
 }
 
 async function loadNilai(examId) {
-  if(!examId){ document.getElementById('nilai-content').style.display='none'; return; }
-  currentExamId = examId;
-  UI.loading(true,'Memuat data nilai...');
+  if(!examId){document.getElementById('nilai-content').style.display='none';return;}
+  currentExamId=examId;
+  UI.loading(true,'Memuat...');
   try {
-    const r = await API.get(`/api/exams/${examId}/results`);
-    nilaiData = r.results||[];
+    const [r, mon] = await Promise.all([
+      API.get(`/api/exams/${examId}/results`),
+      API.get(`/api/exams/${examId}/monitor`).catch(()=>null)
+    ]);
+    nilaiData=r.results||[];
+    monitorData=mon;
     document.getElementById('nilai-content').style.display='block';
     document.getElementById('export-wrap').style.display='flex';
-    renderSummary(r.summary||{});
-    renderDist(r.score_distribution||{});
-    renderSoalChart(r.question_stats||[]);
-    renderTable(nilaiData);
+    renderHero(r);
+    renderGradeBubbles(r.score_distribution||{});
+    renderHardSoal(r.question_stats||[]);
+    renderCards(nilaiData);
     // Filter kelas
-    const kelas = [...new Set(nilaiData.map(s=>s.class_name).filter(Boolean))].sort();
-    document.getElementById('filter-kelas').innerHTML = '<option value="">Semua Kelas</option>' +
+    const kelas=[...new Set(nilaiData.map(s=>s.class_name).filter(Boolean))].sort();
+    document.getElementById('filter-kelas').innerHTML='<option value="">Semua Kelas</option>'+
       kelas.map(k=>`<option>${k}</option>`).join('');
-  } catch(e){ UI.toast('Gagal memuat nilai','error'); }
-  finally{ UI.loading(false); }
+  } catch(e){UI.toast('Gagal memuat nilai','error');}
+  finally{UI.loading(false);}
 }
 
-function renderSummary(s) {
-  const avg = s.avg_score!=null ? s.avg_score.toFixed(1) : '—';
-  document.getElementById('summary-stats').innerHTML = `
-    <div class="stat-card"><div class="stat-num">${s.total_students||0}</div><div class="stat-label">Total Peserta</div></div>
-    <div class="stat-card" style="border-left:4px solid var(--green3)"><div class="stat-num" style="color:var(--green3)">${s.submitted||0}</div><div class="stat-label">Sudah Submit</div></div>
-    <div class="stat-card" style="border-left:4px solid #378add"><div class="stat-num" style="color:#378add">${avg}</div><div class="stat-label">Rata-rata Nilai</div></div>
-    <div class="stat-card" style="border-left:4px solid var(--amber)"><div class="stat-num" style="color:var(--amber)">${(s.pass_rate||0).toFixed(0)}%</div><div class="stat-label">Lulus (≥75)</div></div>
-  `;
+function renderHero(r) {
+  const s=r.summary||{};
+  const scores=nilaiData.filter(x=>x.score!=null).map(x=>parseFloat(x.score));
+  const top=scores.length?Math.max(...scores).toFixed(1):'—';
+  document.getElementById('h-total').textContent=s.total_students||0;
+  document.getElementById('h-avg').textContent=s.avg_score!=null?s.avg_score.toFixed(1):'—';
+  document.getElementById('h-pass').textContent=(s.submitted||0)+' submit';
+  document.getElementById('h-top').textContent=top;
+  document.getElementById('exam-title-hero').textContent=monitorData?.exam?.title||'';
+  document.getElementById('exam-sub-hero').textContent=`${s.submitted||0} dari ${s.total_students||0} siswa sudah mengumpulkan`;
 }
 
-function renderDist(dist) {
-  const ranges=[{l:'90–100',k:'a',c:'#1d9e75'},{l:'75–89',k:'b',c:'#378add'},{l:'60–74',k:'c',c:'#ef9f27'},{l:'<60',k:'d',c:'#e24b4a'}];
-  const max = Math.max(...ranges.map(x=>dist[x.k]||0),1);
-  document.getElementById('dist-chart').innerHTML = ranges.map(x=>`
-    <div class="dist-row">
-      <div style="width:52px;font-size:12px;color:var(--muted);flex-shrink:0">${x.l}</div>
-      <div class="dist-bar" style="background:${x.c};width:${Math.max(8,(dist[x.k]||0)/max*180)}px">
-        ${(dist[x.k]||0)>0?`<span style="font-size:11px;font-weight:700;color:#fff">${dist[x.k]}</span>`:''}
+function renderGradeBubbles(dist) {
+  const grades=[
+    {label:'A',range:'90–100',key:'a',bg:'linear-gradient(135deg,#1d9e75,#0f6e56)',count:dist.a||0},
+    {label:'B',range:'75–89',key:'b',bg:'linear-gradient(135deg,#378add,#1565c0)',count:dist.b||0},
+    {label:'C',range:'60–74',key:'c',bg:'linear-gradient(135deg,#ef9f27,#c07d00)',count:dist.c||0},
+    {label:'D',range:'<60',key:'d',bg:'linear-gradient(135deg,#e24b4a,#b71c1c)',count:dist.d||0},
+  ];
+  document.getElementById('grade-bubbles').innerHTML=grades.map(g=>`
+    <div style="text-align:center">
+      <div class="grade-bubble" style="background:${g.bg};color:#fff;margin:0 auto 6px">
+        <div style="font-size:20px;font-weight:800">${g.count}</div>
+        <div style="font-size:9px;opacity:.8">siswa</div>
       </div>
-      <div style="font-size:12px;color:var(--muted);width:24px">${dist[x.k]||0}</div>
+      <div style="font-size:14px;font-weight:700;color:var(--text)">${g.label}</div>
+      <div style="font-size:11px;color:var(--muted)">${g.range}</div>
     </div>
   `).join('');
 }
 
-function renderSoalChart(stats) {
-  const el = document.getElementById('soal-chart');
-  if(!stats.length){el.innerHTML='<div class="empty-text" style="padding:1rem;font-size:13px">Belum ada data</div>';return;}
-  el.innerHTML = stats.map((s,i)=>{
-    const pct = s.pct||0;
-    const color = pct>=75?'#1d9e75':pct>=50?'#ef9f27':'#e24b4a';
-    const label = pct>=75?'Mudah':pct>=50?'Sedang':'Sulit';
-    return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:.5px solid #f5f5f5">
-      <div style="font-size:12px;color:var(--muted);width:44px;flex-shrink:0">Soal ${i+1}</div>
-      <div style="flex:1;height:8px;background:var(--border);border-radius:99px;overflow:hidden">
-        <div style="height:100%;background:${color};width:${pct}%;border-radius:99px"></div>
-      </div>
-      <div style="font-size:11px;font-weight:600;color:${color};width:44px;text-align:right">${pct}%</div>
-      <div style="font-size:10px;color:var(--muted);width:36px">${label}</div>
+function renderHardSoal(stats) {
+  const hard=stats.map((s,i)=>({...s,no:i+1})).sort((a,b)=>a.pct-b.pct).slice(0,4);
+  document.getElementById('hard-soal').innerHTML=hard.map(s=>{
+    const color=s.pct>=75?'var(--green3)':s.pct>=50?'var(--amber)':'var(--red)';
+    const label=s.pct>=75?'😊 Mudah':s.pct>=50?'😐 Sedang':'😰 Sulit';
+    return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+      <div style="font-size:12px;color:var(--muted);width:44px;flex-shrink:0">Soal ${s.no}</div>
+      <div style="flex:1"><div class="progress-bar-thin"><div class="progress-bar-fill" style="width:${s.pct}%;background:${color}"></div></div></div>
+      <div style="font-size:12px;font-weight:600;color:${color};width:36px">${s.pct}%</div>
+      <div style="font-size:11px;color:var(--muted);width:60px">${label}</div>
     </div>`;
   }).join('');
-}
-
-function scoreClass(v){return v>=90?'score-a':v>=75?'score-b':v>=60?'score-c':'score-d';}
-
-function renderTable(data) {
-  const el = document.getElementById('nilai-list');
-  if(!data.length){
-    el.innerHTML='<div class="empty-state" style="padding:2rem"><div class="empty-text">Belum ada data nilai</div></div>';return;
-  }
-  el.innerHTML = data.map((s,i)=>`
-    <div class="stu-row" onclick="showDetail('${s.student_id||s.id}','${currentExamId}')">
-      <div style="width:28px;height:28px;border-radius:8px;background:var(--green4);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--green);flex-shrink:0">${i+1}</div>
-      <div style="width:36px;height:36px;border-radius:50%;background:var(--green);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:14px;flex-shrink:0">${(s.name||'?')[0]}</div>
-      <div style="flex:1;min-width:0">
-        <div style="font-weight:500;font-size:14px">${s.name}</div>
-        <div style="font-size:12px;color:var(--muted)">${s.class_name||'—'}</div>
-      </div>
-      <!-- Benar/Salah/Kosong -->
-      <div style="display:flex;gap:12px;align-items:center">
-        <div style="text-align:center">
-          <div style="font-size:15px;font-weight:700;color:var(--green3)">${s.correct_count??'—'}</div>
-          <div style="font-size:10px;color:var(--muted)">Benar</div>
-        </div>
-        <div style="text-align:center">
-          <div style="font-size:15px;font-weight:700;color:var(--red)">${s.wrong_count??'—'}</div>
-          <div style="font-size:10px;color:var(--muted)">Salah</div>
-        </div>
-        <div style="text-align:center">
-          <div style="font-size:15px;font-weight:700;color:var(--muted)">${s.empty_count??'—'}</div>
-          <div style="font-size:10px;color:var(--muted)">Kosong</div>
-        </div>
-      </div>
-      <!-- Nilai -->
-      <div style="margin-left:12px">
-        ${s.score!=null?`<span class="score-chip ${scoreClass(s.score)}" style="font-size:16px">${parseFloat(s.score).toFixed(1)}</span>`
-          :`<span style="font-size:13px;color:var(--muted)">Belum submit</span>`}
-      </div>
-      ${s.tab_violations>0?`<span style="font-size:11px;background:#fcebeb;color:var(--red2);padding:2px 8px;border-radius:6px;font-weight:600;margin-left:6px">⚠ ${s.tab_violations}x</span>`:''}
-      <div style="color:var(--muted);font-size:18px;margin-left:8px">›</div>
-    </div>
-  `).join('');
 }
 
 function filterTable() {
-  const kelas = document.getElementById('filter-kelas').value;
-  const q = document.getElementById('search-siswa').value.toLowerCase();
-  renderTable(nilaiData.filter(s=>(!kelas||s.class_name===kelas)&&(!q||s.name.toLowerCase().includes(q))));
+  const kelas=document.getElementById('filter-kelas').value;
+  const status=document.getElementById('filter-status').value;
+  const q=document.getElementById('search-stu').value.toLowerCase();
+  let filtered=nilaiData.filter(s=>
+    (!kelas||s.class_name===kelas)&&
+    (!q||s.name.toLowerCase().includes(q))&&
+    (!status||(status==='submit'?s.submitted_at:!s.submitted_at))
+  );
+  renderCards(filtered);
 }
 
-// ── Detail Panel ─────────────────────────────────────────────
-async function showDetail(studentId, examId) {
-  // Cari session_id dari nilaiData
-  const stu = nilaiData.find(s=>(s.student_id||s.id)===studentId);
-  if(!stu) return;
-
-  document.getElementById('modal-detail').classList.add('show');
-  document.getElementById('detail-stu-info').innerHTML = `
-    <div style="font-weight:700;font-size:17px;color:#fff">${stu.name}</div>
-    <div style="font-size:13px;color:rgba(255,255,255,.65);margin-top:2px">${stu.class_name||'—'} · Submit: ${stu.submitted_at?UI.fmtTime(stu.submitted_at):'Belum'}</div>
-  `;
-  document.getElementById('detail-stats').innerHTML = `
-    <div class="stat-mini" style="flex:1"><div style="font-size:22px;font-weight:700;color:#fff">${stu.correct_count??'—'}</div><div style="font-size:11px;color:rgba(255,255,255,.6)">Benar</div></div>
-    <div class="stat-mini" style="flex:1"><div style="font-size:22px;font-weight:700;color:#fff">${stu.wrong_count??'—'}</div><div style="font-size:11px;color:rgba(255,255,255,.6)">Salah</div></div>
-    <div class="stat-mini" style="flex:1"><div style="font-size:22px;font-weight:700;color:#fff">${stu.empty_count??'—'}</div><div style="font-size:11px;color:rgba(255,255,255,.6)">Kosong</div></div>
-    <div class="stat-mini" style="flex:1"><div style="font-size:22px;font-weight:700;color:#fff">${stu.score!=null?parseFloat(stu.score).toFixed(1):'—'}</div><div style="font-size:11px;color:rgba(255,255,255,.6)">Nilai</div></div>
-  `;
-  document.getElementById('detail-questions').innerHTML = '<div class="loading-spinner" style="margin:2rem auto;width:28px;height:28px"></div>';
-
-  // Ambil detail dari session
-  try {
-    // Cari session_id via monitor data
-    const monitor = await API.get(`/api/exams/${examId}/monitor`);
-    const stuMon = monitor.students?.find(s=>s.student_id===studentId||s.name===stu.name);
-    if(!stuMon?.session_id) {
-      document.getElementById('detail-questions').innerHTML='<div style="padding:1.5rem;color:var(--muted);font-size:13px;text-align:center">Siswa belum memulai ujian</div>';
-      return;
-    }
-    const detail = await API.get(`/api/sessions/${stuMon.session_id}/detail`);
-    renderDetailQuestions(detail.questions||[]);
-  } catch(e) {
-    document.getElementById('detail-questions').innerHTML='<div style="padding:1.5rem;color:var(--red2);font-size:13px">Gagal memuat detail jawaban</div>';
-  }
-}
-
-function renderDetailQuestions(questions) {
-  if(!questions.length){
-    document.getElementById('detail-questions').innerHTML='<div style="padding:1.5rem;color:var(--muted);font-size:13px;text-align:center">Belum ada jawaban</div>';
+function renderCards(data) {
+  document.getElementById('count-label').textContent=`${data.length} siswa`;
+  const el=document.getElementById('stu-cards');
+  if(!data.length){
+    el.innerHTML='<div class="card"><div class="empty-state"><div class="empty-icon">🔍</div><div class="empty-text">Tidak ada data</div></div></div>';
     return;
   }
-  document.getElementById('detail-questions').innerHTML = questions.map((q,i)=>{
-    const isEmpty = !q.student_option_id;
-    const isCorrect = q.is_correct;
-    let statusIcon = isEmpty ? '⬜' : isCorrect ? '✅' : '❌';
-    let answerHtml;
-    if(isEmpty) {
-      answerHtml = `<span class="ans-empty">Tidak dijawab</span>`;
-    } else if(isCorrect) {
-      answerHtml = `<span class="ans-correct">${q.student_label}. ${q.student_answer}</span>`;
-    } else {
-      answerHtml = `
-        <span class="ans-wrong">${q.student_label}. ${q.student_answer}</span>
-        <div style="font-size:11px;color:var(--muted);margin-top:5px">Seharusnya: <strong style="color:var(--green3)">${q.correct_label}. ${q.correct_answer||'—'}</strong></div>
-      `;
+  // Sort by score desc
+  const sorted=[...data].sort((a,b)=>(b.score??-1)-(a.score??-1));
+  el.innerHTML=sorted.map((s,i)=>{
+    const score=s.score!=null?parseFloat(s.score):null;
+    const pct=score!=null?(score/100*100):0;
+    const color=score==null?'var(--muted)':score>=90?'#1d9e75':score>=75?'#378add':score>=60?'#ef9f27':'#e24b4a';
+    const grade=score==null?'—':score>=90?'A':score>=75?'B':score>=60?'C':'D';
+    const rankBadge=i===0?'🥇':i===1?'🥈':i===2?'🥉':'';
+    const bgColor=getColor(s.name||'X');
+    return `<div class="stu-card" onclick="showDetail('${s.student_id||s.id}')">
+      <!-- Avatar -->
+      <div style="position:relative">
+        <div class="stu-avatar" style="background:${bgColor};font-size:${s.name?.length>6?'14px':'18px'}">${(s.name||'?')[0]}</div>
+        ${rankBadge?`<div style="position:absolute;top:-6px;right:-6px;font-size:16px">${rankBadge}</div>`:''}
+        ${s.tab_violations>0?`<div class="stu-badge" style="background:var(--red)">⚠</div>`:''}
+      </div>
+      <!-- Info -->
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:15px">${s.name}</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:1px">${s.class_name||'—'} · ${s.submitted_at?'Submit '+UI.fmtTime(s.submitted_at):'Belum submit'}</div>
+        <!-- Progress bar jawaban benar -->
+        ${score!=null?`
+          <div class="progress-bar-thin" style="margin-top:6px;width:160px">
+            <div class="progress-bar-fill" style="width:${pct}%;background:${color}"></div>
+          </div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">
+            ${s.correct_count??0} benar · ${s.wrong_count??0} salah · ${s.empty_count??0} kosong
+          </div>
+        `:'<div style="font-size:12px;color:var(--muted);margin-top:4px;font-style:italic">Belum mengumpulkan jawaban</div>'}
+      </div>
+      <!-- Nilai bulat besar -->
+      <div style="text-align:center;min-width:64px">
+        <div style="font-size:30px;font-weight:800;color:${color};line-height:1">${score!=null?score.toFixed(0):'—'}</div>
+        <div style="font-size:13px;font-weight:700;color:${color}">${grade}</div>
+        ${score!=null&&score>=75?'<div style="font-size:10px;color:var(--green3);font-weight:600">✓ Lulus</div>':''}
+        ${score!=null&&score<75?'<div style="font-size:10px;color:var(--red);font-weight:600">✗ Remedial</div>':''}
+      </div>
+      <div style="color:var(--muted);font-size:18px">›</div>
+    </div>`;
+  }).join('');
+}
+
+async function showDetail(studentId) {
+  const stu=nilaiData.find(s=>(s.student_id||s.id)===studentId);
+  if(!stu) return;
+  const score=stu.score!=null?parseFloat(stu.score):null;
+  const color=score==null?'#888':score>=90?'#1d9e75':score>=75?'#378add':score>=60?'#ef9f27':'#e24b4a';
+  const grade=score==null?'—':score>=90?'A':score>=75?'B':score>=60?'C':'D';
+  const msg=score==null?''
+    :score>=90?'🌟 Luar biasa!'
+    :score>=75?'👍 Bagus, lulus!'
+    :score>=60?'💪 Lumayan, perlu belajar lagi'
+    :'📚 Perlu remedial';
+
+  document.getElementById('dp-avatar').textContent=(stu.name||'?')[0];
+  document.getElementById('dp-avatar').style.background=getColor(stu.name||'X');
+  document.getElementById('dp-name').textContent=stu.name;
+  document.getElementById('dp-class').textContent=(stu.class_name||'—')+(stu.tab_violations>0?` · ⚠ ${stu.tab_violations} pelanggaran`:'');
+  document.getElementById('dp-time').textContent=stu.submitted_at?'📅 Submit '+UI.fmtTime(stu.submitted_at):'Belum submit';
+  document.getElementById('dp-score-summary').textContent=`${stu.correct_count??0} benar dari ${(stu.correct_count??0)+(stu.wrong_count??0)+(stu.empty_count??0)} soal`;
+
+  document.getElementById('dp-stats').innerHTML=`
+    <div style="flex:1;background:rgba(255,255,255,.12);border-radius:12px;padding:.75rem;text-align:center">
+      <div style="font-size:32px;font-weight:800;color:${color}">${score!=null?score.toFixed(1):'—'}</div>
+      <div style="font-size:11px;color:rgba(255,255,255,.5)">Nilai ${grade}</div>
+      <div style="font-size:11px;color:rgba(255,255,255,.7);font-weight:600;margin-top:2px">${msg}</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <div style="background:rgba(255,255,255,.1);border-radius:8px;padding:8px 12px;text-align:center">
+        <div style="font-size:18px;font-weight:700;color:#4ade80">${stu.correct_count??'—'}</div>
+        <div style="font-size:10px;color:rgba(255,255,255,.5)">Benar</div>
+      </div>
+      <div style="background:rgba(255,255,255,.1);border-radius:8px;padding:8px 12px;text-align:center">
+        <div style="font-size:18px;font-weight:700;color:#f87171">${stu.wrong_count??'—'}</div>
+        <div style="font-size:10px;color:rgba(255,255,255,.5)">Salah</div>
+      </div>
+      <div style="background:rgba(255,255,255,.1);border-radius:8px;padding:8px 12px;text-align:center">
+        <div style="font-size:18px;font-weight:700;color:rgba(255,255,255,.5)">${stu.empty_count??'—'}</div>
+        <div style="font-size:10px;color:rgba(255,255,255,.5)">Kosong</div>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('modal-detail').classList.add('show');
+  document.getElementById('dp-questions').innerHTML='<div class="loading-spinner" style="margin:2rem auto;width:28px;height:28px"></div>';
+
+  try {
+    const mon=monitorData||await API.get(`/api/exams/${currentExamId}/monitor`);
+    const stuMon=mon.students?.find(s=>s.student_id===studentId||s.name===stu.name);
+    if(!stuMon?.session_id){
+      document.getElementById('dp-questions').innerHTML='<div style="padding:2rem;text-align:center;color:var(--muted)">📭 Siswa belum memulai ujian</div>';
+      return;
     }
-    return `<div class="q-detail-row">
-      <div style="display:flex;gap:8px;align-items:flex-start">
-        <span style="font-size:16px;flex-shrink:0;margin-top:2px">${statusIcon}</span>
-        <div style="flex:1">
-          <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:4px">SOAL ${i+1}</div>
-          <div style="font-size:13px;color:var(--text);margin-bottom:8px;line-height:1.5">${q.content}</div>
-          ${answerHtml}
-        </div>
+    const detail=await API.get(`/api/sessions/${stuMon.session_id}/detail`);
+    renderDetailQ(detail.questions||[]);
+  } catch {
+    document.getElementById('dp-questions').innerHTML='<div style="padding:2rem;text-align:center;color:var(--red2)">Gagal memuat detail</div>';
+  }
+}
+
+function renderDetailQ(questions) {
+  if(!questions.length){
+    document.getElementById('dp-questions').innerHTML='<div style="padding:2rem;text-align:center;color:var(--muted)">Belum ada jawaban tercatat</div>';
+    return;
+  }
+  document.getElementById('dp-questions').innerHTML=questions.map((q,i)=>{
+    const empty=!q.student_option_id;
+    const correct=q.is_correct;
+    const statusClass=empty?'empty':correct?'correct':'wrong';
+    const statusIcon=empty?'—':correct?'✓':'✗';
+    return `<div class="q-item">
+      <div class="q-status ${statusClass}">${statusIcon}</div>
+      <div style="flex:1">
+        <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:4px">SOAL ${i+1}</div>
+        <div style="font-size:13px;line-height:1.6;color:var(--text);margin-bottom:6px">${q.content}</div>
+        ${empty
+          ?`<span class="ans-pill empty">⬜ Tidak dijawab</span>`
+          :correct
+            ?`<span class="ans-pill correct">✓ ${q.student_label}. ${q.student_answer}</span>`
+            :`<div>
+                <span class="ans-pill wrong">✗ ${q.student_label}. ${q.student_answer}</span>
+                <div class="correct-ans">↳ Jawaban benar: <strong>${q.correct_label}. ${q.correct_answer||'—'}</strong></div>
+              </div>`
+        }
       </div>
     </div>`;
   }).join('');
 }
 
-function closeDetailPanel() {
-  document.getElementById('modal-detail').classList.remove('show');
-}
-function closeDetail(e) {
-  if(e.target===document.getElementById('modal-detail')) closeDetailPanel();
-}
+function closeDetail(){document.getElementById('modal-detail').classList.remove('show');}
 
-async function exportExcel() {
-  try { await API.download(`/api/exams/${currentExamId}/export-nilai`,'rekap_nilai.xlsx'); }
-  catch { UI.toast('Gagal export','error'); }
+async function exportExcel(){
+  try{await API.download(`/api/exams/${currentExamId}/export-nilai`,'rekap_nilai.xlsx');}
+  catch{UI.toast('Gagal export','error');}
 }
 
 init();
