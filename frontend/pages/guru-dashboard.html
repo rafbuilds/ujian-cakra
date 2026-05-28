@@ -87,6 +87,34 @@
         <div class="stat-card"></div><div class="stat-card"></div><div class="stat-card"></div>
       </div>
 
+      <!-- Kelas Diampu -->
+      <div class="card" style="margin-bottom:1rem">
+        <div class="card-header">
+          <div class="card-title" style="margin:0">Kelas yang Diampu</div>
+          <button class="btn btn-primary btn-sm" onclick="openKelasModal()">+ Tambah Kelas</button>
+        </div>
+        <div id="taught-classes-list" style="margin-top:.75rem">
+          <div class="loading-spinner"></div>
+        </div>
+      </div>
+
+      <!-- Modal tambah kelas -->
+      <div id="modal-kelas-diampu" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:center;justify-content:center;padding:1rem;backdrop-filter:blur(4px)">
+        <div style="background:#fff;border-radius:18px;padding:2rem;max-width:420px;width:100%">
+          <div style="font-weight:700;font-size:18px;color:var(--green);margin-bottom:1.25rem">Tambah Kelas Diampu</div>
+          <div class="form-group">
+            <label>Pilih Kelas</label>
+            <select class="form-control" id="kd-select">
+              <option value="">— Pilih kelas —</option>
+            </select>
+          </div>
+          <div style="display:flex;gap:10px;margin-top:1rem">
+            <button class="btn btn-secondary" onclick="closeKelasModal()" style="flex:1">Batal</button>
+            <button class="btn btn-primary" onclick="addKelas()" style="flex:1">Tambah</button>
+          </div>
+        </div>
+      </div>
+
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.25rem">
         <!-- Quick actions -->
         <div>
@@ -219,6 +247,57 @@ async function loadDashboard() {
   } catch(e) { UI.toast('Gagal memuat dashboard','error'); }
 }
 loadDashboard();
+loadTaughtClasses();
+
+async function loadTaughtClasses() {
+  try {
+    const [taught, all] = await Promise.all([
+      API.get('/api/guru/taught-classes'),
+      API.get('/api/classes')
+    ]);
+
+    const el = document.getElementById('taught-classes-list');
+    if(!taught.length) {
+      el.innerHTML = '<div style="font-size:13px;color:var(--muted);text-align:center;padding:.75rem">Belum ada kelas. Tambah kelas yang kamu ampu.</div>';
+    } else {
+      el.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:7px">
+        ${taught.map(c=>`
+          <div style="display:flex;align-items:center;gap:6px;background:var(--green4);border:1px solid rgba(29,158,117,.25);border-radius:8px;padding:5px 10px">
+            <span style="font-size:13px;font-weight:600;color:var(--green)">${c.name}</span>
+            <button onclick="removeKelas('${c.id}','${c.name}')" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;padding:0;line-height:1">×</button>
+          </div>
+        `).join('')}
+      </div>`;
+    }
+
+    // Isi dropdown - filter yang sudah ditambahkan
+    const taughtIds = taught.map(c=>c.id);
+    const sel = document.getElementById('kd-select');
+    sel.innerHTML = '<option value="">— Pilih kelas —</option>' +
+      all.filter(c=>!taughtIds.includes(c.id))
+         .map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+  } catch(e) { UI.toast('Gagal memuat kelas','error'); }
+}
+
+function openKelasModal()  { document.getElementById('modal-kelas-diampu').style.display='flex'; }
+function closeKelasModal() { document.getElementById('modal-kelas-diampu').style.display='none'; }
+
+async function addKelas() {
+  const id = document.getElementById('kd-select').value;
+  if(!id) { UI.toast('Pilih kelas dulu','warn'); return; }
+  try {
+    await API.post('/api/guru/taught-classes', {class_id: id});
+    UI.toast('✅ Kelas ditambahkan','success');
+    closeKelasModal(); loadTaughtClasses();
+  } catch(e) { UI.toast(e.error||'Gagal','error'); }
+}
+
+async function removeKelas(id, name) {
+  UI.confirm('Hapus Kelas', `Hapus kelas <strong>${name}</strong> dari daftar diampu?`, async()=>{
+    await API.del(`/api/guru/taught-classes/${id}`);
+    UI.toast('Kelas dihapus','success'); loadTaughtClasses();
+  });
+}
 </script>
 </body>
 </html>
