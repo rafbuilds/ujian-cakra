@@ -49,6 +49,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="18" y1="20" x2="18" y2="10" stroke-linecap="round"/><line x1="12" y1="20" x2="12" y2="4" stroke-linecap="round"/><line x1="6" y1="20" x2="6" y2="14" stroke-linecap="round"/></svg>
         Nilai & Rekap
       </a>
+      <a href="guru-mapel.html" class="sb-item" id="nav-mapel">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" stroke-linecap="round"/></svg>
+        Mata Pelajaran
+      </a>
       <a href="guru-siswa.html" class="sb-item" id="nav-siswa">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke-linecap="round"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke-linecap="round"/></svg>
         Data Siswa
@@ -105,7 +109,9 @@
     </div>
     <div class="form-row">
       <div class="form-group">
-        <label>Mata Pelajaran</label>
+        <label>Mata Pelajaran
+          <button type="button" onclick="tambahMapel()" style="background:none;border:none;color:var(--green3);font-size:12px;cursor:pointer;font-weight:600;margin-left:6px">+ Tambah mapel</button>
+        </label>
         <select class="form-control" id="f-subject">
           <option value="">— Pilih Mapel —</option>
         </select>
@@ -336,6 +342,18 @@ async function saveExam() {
     }
   } catch(e) { UI.toast(e.error||'Gagal menyimpan','error'); }
   finally { btn.textContent = editingId?'Simpan Perubahan':'Simpan & Tambah Soal'; btn.disabled=false; }
+}
+
+async function tambahMapel() {
+  const name = prompt('Nama mata pelajaran baru:');
+  if(!name || !name.trim()) return;
+  try {
+    const sub = await API.post('/api/subjects', {name: name.trim()});
+    UI.toast(`✅ Mapel "${sub.name}" ditambahkan`, 'success');
+    // Reload subjects
+    await loadSubjects();
+    document.getElementById('f-subject').value = sub.id;
+  } catch(e) { UI.toast(e.error || 'Gagal tambah mapel', 'error'); }
 }
 
 init();
