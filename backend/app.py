@@ -928,6 +928,7 @@ def monitor_exam(exam_id):
 
         result.append({
             "student_id":     sid,
+            "session_id":     sess["id"] if sess else None,
             "name":           stu["name"],
             "avatar_url":     stu["avatar_url"],
             "class_name":     stu["class_name"],
