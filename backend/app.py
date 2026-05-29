@@ -1034,6 +1034,34 @@ def exam_results(exam_id):
         'question_stats': q_stats,
     })
 
+@app.route("/api/exams/<exam_id>/student/<student_id>/detail", methods=["GET"])
+@require_guru
+def student_exam_detail(exam_id, student_id):
+    """Detail jawaban siswa via exam_id + student_id (lebih mudah dari frontend)."""
+    sess = query("""
+        SELECT id FROM exam_sessions
+        WHERE exam_id=%s AND student_id=%s
+        LIMIT 1
+    """, (exam_id, student_id), fetch="one")
+    if not sess:
+        return jsonify({"error": "Siswa belum memulai ujian ini"}), 404
+
+    questions = query("""
+        SELECT q.id, q.content, q.order_num,
+               a.option_id as student_option_id,
+               ao.label as student_label, ao.content as student_answer,
+               ao.is_correct as is_correct,
+               co.label as correct_label, co.content as correct_answer
+        FROM questions q
+        LEFT JOIN answers a ON a.question_id = q.id AND a.session_id = %s
+        LEFT JOIN options ao ON ao.id = a.option_id
+        LEFT JOIN options co ON co.question_id = q.id AND co.is_correct = true
+        WHERE q.exam_id = %s
+        ORDER BY q.order_num, q.created_at
+    """, (sess["id"], exam_id))
+
+    return jsonify({"questions": [dict(q) for q in questions]})
+
 @app.route("/api/sessions/<session_id>/detail", methods=["GET"])
 @require_guru
 def session_detail(session_id):
