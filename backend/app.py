@@ -156,7 +156,24 @@ def get_classes():
 @app.route("/api/subjects", methods=["GET"])
 @require_guru
 def get_subjects():
-    rows = query("SELECT * FROM subjects ORDER BY name")
+    """Ambil mapel milik guru ini saja."""
+    rows = query("""
+        SELECT * FROM subjects
+        WHERE teacher_id=%s OR teacher_id IS NULL
+        ORDER BY name
+    """, (request.user_id,))
+    return jsonify([dict(r) for r in rows])
+
+@app.route("/api/admin/subjects", methods=["GET"])
+@require_admin
+def admin_get_all_subjects():
+    """Admin lihat semua mapel dari semua guru."""
+    rows = query("""
+        SELECT s.*, u.name as teacher_name
+        FROM subjects s
+        LEFT JOIN users u ON u.id = s.teacher_id
+        ORDER BY u.name, s.name
+    """)
     return jsonify([dict(r) for r in rows])
 
 @app.route("/api/subjects", methods=["POST"])
@@ -170,8 +187,8 @@ def create_subject():
     if existing:
         return jsonify({"error": "Mapel sudah ada"}), 409
     sub = query("""
-        INSERT INTO subjects (id, name) VALUES (%s, %s) RETURNING *
-    """, (str(uuid.uuid4()), name), fetch="one")
+        INSERT INTO subjects (id, name, teacher_id) VALUES (%s, %s, %s) RETURNING *
+    """, (str(uuid.uuid4()), name, request.user_id), fetch="one")
     return jsonify(dict(sub)), 201
 
 @app.route("/api/subjects/<subject_id>", methods=["PATCH"])
@@ -188,10 +205,14 @@ def update_subject(subject_id):
 @app.route("/api/subjects/<subject_id>", methods=["DELETE"])
 @require_guru
 def delete_subject(subject_id):
-    # Cek apakah dipakai di ujian
+    sub = query("SELECT * FROM subjects WHERE id=%s", (subject_id,), fetch="one")
+    if not sub:
+        return jsonify({"error": "Mapel tidak ditemukan"}), 404
+    if str(sub.get("teacher_id","")) != request.user_id and request.user_role != "admin":
+        return jsonify({"error": "Bukan mapel kamu"}), 403
     used = query("SELECT id FROM exams WHERE subject_id=%s LIMIT 1", (subject_id,), fetch="one")
     if used:
-        return jsonify({"error": "Mapel masih dipakai di ujian, tidak bisa dihapus"}), 400
+        return jsonify({"error": "Mapel masih dipakai di ujian"}), 400
     query("DELETE FROM subjects WHERE id=%s", (subject_id,), fetch="none")
     return jsonify({"ok": True})
 
@@ -864,11 +885,45 @@ def submit_exam(session_id):
         WHERE id=%s
     """, (auto_submit, session_id), fetch="none")
 
-    # Hitung nilai
-    query("SELECT calculate_result(%s)", (session_id,), fetch="none")
+    # Hitung nilai langsung di Python (tanpa stored procedure)
+    exam_data = query("SELECT * FROM exams WHERE id=%s", (sess["exam_id"],), fetch="one")
 
-    result = query("SELECT * FROM results WHERE session_id=%s",
-                   (session_id,), fetch="one")
+    # Ambil semua soal ujian
+    total_q = query("SELECT COUNT(*) as n FROM questions WHERE exam_id=%s",
+                    (sess["exam_id"],), fetch="one")["n"]
+
+    # Hitung jawaban benar
+    correct = query("""
+        SELECT COUNT(*) as n FROM answers a
+        JOIN options o ON o.id = a.option_id
+        WHERE a.session_id=%s AND o.is_correct=true
+    """, (session_id,), fetch="one")["n"]
+
+    wrong = query("""
+        SELECT COUNT(*) as n FROM answers a
+        JOIN options o ON o.id = a.option_id
+        WHERE a.session_id=%s AND o.is_correct=false
+    """, (session_id,), fetch="one")["n"]
+
+    empty = total_q - correct - wrong
+
+    # Hitung skor dengan formula dari ujian
+    # score_formula: 'standard' (benar/total*100), atau custom
+    score_per_correct = float(exam_data.get("score_per_correct") or (100.0/total_q if total_q else 0))
+    score = round(correct * score_per_correct, 2)
+
+    # Simpan hasil
+    existing = query("SELECT id FROM results WHERE session_id=%s", (session_id,), fetch="one")
+    if existing:
+        query("""UPDATE results SET score=%s, correct_count=%s, wrong_count=%s, empty_count=%s
+                 WHERE session_id=%s""",
+              (score, correct, wrong, empty, session_id), fetch="none")
+    else:
+        query("""INSERT INTO results (id, session_id, score, correct_count, wrong_count, empty_count)
+                 VALUES (%s, %s, %s, %s, %s, %s)""",
+              (str(uuid.uuid4()), session_id, score, correct, wrong, empty), fetch="none")
+
+    result = query("SELECT * FROM results WHERE session_id=%s", (session_id,), fetch="one")
     exam   = query("SELECT show_result_after FROM exams WHERE id=%s",
                    (sess["exam_id"],), fetch="one")
 
