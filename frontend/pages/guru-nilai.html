@@ -350,16 +350,15 @@ async function showDetail(studentId) {
   document.getElementById('dp-questions').innerHTML='<div class="loading-spinner" style="margin:2rem auto;width:28px;height:28px"></div>';
 
   try {
-    const mon=monitorData||await API.get(`/api/exams/${currentExamId}/monitor`);
-    const stuMon=mon.students?.find(s=>s.student_id===studentId||s.name===stu.name);
-    if(!stuMon?.session_id){
-      document.getElementById('dp-questions').innerHTML='<div style="padding:2rem;text-align:center;color:var(--muted)">📭 Siswa belum memulai ujian</div>';
-      return;
-    }
-    const detail=await API.get(`/api/sessions/${stuMon.session_id}/detail`);
+    const detail = await API.get(`/api/exams/${currentExamId}/student/${studentId}/detail`);
     renderDetailQ(detail.questions||[]);
-  } catch {
-    document.getElementById('dp-questions').innerHTML='<div style="padding:2rem;text-align:center;color:var(--red2)">Gagal memuat detail</div>';
+  } catch(e) {
+    const msg = e.error||e.toString();
+    if(msg.includes('belum memulai')) {
+      document.getElementById('dp-questions').innerHTML='<div style="padding:2rem;text-align:center;color:var(--muted)">📭 Siswa belum memulai ujian ini</div>';
+    } else {
+      document.getElementById('dp-questions').innerHTML=`<div style="padding:2rem;text-align:center;color:var(--red2)">Gagal memuat: ${msg}</div>`;
+    }
   }
 }
 
