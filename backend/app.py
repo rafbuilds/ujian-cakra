@@ -65,7 +65,7 @@ def google_callback():
     user_r = http_requests.get('https://www.googleapis.com/oauth2/v3/userinfo',
                                 headers={'Authorization': f"Bearer {tokens['access_token']}"})
     if not user_r.ok: return jsonify({'error': 'Gagal ambil info user'}), 400
-    info = user_r.json()
+    info    = user_r.json()
     google_id = info['sub']
     email     = info.get('email','')
     name      = info.get('name','')
@@ -73,23 +73,37 @@ def google_callback():
 
     user = query("SELECT * FROM users WHERE google_id=%s", (google_id,), fetch='one')
     if not user:
-        if ALLOWED_DOMAIN and not email.endswith('@'+ALLOWED_DOMAIN) and role=='siswa':
+        if ALLOWED_DOMAIN and not email.endswith('@'+ALLOWED_DOMAIN) and role == 'siswa':
             return f"<script>window.location='{FRONTEND_URL}?error=domain'</script>"
-        assigned_role = 'guru_pending' if role=='guru' else role
+        # Guru masuk dulu sebagai guru_pending, admin aktivasi
+        assigned_role = 'guru_pending' if role == 'guru' else role
         uid = str(uuid.uuid4())
         query("""INSERT INTO users (id, google_id, email, name, avatar_url, role, is_active)
                  VALUES (%s,%s,%s,%s,%s,%s,true)""",
               (uid, google_id, email, name, avatar, assigned_role), fetch='none')
         user = query("SELECT * FROM users WHERE id=%s", (uid,), fetch='one')
+
     query("UPDATE users SET last_login=NOW(), avatar_url=%s WHERE id=%s", (avatar, user['id']), fetch='none')
     token = create_token(str(user['id']), user['role'])
-    return f"<script>window.location='{FRONTEND_URL}?token={token}'</script>"
+
+    # Redirect ke halaman yang sesuai role
+    role_actual = user['role']
+    if role_actual == 'guru_pending':
+        dest = f"{FRONTEND_URL}/pages/guru-pending.html"
+    elif role_actual == 'guru':
+        dest = f"{FRONTEND_URL}/pages/guru-dashboard.html"
+    elif role_actual == 'admin':
+        dest = f"{FRONTEND_URL}/pages/admin-dashboard.html"
+    else:
+        dest = f"{FRONTEND_URL}/pages/siswa-ujian.html"
+
+    return f"<script>localStorage.setItem('token','{token}');localStorage.setItem('user_role','{role_actual}');window.location='{dest}'</script>"
 
 @app.route('/api/auth/me')
 @require_auth
 def auth_me():
     from db import query
-    user = query("SELECT id,email,name,role,avatar_url,class_id,nisn,device_id,last_login FROM users WHERE id=%s",
+    user = query("SELECT id,email,name,role,avatar_url,class_id,nisn,last_login FROM users WHERE id=%s",
                  (request.user_id,), fetch='one')
     if not user: return jsonify({'error': 'User tidak ditemukan'}), 404
     return jsonify(dict(user))
@@ -105,6 +119,70 @@ def dev_login():
     query("UPDATE users SET last_login=NOW() WHERE id=%s", (user['id'],), fetch='none')
     token = create_token(str(user['id']), user['role'])
     return jsonify({'token': token, 'role': user['role'], 'name': user['name']})
+
+# ══════════════════════════════════════════════════════════════
+# ADMIN — Exam Groups (dibuat admin, guru bisa join)
+# ══════════════════════════════════════════════════════════════
+import uuid as _uuid
+
+@app.route('/api/admin/exam-groups', methods=['GET'])
+@require_admin
+def admin_list_groups():
+    from db import query
+    rows = query("""
+        SELECT eg.*, u.name as created_by_name,
+               COUNT(DISTINCT egm.teacher_id) as member_count,
+               COUNT(DISTINCT e.id) as exam_count
+        FROM exam_groups eg
+        LEFT JOIN users u ON u.id=eg.created_by
+        LEFT JOIN exam_group_members egm ON egm.group_id=eg.id
+        LEFT JOIN exams e ON e.group_id=eg.id
+        GROUP BY eg.id, u.name
+        ORDER BY eg.created_at DESC
+    """, ())
+    return jsonify([dict(r) for r in rows])
+
+@app.route('/api/admin/exam-groups', methods=['POST'])
+@require_admin
+def admin_create_group():
+    from db import query
+    body = request.json or {}
+    name = body.get('name','').strip()
+    if not name: return jsonify({'error': 'Nama group wajib'}), 400
+    grp = query("""
+        INSERT INTO exam_groups (id, name, description, created_by, is_active)
+        VALUES (%s,%s,%s,%s,true) RETURNING *
+    """, (str(_uuid.uuid4()), name, body.get('description',''), request.user_id), fetch='one')
+    return jsonify(dict(grp)), 201
+
+@app.route('/api/admin/exam-groups/<group_id>', methods=['PATCH'])
+@require_admin
+def admin_update_group(group_id):
+    from db import query
+    body = request.json or {}
+    query("UPDATE exam_groups SET name=%s, description=%s WHERE id=%s",
+          (body.get('name',''), body.get('description',''), group_id), fetch='none')
+    return jsonify({'ok': True})
+
+@app.route('/api/admin/exam-groups/<group_id>', methods=['DELETE'])
+@require_admin
+def admin_delete_group(group_id):
+    from db import query
+    query("UPDATE exam_groups SET is_active=false WHERE id=%s", (group_id,), fetch='none')
+    return jsonify({'ok': True})
+
+@app.route('/api/admin/exam-groups/<group_id>/members', methods=['GET'])
+@require_admin
+def admin_group_members(group_id):
+    from db import query
+    rows = query("""
+        SELECT u.id, u.name, u.email, egm.joined_at
+        FROM exam_group_members egm
+        JOIN users u ON u.id=egm.teacher_id
+        WHERE egm.group_id=%s
+        ORDER BY egm.joined_at DESC
+    """, (group_id,))
+    return jsonify([dict(r) for r in rows])
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)),
