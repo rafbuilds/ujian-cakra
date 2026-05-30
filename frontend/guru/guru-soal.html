@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Kelola Soal — Ujian Online</title>
+<link rel="stylesheet" href="../style.css"/>
+<style>
+.q-card{background:var(--white);border:.5px solid var(--border);border-radius:12px;padding:1rem 1.25rem;margin-bottom:8px}
+.q-num{font-size:11px;font-weight:600;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px}
+.q-text{font-size:15px;font-weight:500;line-height:1.6;margin-bottom:.875rem}
+.q-options{display:flex;flex-direction:column;gap:6px}
+.opt-row{display:flex;align-items:center;gap:10px;padding:7px 12px;border-radius:9px;font-size:13px}
+.opt-row.correct{background:#eaf3de;border:.5px solid rgba(29,158,117,.3)}
+.opt-label{width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0}
+.opt-label.correct{background:var(--green3);color:#fff}
+.opt-label.wrong{background:var(--light);color:var(--muted)}
+.q-footer{display:flex;align-items:center;justify-content:space-between;margin-top:.75rem;padding-top:.75rem;border-top:.5px solid #f0ede5}
+.add-soal-box{background:#fafaf8;border:1.5px dashed var(--border2);border-radius:12px;padding:1.25rem;margin-top:.75rem}
+.opt-input-row{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+.opt-letter{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;cursor:pointer;transition:all .15s;flex-shrink:0}
+.opt-letter.key{background:var(--green3);color:#fff}
+.opt-letter.nokey{background:var(--light);color:var(--muted)}
+.exam-info-bar{background:var(--white);border:.5px solid var(--border);border-radius:12px;padding:1rem 1.25rem;margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+/* Kunci mode */
+.kunci-banner{background:linear-gradient(135deg,var(--green),var(--green2));border-radius:12px;padding:1rem 1.25rem;margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem}
+.opt-kunci-btn{display:flex;align-items:center;gap:10px;width:100%;padding:11px 14px;margin-bottom:6px;border-radius:11px;cursor:pointer;border:2px solid var(--border);background:var(--white);font-family:inherit;text-align:left;transition:all .15s}
+.opt-kunci-btn.selected{border-color:var(--green);background:var(--green4)}
+.opt-kunci-letter{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;transition:all .15s}
+.opt-kunci-letter.selected{background:var(--green);color:#fff}
+.opt-kunci-letter.nosel{background:var(--light);color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="app-shell">
+  <nav class="sidebar">
+    <div class="sb-logo"><div class="sb-logo-title">📋 Ujian Online</div><div class="sb-logo-sub">SMAN 1 Batangan</div></div>
+    <div class="sb-nav">
+      <div class="sb-section">Menu</div>
+      <a href="guru-dashboard.html" class="sb-item" id="nav-dashboard">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" stroke-linecap="round" stroke-linejoin="round"/><polyline points="9 22 9 12 15 12 15 22" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Dashboard
+      </a>
+      <a href="guru-ujian.html" class="sb-item active" id="nav-ujian">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" stroke-linecap="round"/></svg>
+        Daftar Ujian
+      </a>
+      <a href="guru-pengawas.html" class="sb-item" id="nav-pengawas">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M15 10l4.553-2.069A1 1 0 0121 8.82V15.18a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" stroke-linecap="round"/></svg>
+        Pengawas Live
+      </a>
+      <a href="guru-nilai.html" class="sb-item" id="nav-nilai">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="18" y1="20" x2="18" y2="10" stroke-linecap="round"/><line x1="12" y1="20" x2="12" y2="4" stroke-linecap="round"/><line x1="6" y1="20" x2="6" y2="14" stroke-linecap="round"/></svg>
+        Nilai & Rekap
+      </a>
+      <a href="guru-mapel.html" class="sb-item" id="nav-mapel">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" stroke-linecap="round"/></svg>
+        Mata Pelajaran
+      </a>
+      <a href="guru-siswa.html" class="sb-item" id="nav-siswa">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke-linecap="round"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke-linecap="round"/></svg>
+        Data Siswa
+      </a>
+    </div>
+
+    <div class="sb-user">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <div class="sb-avatar" id="sb-avatar">G</div>
+        <div><div class="sb-user-name" id="sb-user-name">Guru</div><div class="sb-user-role">Guru Pengampu</div></div>
+      </div>
+      <button class="sb-logout" onclick="Auth.logout()">⏻ Keluar</button>
+    </div>
+  </nav>
+
+  <div class="main-wrap">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:10px">
+        <a href="guru-ujian.html" style="color:var(--muted);font-size:13px;font-weight:500">← Daftar Ujian</a>
+        <span style="color:var(--border)">/</span>
+        <div class="topbar-title" id="exam-title-topbar">Kelola Soal</div>
+      </div>
+      <div class="topbar-right" id="topbar-actions"></div>
+    </div>
+
+    <div class="page-main">
+      <div id="loading-state" style="text-align:center;padding:3rem"><div class="loading-spinner"></div></div>
+      <div id="main-content" style="display:none">
+
+        <!-- Info ujian -->
+        <div class="exam-info-bar" id="exam-info-bar"></div>
+
+        <!-- Kunci mode banner -->
+        <div class="kunci-banner" id="kunci-banner" style="display:none">
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="font-size:24px">🔑</div>
+            <div>
+              <div style="font-weight:700;font-size:15px;color:#fff">Mode Set Kunci Jawaban</div>
+              <div style="font-size:13px;color:rgba(255,255,255,.75)" id="kunci-counter">Pilih jawaban benar untuk setiap soal</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-sm" style="background:#fff;color:var(--green);font-weight:700" onclick="simpanKunci()">💾 Simpan Semua</button>
+            <button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff" onclick="exitKunciMode()">✕ Batal</button>
+          </div>
+        </div>
+
+        <!-- Toolbar soal -->
+        <div class="card" style="padding:.875rem 1.25rem">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+            <div style="font-weight:600;font-size:15px">Soal (<span id="q-count">0</span>)</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn btn-secondary btn-sm" onclick="downloadTemplate()">⬇ Template CSV</button>
+              <label class="btn btn-secondary btn-sm" style="cursor:pointer">
+                ⬆ Import File
+                <input type="file" id="import-file" accept=".csv,.xlsx,.xls,.docx,.doc" style="display:none" onchange="importSoal(this)"/>
+              </label>
+              <button class="btn btn-secondary btn-sm" id="btn-kunci" onclick="enterKunciMode()">🔑 Set Kunci</button>
+              <button class="btn btn-primary btn-sm" onclick="toggleAddForm()">+ Tambah Soal</button>
+            </div>
+          </div>
+
+          <!-- Form tambah soal -->
+          <div class="add-soal-box" id="add-soal-form" style="display:none;margin-top:.875rem">
+            <div style="font-weight:600;font-size:14px;color:var(--green);margin-bottom:.875rem">Tambah Soal Baru</div>
+            <div class="form-group">
+              <label>Pertanyaan</label>
+              <textarea class="form-control" id="nq-text" rows="3" placeholder="Ketik pertanyaan di sini..."></textarea>
+            </div>
+            <div style="margin-bottom:.875rem">
+              <label style="display:block;font-size:12px;font-weight:600;color:#5f5e5a;margin-bottom:8px">Pilihan Jawaban <span style="color:var(--muted);font-weight:400">(klik huruf = set kunci)</span></label>
+              <div id="opt-inputs">
+                <div class="opt-input-row" data-label="A"><div class="opt-letter key" onclick="setKey('A')">A</div><input class="form-control" placeholder="Pilihan A..." style="flex:1"/><span style="font-size:11px;color:var(--green);font-weight:600;white-space:nowrap">✓ Kunci</span></div>
+                <div class="opt-input-row" data-label="B"><div class="opt-letter nokey" onclick="setKey('B')">B</div><input class="form-control" placeholder="Pilihan B..." style="flex:1"/><span style="font-size:11px;color:transparent">✓ Kunci</span></div>
+                <div class="opt-input-row" data-label="C"><div class="opt-letter nokey" onclick="setKey('C')">C</div><input class="form-control" placeholder="Pilihan C..." style="flex:1"/><span style="font-size:11px;color:transparent">✓ Kunci</span></div>
+                <div class="opt-input-row" data-label="D"><div class="opt-letter nokey" onclick="setKey('D')">D</div><input class="form-control" placeholder="Pilihan D..." style="flex:1"/><span style="font-size:11px;color:transparent">✓ Kunci</span></div>
+                <div class="opt-input-row" data-label="E"><div class="opt-letter nokey" onclick="setKey('E')">E</div><input class="form-control" placeholder="Pilihan E (opsional)..." style="flex:1"/><span style="font-size:11px;color:transparent">✓ Kunci</span></div>
+              </div>
+              <div style="font-size:11px;color:var(--muted);margin-top:4px">Klik huruf A/B/C/D/E untuk set kunci jawaban</div>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-primary btn-sm" onclick="addSoal()">Simpan Soal</button>
+              <button class="btn btn-secondary btn-sm" onclick="toggleAddForm()">Batal</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Daftar soal -->
+        <div id="soal-list"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="../config.js"></script>
+<script src="../components/api.js"></script>
+<script src="../components/auth.js"></script>
+<script src="../components/common.js"></script>
+<script>
+if(!Auth.requireRole(['guru','admin'])) throw new Error();
+UI.initSidebar();
+
+const examId = new URLSearchParams(location.search).get('id');
+if(!examId) { location.href='guru-ujian.html'; throw new Error(); }
+
+let exam=null, kunciMode=false, kunciDraft={};
+
+async function load() {
+  try {
+    exam = await API.get(`/api/exams/${examId}`);
+    render();
+  } catch { UI.toast('Gagal memuat ujian','error'); }
+}
+
+function render() {
+  document.getElementById('loading-state').style.display='none';
+  document.getElementById('main-content').style.display='block';
+  document.getElementById('exam-title-topbar').textContent = exam.title;
+  document.getElementById('q-count').textContent = exam.questions.length;
+
+  // Info bar
+  document.getElementById('exam-info-bar').innerHTML = `
+    <div>
+      <div style="font-weight:600;font-size:16px">${exam.title}</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:3px;display:flex;gap:10px;flex-wrap:wrap">
+        <span>📚 ${exam.subject_name||'—'}</span>
+        <span>⏱ ${exam.duration_minutes} menit</span>
+        <span>📅 ${UI.fmtDT(exam.start_at)}</span>
+        <span>👥 ${exam.classes?.map(c=>c.name).join(', ')||'—'}</span>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      ${UI.examStatusBadge(exam.status)}
+      ${exam.status==='draft'?`<button class="btn btn-success btn-sm" onclick="publish()">Publish Ujian</button>`:''}
+      ${exam.status==='published'||exam.status==='ongoing'?`<a href="guru-pengawas.html?id=${examId}" class="btn btn-secondary btn-sm">👁 Monitor</a>`:''}
+    </div>
+  `;
+
+  // Topbar actions
+  document.getElementById('topbar-actions').innerHTML = `
+    ${exam.status==='draft'?`<button class="btn btn-success btn-sm" onclick="publish()">✓ Publish</button>`:''}
+    <a href="guru-pengawas.html?id=${examId}" class="btn btn-secondary btn-sm">👁 Monitor</a>
+    <a href="guru-nilai.html?id=${examId}" class="btn btn-secondary btn-sm">📊 Nilai</a>
+  `;
+
+  renderSoal();
+}
+
+function renderSoal() {
+  const el = document.getElementById('soal-list');
+  if(!exam.questions.length) {
+    el.innerHTML=`<div class="card"><div class="empty-state"><div class="empty-icon">📝</div>
+      <div class="empty-text">Belum ada soal. Tambah soal manual atau import dari file.</div></div></div>`;
+    return;
+  }
+  el.innerHTML = exam.questions.map((q,i)=>`
+    <div class="q-card" id="qcard-${q.id}">
+      <div class="q-num">Soal ${i+1}</div>
+      <div class="q-text">${q.content}</div>
+      ${kunciMode ? renderKunciOptions(q) : renderNormalOptions(q)}
+      <div class="q-footer">
+        <div style="font-size:11px;color:var(--muted)">${q.options.filter(o=>o.is_correct).length?'Kunci: '+q.options.find(o=>o.is_correct)?.label:'⚠ Belum ada kunci'}</div>
+        ${!kunciMode?`<button class="btn btn-danger btn-sm" onclick="deleteSoal('${q.id}')">🗑 Hapus</button>`:''}
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderNormalOptions(q) {
+  return `<div class="q-options">${q.options.map(o=>`
+    <div class="opt-row ${o.is_correct?'correct':''}">
+      <div class="opt-label ${o.is_correct?'correct':'wrong'}">${o.label}</div>
+      <div>${o.content}</div>
+      ${o.is_correct?'<span style="font-size:11px;color:var(--green3);font-weight:600;margin-left:auto">✓ Kunci</span>':''}
+    </div>
+  `).join('')}</div>`;
+}
+
+function renderKunciOptions(q) {
+  return `<div>${q.options.map(o=>{
+    const isDraft  = kunciDraft[q.id]===o.id;
+    const isSaved  = !kunciDraft[q.id] && o.is_correct;
+    const selected = isDraft||isSaved;
+    return `<button class="opt-kunci-btn ${selected?'selected':''}" onclick="pickKunci('${q.id}','${o.id}')">
+      <div class="opt-kunci-letter ${selected?'selected':'nosel'}">${o.label}</div>
+      <div style="font-size:14px;flex:1;text-align:left">${o.content}</div>
+      ${isDraft?'<span style="font-size:11px;background:#d4edda;color:var(--green);padding:2px 8px;border-radius:6px;font-weight:600">✓ Dipilih</span>':''}
+    </button>`;
+  }).join('')}</div>`;
+}
+
+// ── Kunci Mode ───────────────────────────────────────────────
+function enterKunciMode() {
+  kunciMode=true; kunciDraft={};
+  document.getElementById('kunci-banner').style.display='flex';
+  document.getElementById('btn-kunci').style.display='none';
+  renderSoal(); updateKunciCounter();
+}
+function exitKunciMode() {
+  kunciMode=false; kunciDraft={};
+  document.getElementById('kunci-banner').style.display='none';
+  document.getElementById('btn-kunci').style.display='';
+  renderSoal();
+}
+function pickKunci(qid, oid) {
+  kunciDraft[qid]=oid;
+  document.getElementById(`qcard-${qid}`).querySelector('div:nth-child(3)').innerHTML = renderKunciOptions(exam.questions.find(q=>q.id===qid));
+  // Re-attach events
+  document.getElementById(`qcard-${qid}`).querySelectorAll('.opt-kunci-btn').forEach((btn,i)=>{
+    const q=exam.questions.find(q=>q.id===qid);
+    btn.onclick=()=>pickKunci(qid, q.options[i].id);
+  });
+  updateKunciCounter();
+}
+function updateKunciCounter() {
+  const filled=Object.keys(kunciDraft).length;
+  const total=exam.questions.length;
+  document.getElementById('kunci-counter').textContent=`Sudah dipilih: ${filled} dari ${total} soal`;
+}
+async function simpanKunci() {
+  if(!Object.keys(kunciDraft).length){UI.toast('Belum ada kunci yang dipilih','warn');return;}
+  UI.loading(true,'Menyimpan kunci jawaban...');
+  let ok=0;
+  try {
+    for(const [qid, oid] of Object.entries(kunciDraft)) {
+      const q=exam.questions.find(q=>q.id===qid);
+      if(!q) continue;
+      await API.patch(`/api/questions/${qid}`,{options:q.options.map(o=>({label:o.label,content:o.content,is_correct:o.id===oid}))});
+      ok++;
+    }
+    UI.toast(`✅ ${ok} kunci jawaban disimpan`,'success');
+    exitKunciMode();
+    await load();
+  } catch { UI.toast('Gagal menyimpan kunci','error'); }
+  finally { UI.loading(false); }
+}
+
+// ── Tambah Soal ──────────────────────────────────────────────
+let currentKey='A';
+function setKey(label) {
+  currentKey=label;
+  document.querySelectorAll('#opt-inputs .opt-input-row').forEach(row=>{
+    const lbl=row.dataset.label;
+    const letterEl=row.querySelector('.opt-letter');
+    const kunciEl=row.querySelector('span');
+    letterEl.className=`opt-letter ${lbl===label?'key':'nokey'}`;
+    kunciEl.style.color=lbl===label?'var(--green)':'transparent';
+  });
+}
+function toggleAddForm() {
+  const el=document.getElementById('add-soal-form');
+  el.style.display=el.style.display==='none'?'block':'none';
+  if(el.style.display==='block') {
+    document.getElementById('nq-text').value='';
+    document.querySelectorAll('#opt-inputs input').forEach(i=>i.value='');
+    setKey('A');
+  }
+}
+async function addSoal() {
+  const text=document.getElementById('nq-text').value.trim();
+  if(!text){UI.toast('Isi pertanyaan terlebih dahulu','warn');return;}
+  const options=[];
+  document.querySelectorAll('#opt-inputs .opt-input-row').forEach(row=>{
+    const val=row.querySelector('input').value.trim();
+    if(val) options.push({label:row.dataset.label,content:val,is_correct:row.dataset.label===currentKey});
+  });
+  if(options.length<2){UI.toast('Minimal 2 pilihan jawaban','warn');return;}
+  if(!options.some(o=>o.is_correct)){UI.toast('Set kunci jawaban dulu','warn');return;}
+  try {
+    await API.post(`/api/exams/${examId}/questions`,{content:text,options});
+    UI.toast('✅ Soal ditambahkan','success');
+    toggleAddForm(); await load();
+  } catch(e){UI.toast(e.error||'Gagal','error');}
+}
+
+// ── Import ────────────────────────────────────────────────────
+async function importSoal(input) {
+  const file=input.files[0]; if(!file) return;
+  UI.loading(true,'Mengimport soal...');
+  try {
+    const fd=new FormData(); fd.append('file',file);
+    const r=await API.upload(`/api/exams/${examId}/import`,fd);
+    UI.toast(`✅ ${r.saved} dari ${r.total} soal berhasil diimport`,'success');
+    await load();
+  } catch(e){UI.toast(e.error||'Gagal import','error');}
+  finally{UI.loading(false);input.value='';}
+}
+async function downloadTemplate() {
+  try { await API.download('/api/template-soal','template_soal.csv'); }
+  catch { UI.toast('Gagal download template','error'); }
+}
+
+// ── Hapus & Publish ───────────────────────────────────────────
+async function deleteSoal(qid) {
+  UI.confirm('Hapus Soal','Soal ini akan dihapus permanen.',async()=>{
+    await API.del(`/api/questions/${qid}`);
+    UI.toast('Soal dihapus','success'); await load();
+  });
+}
+async function publish() {
+  if(!exam.questions.length){UI.toast('Tambah soal dulu sebelum publish','warn');return;}
+  const noKey=exam.questions.filter(q=>!q.options.some(o=>o.is_correct));
+  if(noKey.length){UI.toast(`${noKey.length} soal belum punya kunci jawaban. Set kunci dulu.`,'warn');return;}
+  UI.confirm('Publish Ujian',`Ujian "<strong>${exam.title}</strong>" akan dipublish dan bisa diakses siswa.`,async()=>{
+    await API.patch(`/api/exams/${examId}`,{status:'published'});
+    UI.toast('✅ Ujian dipublish','success'); await load();
+  },'success');
+}
+
+load();
+</script>
+</body>
+</html>
