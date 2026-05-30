@@ -22,7 +22,7 @@ app.register_blueprint(siswa_bp)
 app.register_blueprint(exams_bp)
 
 # ── Auth Routes ────────────────────────────────────────────────
-from auth import require_auth, require_admin, generate_token
+from auth import require_auth, require_admin, require_guru, create_token
 import requests as http_requests
 
 GOOGLE_CLIENT_ID     = os.environ.get('GOOGLE_CLIENT_ID','')
@@ -82,7 +82,7 @@ def google_callback():
               (uid, google_id, email, name, avatar, assigned_role), fetch='none')
         user = query("SELECT * FROM users WHERE id=%s", (uid,), fetch='one')
     query("UPDATE users SET last_login=NOW(), avatar_url=%s WHERE id=%s", (avatar, user['id']), fetch='none')
-    token = generate_token(str(user['id']), user['role'])
+    token = create_token(str(user['id']), user['role'])
     return f"<script>window.location='{FRONTEND_URL}?token={token}'</script>"
 
 @app.route('/api/auth/me')
@@ -103,7 +103,7 @@ def dev_login():
     user  = query("SELECT * FROM users WHERE email=%s", (email,), fetch='one')
     if not user: return jsonify({'error': f'User {email} tidak ditemukan'}), 404
     query("UPDATE users SET last_login=NOW() WHERE id=%s", (user['id'],), fetch='none')
-    token = generate_token(str(user['id']), user['role'])
+    token = create_token(str(user['id']), user['role'])
     return jsonify({'token': token, 'role': user['role'], 'name': user['name']})
 
 if __name__ == '__main__':
