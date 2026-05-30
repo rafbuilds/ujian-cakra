@@ -1904,5 +1904,127 @@ def export_nilai(exam_id):
     return send_file(buf, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                      as_attachment=True, download_name=filename)
 
+
+# ═══════════════════════════════════════════════════════════
+#  DEVICE TRACKING - Siswa tidak bisa ganti device
+# ═══════════════════════════════════════════════════════════
+
+@app.route("/api/admin/siswa/<siswa_id>/device", methods=["GET"])
+@require_admin
+def get_siswa_device(siswa_id):
+    user = query("SELECT id, name, device_id, device_info, last_login FROM users WHERE id=%s", (siswa_id,), fetch="one")
+    if not user: return jsonify({"error": "Siswa tidak ditemukan"}), 404
+    return jsonify(dict(user))
+
+@app.route("/api/admin/siswa/<siswa_id>/reset-device", methods=["POST"])
+@require_admin
+def reset_siswa_device(siswa_id):
+    query("UPDATE users SET device_id=NULL, device_info=NULL WHERE id=%s AND role='siswa'", (siswa_id,), fetch="none")
+    return jsonify({"ok": True, "message": "Device berhasil direset"})
+
+@app.route("/api/student/register-device", methods=["POST"])
+@require_auth
+def register_device():
+    data = request.json or {}
+    device_id   = data.get("device_id","").strip()
+    device_info = data.get("device_info","").strip()
+    if not device_id:
+        return jsonify({"error": "device_id wajib"}), 400
+    user = query("SELECT device_id FROM users WHERE id=%s", (request.user_id,), fetch="one")
+    if not user: return jsonify({"error": "User tidak ditemukan"}), 404
+    if user.get("device_id") and user["device_id"] != device_id:
+        return jsonify({"allowed": False, "error": "Device tidak dikenali. Hubungi admin untuk reset device."}), 403
+    query("UPDATE users SET device_id=%s, device_info=%s WHERE id=%s",
+          (device_id, device_info, request.user_id), fetch="none")
+    return jsonify({"allowed": True})
+
+# ═══════════════════════════════════════════════════════════
+#  ADMIN - GURU SUBJECTS & CLASSES (kelola per guru)
+# ═══════════════════════════════════════════════════════════
+
+@app.route("/api/admin/guru/<guru_id>/subjects", methods=["GET"])
+@require_admin
+def admin_get_guru_subjects(guru_id):
+    rows = query("SELECT * FROM subjects WHERE teacher_id=%s ORDER BY name", (guru_id,))
+    return jsonify([dict(r) for r in rows])
+
+@app.route("/api/admin/guru/<guru_id>/subjects", methods=["POST"])
+@require_admin
+def admin_add_guru_subject(guru_id):
+    data = request.json or {}
+    name = data.get("name","").strip()
+    if not name: return jsonify({"error": "Nama mapel wajib"}), 400
+    existing = query("SELECT id FROM subjects WHERE LOWER(name)=LOWER(%s) AND teacher_id=%s", (name, guru_id), fetch="one")
+    if existing: return jsonify({"error": "Mapel sudah ada untuk guru ini"}), 409
+    sub = query("INSERT INTO subjects (id, name, teacher_id) VALUES (%s,%s,%s) RETURNING *",
+                (str(uuid.uuid4()), name, guru_id), fetch="one")
+    return jsonify(dict(sub)), 201
+
+@app.route("/api/admin/guru/<guru_id>/subjects/<subject_id>", methods=["DELETE"])
+@require_admin
+def admin_delete_guru_subject(guru_id, subject_id):
+    used = query("SELECT id FROM exams WHERE subject_id=%s LIMIT 1", (subject_id,), fetch="one")
+    if used: return jsonify({"error": "Mapel masih dipakai di ujian"}), 400
+    query("DELETE FROM subjects WHERE id=%s AND teacher_id=%s", (subject_id, guru_id), fetch="none")
+    return jsonify({"ok": True})
+
+@app.route("/api/admin/guru/<guru_id>/classes", methods=["GET"])
+@require_admin
+def admin_get_guru_classes(guru_id):
+    rows = query("""
+        SELECT c.* FROM classes c
+        JOIN guru_classes gc ON gc.class_id=c.id
+        WHERE gc.teacher_id=%s
+        ORDER BY c.grade, LENGTH(c.id), c.id
+    """, (guru_id,))
+    return jsonify([dict(r) for r in rows])
+
+@app.route("/api/admin/guru/<guru_id>/classes", methods=["POST"])
+@require_admin
+def admin_add_guru_class(guru_id):
+    data = request.json or {}
+    class_id = data.get("class_id","").strip()
+    if not class_id: return jsonify({"error": "class_id wajib"}), 400
+    query("INSERT INTO guru_classes (teacher_id, class_id) VALUES (%s,%s) ON CONFLICT DO NOTHING",
+          (guru_id, class_id), fetch="none")
+    return jsonify({"ok": True})
+
+@app.route("/api/admin/guru/<guru_id>/classes/<class_id>", methods=["DELETE"])
+@require_admin
+def admin_remove_guru_class(guru_id, class_id):
+    query("DELETE FROM guru_classes WHERE teacher_id=%s AND class_id=%s", (guru_id, class_id), fetch="none")
+    return jsonify({"ok": True})
+
+# ═══════════════════════════════════════════════════════════
+#  ADMIN - EXAM SETTINGS (aturan penilaian)
+# ═══════════════════════════════════════════════════════════
+
+@app.route("/api/admin/exam-settings", methods=["GET"])
+@require_admin
+def get_exam_settings():
+    settings = query("SELECT * FROM exam_settings LIMIT 1", fetch="one")
+    return jsonify(dict(settings) if settings else {
+        "passing_grade": 75,
+        "allow_remedial": True,
+        "max_violations": 5,
+        "auto_submit_on_violation": True,
+        "show_ranking": True,
+    })
+
+@app.route("/api/admin/exam-settings", methods=["PATCH"])
+@require_admin
+def update_exam_settings():
+    data = request.json or {}
+    existing = query("SELECT id FROM exam_settings LIMIT 1", fetch="one")
+    if existing:
+        fields = ", ".join(f"{k}=%s" for k in data.keys())
+        query(f"UPDATE exam_settings SET {fields} WHERE id=%s",
+              list(data.values()) + [existing["id"]], fetch="none")
+    else:
+        cols = ", ".join(data.keys())
+        vals = ", ".join(["%s"]*len(data))
+        query(f"INSERT INTO exam_settings ({cols}) VALUES ({vals})", list(data.values()), fetch="none")
+    return jsonify({"ok": True})
+
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)
