@@ -184,6 +184,115 @@ def admin_group_members(group_id):
     """, (group_id,))
     return jsonify([dict(r) for r in rows])
 
+# ══════════════════════════════════════════════════════════════
+# UPLOAD MEDIA — Lampiran & Audio untuk soal
+# ══════════════════════════════════════════════════════════════
+import base64, mimetypes
+from werkzeug.utils import secure_filename
+
+ALLOWED_ATTACH = {'png','jpg','jpeg','gif','webp','pdf'}
+ALLOWED_AUDIO  = {'mp3','wav','ogg','m4a','aac'}
+MAX_FILE_MB    = 10
+
+def _ext(filename):
+    return filename.rsplit('.', 1)[-1].lower() if '.' in filename else ''
+
+@app.route('/api/exams/<exam_id>/upload-media', methods=['POST'])
+@require_auth
+def upload_media(exam_id):
+    from db import query as dbq
+    file = request.files.get('file')
+    ftype = request.form.get('type', 'attachment')  # 'attachment' | 'audio'
+    if not file or not file.filename:
+        return jsonify({'error': 'File tidak ada'}), 400
+
+    ext = _ext(file.filename)
+    allowed = ALLOWED_AUDIO if ftype == 'audio' else ALLOWED_ATTACH
+    if ext not in allowed:
+        return jsonify({'error': f'Format tidak diizinkan. Gunakan: {", ".join(allowed)}'}), 400
+
+    data = file.read()
+    if len(data) > MAX_FILE_MB * 1024 * 1024:
+        return jsonify({'error': f'Ukuran file maksimal {MAX_FILE_MB}MB'}), 400
+
+    # Simpan sebagai base64 data URL (no external storage needed)
+    mime = mimetypes.guess_type(file.filename)[0] or ('audio/mpeg' if ftype=='audio' else 'application/octet-stream')
+    b64  = base64.b64encode(data).decode()
+    url  = f"data:{mime};base64,{b64}"
+
+    # Simpan ke DB (kolom media di exam)
+    media_id = str(_uuid.uuid4())
+    dbq("""INSERT INTO exam_media (id, exam_id, media_type, url, filename, uploaded_by, created_at)
+           VALUES (%s,%s,%s,%s,%s,%s,NOW())
+           ON CONFLICT DO NOTHING""",
+        (media_id, exam_id, ftype, url, secure_filename(file.filename), request.user_id),
+        fetch='none')
+
+    return jsonify({'ok': True, 'url': url, 'media_id': media_id})
+
+# ══════════════════════════════════════════════════════════════
+# CAMERA ESSAY — Siswa submit foto + uraian
+# ══════════════════════════════════════════════════════════════
+@app.route('/api/student/sessions/<session_id>/answer-essay', methods=['POST'])
+@require_auth
+def answer_essay(session_id):
+    from db import query as dbq
+    body = request.json or {}
+    question_id = body.get('question_id')
+    essay_text  = body.get('essay_text', '')
+    photo_b64   = body.get('photo_b64', '')  # base64 dari kamera
+
+    if not question_id:
+        return jsonify({'error': 'question_id wajib'}), 400
+
+    dbq("""INSERT INTO essay_answers (id, session_id, question_id, essay_text, photo_b64, submitted_at)
+           VALUES (%s,%s,%s,%s,%s,NOW())
+           ON CONFLICT (session_id, question_id) DO UPDATE
+           SET essay_text=%s, photo_b64=%s, submitted_at=NOW()""",
+        (str(_uuid.uuid4()), session_id, question_id, essay_text, photo_b64, essay_text, photo_b64),
+        fetch='none')
+
+    # Juga simpan ke answers biasa (untuk tracking progress)
+    dbq("""INSERT INTO answers (id, session_id, question_id, option_id, answered_at)
+           VALUES (%s,%s,%s,'essay_submitted',NOW())
+           ON CONFLICT (session_id, question_id) DO UPDATE SET option_id='essay_submitted', answered_at=NOW()""",
+        (str(_uuid.uuid4()), session_id, question_id), fetch='none')
+
+    return jsonify({'ok': True})
+
+# ══════════════════════════════════════════════════════════════
+# MULTI-ANSWER — Siswa pilih lebih dari 1 jawaban
+# ══════════════════════════════════════════════════════════════
+@app.route('/api/student/sessions/<session_id>/answer-multi', methods=['POST'])
+@require_auth
+def answer_multi(session_id):
+    from db import query as dbq
+    body = request.json or {}
+    question_id = body.get('question_id')
+    option_ids  = body.get('option_ids', [])  # list of option IDs
+
+    if not question_id:
+        return jsonify({'error': 'question_id wajib'}), 400
+
+    # Hapus jawaban lama untuk soal ini
+    dbq("DELETE FROM multi_answers WHERE session_id=%s AND question_id=%s",
+        (session_id, question_id), fetch='none')
+
+    # Insert semua pilihan baru
+    for oid in option_ids:
+        dbq("""INSERT INTO multi_answers (id, session_id, question_id, option_id, answered_at)
+               VALUES (%s,%s,%s,%s,NOW())""",
+            (str(_uuid.uuid4()), session_id, question_id, oid), fetch='none')
+
+    # Tracking di answers biasa
+    dbq("""INSERT INTO answers (id, session_id, question_id, option_id, answered_at)
+           VALUES (%s,%s,%s,%s,NOW())
+           ON CONFLICT (session_id, question_id) DO UPDATE SET option_id=%s, answered_at=NOW()""",
+        (str(_uuid.uuid4()), session_id, question_id, ','.join(option_ids), ','.join(option_ids)),
+        fetch='none')
+
+    return jsonify({'ok': True})
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)),
             debug=DEV_MODE)
