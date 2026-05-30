@@ -1361,6 +1361,17 @@ def admin_list_siswa():
         "total_pages": max(1,(total+per_page-1)//per_page)
     })
 
+@app.route("/api/admin/siswa/<siswa_id>", methods=["PATCH"])
+@require_admin
+def admin_update_siswa(siswa_id):
+    data = request.json or {}
+    allowed = ['name','nisn','class_id']
+    for f in [k for k in data.keys() if k in allowed]:
+        if data[f] is not None:
+            query(f"UPDATE users SET {f}=%s WHERE id=%s AND role='siswa'",
+                  (data[f] or None, siswa_id), fetch="none")
+    return jsonify({"ok": True})
+
 @app.route("/api/admin/siswa/<siswa_id>", methods=["DELETE"])
 @require_admin
 def admin_delete_siswa(siswa_id):
