@@ -277,3 +277,135 @@ def update_exam_settings():
         cols = ', '.join(data.keys()); vals = ', '.join(['%s']*len(data))
         query(f"INSERT INTO exam_settings ({cols}) VALUES ({vals})", list(data.values()), fetch='none')
     return jsonify({'ok': True})
+
+# ── Rooms ──────────────────────────────────────────────────────
+@admin_bp.route('/api/admin/rooms', methods=['GET'])
+@require_admin
+def get_rooms():
+    rows = query("""
+        SELECT r.*,
+               u.name as created_by_name,
+               COUNT(DISTINCT rt.teacher_id) as teacher_count,
+               COUNT(DISTINCT rc.class_id) as class_count
+        FROM rooms r
+        LEFT JOIN users u ON u.id=r.created_by
+        LEFT JOIN room_teachers rt ON rt.room_id=r.id
+        LEFT JOIN room_classes rc ON rc.room_id=r.id
+        GROUP BY r.id, u.name
+        ORDER BY r.created_at DESC
+    """)
+    return jsonify([dict(r) for r in rows])
+
+@admin_bp.route('/api/admin/rooms', methods=['POST'])
+@require_admin
+def create_room():
+    data = request.json or {}
+    name = data.get('name','').strip()
+    if not name: return jsonify({'error': 'Nama room wajib'}), 400
+    room = query("""
+        INSERT INTO rooms (id, name, description, created_by)
+        VALUES (%s,%s,%s,%s) RETURNING *
+    """, (str(uuid.uuid4()), name, data.get('description',''), request.user_id), fetch='one')
+    # Assign classes
+    for cls in (data.get('class_ids') or []):
+        query("INSERT INTO room_classes (room_id,class_id) VALUES (%s,%s) ON CONFLICT DO NOTHING",
+              (str(room['id']), cls), fetch='none')
+    # Assign teachers
+    for tid in (data.get('teacher_ids') or []):
+        query("INSERT INTO room_teachers (room_id,teacher_id) VALUES (%s,%s) ON CONFLICT DO NOTHING",
+              (str(room['id']), tid), fetch='none')
+    return jsonify(dict(room)), 201
+
+@admin_bp.route('/api/admin/rooms/<room_id>', methods=['PATCH'])
+@require_admin
+def update_room(room_id):
+    data = request.json or {}
+    if 'name' in data:
+        query("UPDATE rooms SET name=%s WHERE id=%s", (data['name'], room_id), fetch='none')
+    if 'description' in data:
+        query("UPDATE rooms SET description=%s WHERE id=%s", (data['description'], room_id), fetch='none')
+    if 'is_active' in data:
+        query("UPDATE rooms SET is_active=%s WHERE id=%s", (data['is_active'], room_id), fetch='none')
+    return jsonify({'ok': True})
+
+@admin_bp.route('/api/admin/rooms/<room_id>', methods=['DELETE'])
+@require_admin
+def delete_room(room_id):
+    query("DELETE FROM rooms WHERE id=%s", (room_id,), fetch='none')
+    return jsonify({'ok': True})
+
+@admin_bp.route('/api/admin/rooms/<room_id>', methods=['GET'])
+@require_admin
+def get_room_detail(room_id):
+    room = query("SELECT * FROM rooms WHERE id=%s", (room_id,), fetch='one')
+    if not room: return jsonify({'error': 'Tidak ditemukan'}), 404
+    teachers = query("""
+        SELECT u.id, u.name, u.email, u.avatar_url FROM users u
+        JOIN room_teachers rt ON rt.teacher_id=u.id
+        WHERE rt.room_id=%s ORDER BY u.name
+    """, (room_id,))
+    classes = query("""
+        SELECT c.* FROM classes c
+        JOIN room_classes rc ON rc.class_id=c.id
+        WHERE rc.room_id=%s ORDER BY c.grade, LENGTH(c.id), c.id
+    """, (room_id,))
+    exams = query("""
+        SELECT e.*, u.name as teacher_name, s.name as subject_name,
+               (SELECT COUNT(*) FROM questions q WHERE q.exam_id=e.id) as question_count
+        FROM exams e
+        JOIN users u ON u.id=e.teacher_id
+        LEFT JOIN subjects s ON s.id=e.subject_id
+        WHERE e.room_id=%s ORDER BY e.created_at DESC
+    """, (room_id,))
+    return jsonify({
+        **dict(room),
+        'teachers': [dict(t) for t in teachers],
+        'classes': [dict(c) for c in classes],
+        'exams': [dict(e) for e in exams],
+    })
+
+@admin_bp.route('/api/admin/rooms/<room_id>/teachers', methods=['POST'])
+@require_admin
+def add_room_teacher(room_id):
+    teacher_id = (request.json or {}).get('teacher_id','')
+    query("INSERT INTO room_teachers (room_id,teacher_id) VALUES (%s,%s) ON CONFLICT DO NOTHING",
+          (room_id, teacher_id), fetch='none')
+    return jsonify({'ok': True})
+
+@admin_bp.route('/api/admin/rooms/<room_id>/teachers/<teacher_id>', methods=['DELETE'])
+@require_admin
+def remove_room_teacher(room_id, teacher_id):
+    query("DELETE FROM room_teachers WHERE room_id=%s AND teacher_id=%s",
+          (room_id, teacher_id), fetch='none')
+    return jsonify({'ok': True})
+
+@admin_bp.route('/api/admin/rooms/<room_id>/classes', methods=['POST'])
+@require_admin
+def add_room_class(room_id):
+    class_id = (request.json or {}).get('class_id','')
+    query("INSERT INTO room_classes (room_id,class_id) VALUES (%s,%s) ON CONFLICT DO NOTHING",
+          (room_id, class_id), fetch='none')
+    return jsonify({'ok': True})
+
+@admin_bp.route('/api/admin/rooms/<room_id>/classes/<class_id>', methods=['DELETE'])
+@require_admin
+def remove_room_class(room_id, class_id):
+    query("DELETE FROM room_classes WHERE room_id=%s AND class_id=%s",
+          (room_id, class_id), fetch='none')
+    return jsonify({'ok': True})
+
+# ── Guru: lihat rooms yang dia ikuti ──────────────────────────
+@admin_bp.route('/api/guru/rooms', methods=['GET'])
+@require_guru
+def get_guru_rooms():
+    rows = query("""
+        SELECT r.*, COUNT(DISTINCT rc.class_id) as class_count,
+               COUNT(DISTINCT e.id) as exam_count
+        FROM rooms r
+        JOIN room_teachers rt ON rt.room_id=r.id AND rt.teacher_id=%s
+        LEFT JOIN room_classes rc ON rc.room_id=r.id
+        LEFT JOIN exams e ON e.room_id=r.id AND e.teacher_id=%s
+        WHERE r.is_active=true
+        GROUP BY r.id ORDER BY r.created_at DESC
+    """, (request.user_id, request.user_id))
+    return jsonify([dict(r) for r in rows])
