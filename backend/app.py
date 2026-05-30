@@ -2026,5 +2026,81 @@ def update_exam_settings():
         query(f"INSERT INTO exam_settings ({cols}) VALUES ({vals})", list(data.values()), fetch="none")
     return jsonify({"ok": True})
 
+
+# ═══════════════════════════════════════════════════════════
+#  ADMIN - KELOLA UJIAN (force finish, delete, override)
+# ═══════════════════════════════════════════════════════════
+
+@app.route("/api/admin/exams/<exam_id>", methods=["PATCH"])
+@require_admin
+def admin_update_exam(exam_id):
+    """Admin bisa override status ujian apapun."""
+    data = request.json or {}
+    allowed = ['status','title','duration_minutes','start_at','instructions',
+               'randomize_questions','randomize_options','show_result_after',
+               'show_key_after','score_per_correct']
+    for f in [k for k in data.keys() if k in allowed]:
+        query(f"UPDATE exams SET {f}=%s WHERE id=%s", (data[f], exam_id), fetch="none")
+    return jsonify({"ok": True})
+
+@app.route("/api/admin/exams/<exam_id>", methods=["DELETE"])
+@require_admin
+def admin_delete_exam(exam_id):
+    """Admin hapus ujian beserta semua data terkait."""
+    query("DELETE FROM exams WHERE id=%s", (exam_id,), fetch="none")
+    return jsonify({"ok": True})
+
+@app.route("/api/admin/exams/<exam_id>/force-finish", methods=["POST"])
+@require_admin
+def admin_force_finish_exam(exam_id):
+    """Admin paksa selesaikan ujian dan hitung semua nilai."""
+    # Auto-submit semua sesi yang masih ongoing
+    ongoing = query("""
+        SELECT id FROM exam_sessions
+        WHERE exam_id=%s AND submitted_at IS NULL
+    """, (exam_id,))
+
+    for sess in ongoing:
+        sid = str(sess["id"])
+        # Hitung nilai
+        exam_data = query("SELECT * FROM exams WHERE id=%s", (exam_id,), fetch="one")
+        total_q = query("SELECT COUNT(*) as n FROM questions WHERE exam_id=%s", (exam_id,), fetch="one")["n"]
+        correct = query("""
+            SELECT COUNT(*) as n FROM answers a
+            JOIN options o ON o.id=a.option_id
+            WHERE a.session_id=%s AND o.is_correct=true
+        """, (sid,), fetch="one")["n"]
+        wrong = query("""
+            SELECT COUNT(*) as n FROM answers a
+            JOIN options o ON o.id=a.option_id
+            WHERE a.session_id=%s AND o.is_correct=false
+        """, (sid,), fetch="one")["n"]
+        empty = total_q - correct - wrong
+        spc = float(exam_data.get("score_per_correct") or (100.0/total_q if total_q else 0))
+        score = round(correct * spc, 2)
+
+        query("UPDATE exam_sessions SET submitted_at=NOW(), auto_submitted=true WHERE id=%s", (sid,), fetch="none")
+        existing = query("SELECT id FROM results WHERE session_id=%s", (sid,), fetch="one")
+        if existing:
+            query("UPDATE results SET score=%s,correct_count=%s,wrong_count=%s,empty_count=%s WHERE session_id=%s",
+                  (score,correct,wrong,empty,sid), fetch="none")
+        else:
+            query("INSERT INTO results (id,session_id,score,correct_count,wrong_count,empty_count) VALUES (%s,%s,%s,%s,%s,%s)",
+                  (str(uuid.uuid4()),sid,score,correct,wrong,empty), fetch="none")
+
+    query("UPDATE exams SET status='finished' WHERE id=%s", (exam_id,), fetch="none")
+    return jsonify({"ok": True, "submitted": len(ongoing)})
+
+# ═══════════════════════════════════════════════════════════
+#  MAPEL REFERENSI GLOBAL (untuk dropdown pilih mapel)
+# ═══════════════════════════════════════════════════════════
+
+@app.route("/api/mapel-referensi", methods=["GET"])
+@require_guru
+def get_mapel_referensi():
+    """Daftar mapel referensi global (tidak terikat guru)."""
+    rows = query("SELECT DISTINCT name FROM subjects ORDER BY name")
+    return jsonify([r["name"] for r in rows])
+
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)
