@@ -1,5 +1,8 @@
 // frontend/config.js
-const Config = {
-  apiBase: "https://my-smaba.onrender.com",
-  devMode: true,
+const CONFIG = {
+  API_BASE: "https://my-smaba.onrender.com",
+  DEV_MODE: true,
 };
+
+// Alias untuk kompatibilitas
+const Config = CONFIG;
