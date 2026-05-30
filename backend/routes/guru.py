@@ -93,20 +93,40 @@ def mapel_referensi():
 @guru_bp.route('/api/guru/siswa', methods=['GET'])
 @require_guru
 def get_guru_siswa():
-    rows = query("""
-        SELECT
-            u.id, u.name, u.email, u.nisn, u.class_id,
-            c.name as class_name,
-            ROUND(AVG(es.score)::numeric, 1) as avg_score
-        FROM users u
-        LEFT JOIN classes c ON c.id=u.class_id
-        LEFT JOIN exam_sessions es ON es.student_id=u.id AND es.status='submitted'
-        WHERE u.role='siswa' AND u.class_id IN (
-            SELECT class_id FROM guru_classes WHERE teacher_id=%s
-        )
-        GROUP BY u.id, u.name, u.email, u.nisn, u.class_id, c.name
-        ORDER BY c.grade, LENGTH(c.id), c.id, u.name
-    """, (request.user_id,))
+    # Cek apakah guru sudah assign kelas
+    taught = query("SELECT class_id FROM guru_classes WHERE teacher_id=%s", (request.user_id,))
+    
+    if taught:
+        # Guru sudah set kelas — tampilkan siswa dari kelas yang diajar saja
+        rows = query("""
+            SELECT
+                u.id, u.name, u.email, u.nisn, u.class_id,
+                c.name as class_name,
+                ROUND(AVG(es.score)::numeric, 1) as avg_score
+            FROM users u
+            LEFT JOIN classes c ON c.id=u.class_id
+            LEFT JOIN exam_sessions es ON es.student_id=u.id AND es.status='submitted'
+            WHERE u.role='siswa' AND u.class_id IN (
+                SELECT class_id FROM guru_classes WHERE teacher_id=%s
+            )
+            GROUP BY u.id, u.name, u.email, u.nisn, u.class_id, c.name
+            ORDER BY c.grade, LENGTH(c.id), c.id, u.name
+        """, (request.user_id,))
+    else:
+        # Guru belum set kelas — tampilkan semua siswa
+        rows = query("""
+            SELECT
+                u.id, u.name, u.email, u.nisn, u.class_id,
+                c.name as class_name,
+                ROUND(AVG(es.score)::numeric, 1) as avg_score
+            FROM users u
+            LEFT JOIN classes c ON c.id=u.class_id
+            LEFT JOIN exam_sessions es ON es.student_id=u.id AND es.status='submitted'
+            WHERE u.role='siswa'
+            GROUP BY u.id, u.name, u.email, u.nisn, u.class_id, c.name
+            ORDER BY c.grade, LENGTH(c.id), c.id, u.name
+        """)
+    
     students = [dict(r) for r in rows]
     return jsonify({'students': students, 'total': len(students)})
 
