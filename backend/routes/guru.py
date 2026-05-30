@@ -40,11 +40,13 @@ def remove_taught_class(class_id):
 @guru_bp.route('/api/subjects', methods=['GET'])
 @require_guru
 def get_subjects():
-    rows = query("""
-        SELECT * FROM subjects
-        WHERE teacher_id=%s OR teacher_id IS NULL
-        ORDER BY name
-    """, (request.user_id,))
+    if getattr(request, 'user_role', '') == 'admin':
+        rows = query("SELECT * FROM subjects ORDER BY name")
+    else:
+        rows = query(
+            "SELECT * FROM subjects WHERE teacher_id=%s ORDER BY name",
+            (request.user_id,)
+        )
     return jsonify([dict(r) for r in rows])
 
 @guru_bp.route('/api/subjects', methods=['POST'])
