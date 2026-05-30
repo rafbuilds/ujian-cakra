@@ -87,18 +87,26 @@ def mapel_referensi():
     return jsonify([r['name'] for r in rows])
 
 # ── Siswa (guru view) ──────────────────────────────────────────
+# FIX: return {students: [...]} bukan raw array, sesuai yang dibutuhkan frontend
 @guru_bp.route('/api/guru/siswa', methods=['GET'])
 @require_guru
 def get_guru_siswa():
     rows = query("""
-        SELECT u.*, c.name as class_name FROM users u
+        SELECT
+            u.id, u.name, u.email, u.nisn, u.class_id,
+            c.name as class_name,
+            ROUND(AVG(es.score)::numeric, 1) as avg_score
+        FROM users u
         LEFT JOIN classes c ON c.id=u.class_id
+        LEFT JOIN exam_sessions es ON es.student_id=u.id AND es.status='submitted'
         WHERE u.role='siswa' AND u.class_id IN (
             SELECT class_id FROM guru_classes WHERE teacher_id=%s
         )
+        GROUP BY u.id, u.name, u.email, u.nisn, u.class_id, c.name
         ORDER BY c.grade, LENGTH(c.id), c.id, u.name
     """, (request.user_id,))
-    return jsonify([dict(r) for r in rows])
+    students = [dict(r) for r in rows]
+    return jsonify({'students': students, 'total': len(students)})
 
 @guru_bp.route('/api/guru/siswa/import', methods=['POST'])
 @require_guru
@@ -107,24 +115,54 @@ def guru_import_siswa():
     file = request.files.get('file')
     if not file: return jsonify({'error': 'File tidak ada'}), 400
     wb = load_workbook(file); ws = wb.active
-    imported = 0
-    for row in ws.iter_rows(min_row=2, values_only=True):
+    saved = 0
+    errors = []
+    for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
         if not row or not row[0]: continue
-        name, nisn, class_id, email = (str(row[i] or '').strip() for i in range(4))
-        if not name: continue
-        dummy_gid = f"import_{uuid.uuid4().hex[:12]}"
-        existing = query("SELECT id FROM users WHERE email=%s", (email,), fetch='one') if email else None
-        if existing:
-            query("UPDATE users SET name=%s, nisn=%s, class_id=%s WHERE id=%s",
-                  (name, nisn or None, class_id or None, existing['id']), fetch='none')
-        else:
-            query("""INSERT INTO users (id, google_id, email, name, nisn, class_id, role, is_active)
-                     VALUES (%s,%s,%s,%s,%s,%s,'siswa',true) ON CONFLICT (google_id) DO NOTHING""",
-                  (str(uuid.uuid4()), dummy_gid, email or None, name, nisn or None, class_id or None), fetch='none')
-        imported += 1
-    return jsonify({'ok': True, 'imported': imported})
+        try:
+            name = str(row[0] or '').strip()
+            nisn = str(row[1] or '').strip()
+            class_id = str(row[2] or '').strip() or None
+            email = str(row[3] or '').strip() or None
+            if not name: continue
 
-# ── Shared ─────────────────────────────────────────────────────
+            # Validasi kelas kalau ada
+            if class_id:
+                cls = query("SELECT id FROM classes WHERE id=%s", (class_id,), fetch='one')
+                if not cls:
+                    errors.append(f"Baris {idx}: Kelas '{class_id}' tidak ditemukan")
+                    class_id = None
+
+            existing = query("SELECT id FROM users WHERE email=%s", (email,), fetch='one') if email else None
+            if existing:
+                query("UPDATE users SET name=%s, nisn=%s, class_id=%s WHERE id=%s",
+                      (name, nisn or None, class_id, existing['id']), fetch='none')
+            else:
+                dummy_gid = f"import_{uuid.uuid4().hex[:12]}"
+                query("""INSERT INTO users (id, google_id, email, name, nisn, class_id, role, is_active)
+                         VALUES (%s,%s,%s,%s,%s,%s,'siswa',true) ON CONFLICT (google_id) DO NOTHING""",
+                      (str(uuid.uuid4()), dummy_gid, email, name, nisn or None, class_id), fetch='none')
+            saved += 1
+        except Exception as e:
+            errors.append(f"Baris {idx}: {str(e)}")
+    return jsonify({'ok': True, 'saved': saved, 'errors': errors})
+
+# ── Riwayat ujian satu siswa ───────────────────────────────────
+@guru_bp.route('/api/siswa/<student_id>/history', methods=['GET'])
+@require_guru
+def siswa_history(student_id):
+    rows = query("""
+        SELECT
+            es.id, es.score, es.status, es.submitted_at, es.created_at,
+            e.title as exam_title, e.id as exam_id
+        FROM exam_sessions es
+        JOIN exams e ON e.id=es.exam_id
+        WHERE es.student_id=%s
+        ORDER BY es.created_at DESC
+    """, (student_id,))
+    return jsonify({'history': [dict(r) for r in rows]})
+
+# ── Classes (shared endpoint) ──────────────────────────────────
 @guru_bp.route('/api/classes', methods=['GET'])
 @require_auth
 def get_classes():
@@ -140,6 +178,7 @@ def template_siswa():
     wb = Workbook(); ws = wb.active; ws.title = 'Data Siswa'
     ws.append(['Nama Lengkap','NISN','ID Kelas','Email'])
     ws.append(['Adi Saputra','0012345678','x_1','adi@sman1batangan.sch.id'])
+    ws.append(['Budi Santoso','0098765432','x_2','budi@sman1batangan.sch.id'])
     buf = io.BytesIO(); wb.save(buf); buf.seek(0)
     return send_file(buf, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
                      as_attachment=True, download_name='template_siswa.xlsx')
@@ -150,3 +189,75 @@ def template_siswa():
 def allow_exit(session_id):
     query("UPDATE exam_sessions SET exit_allowed=true WHERE id=%s", (session_id,), fetch='none')
     return jsonify({'ok': True})
+
+# ══════════════════════════════════════════════════════════════
+# EXAM GROUPS — Guru bisa join group ujian yang dibuat admin
+# ══════════════════════════════════════════════════════════════
+
+@guru_bp.route('/api/exam-groups', methods=['GET'])
+@require_guru
+def list_exam_groups():
+    """
+    Menampilkan semua group ujian yang dibuat admin.
+    Termasuk info apakah guru sudah join atau belum.
+    """
+    rows = query("""
+        SELECT
+            eg.id, eg.name, eg.description, eg.created_at,
+            u.name as created_by_name,
+            COUNT(DISTINCT egm.teacher_id) as member_count,
+            COUNT(DISTINCT e.id) as exam_count,
+            BOOL_OR(egm.teacher_id = %s) as is_member
+        FROM exam_groups eg
+        LEFT JOIN users u ON u.id = eg.created_by
+        LEFT JOIN exam_group_members egm ON egm.group_id = eg.id
+        LEFT JOIN exams e ON e.group_id = eg.id
+        WHERE eg.is_active = true
+        GROUP BY eg.id, eg.name, eg.description, eg.created_at, u.name
+        ORDER BY eg.created_at DESC
+    """, (request.user_id,))
+    return jsonify([dict(r) for r in rows])
+
+@guru_bp.route('/api/exam-groups/<group_id>/join', methods=['POST'])
+@require_guru
+def join_exam_group(group_id):
+    """Guru bergabung ke group ujian yang dibuat admin."""
+    grp = query("SELECT id, name FROM exam_groups WHERE id=%s AND is_active=true",
+                (group_id,), fetch='one')
+    if not grp:
+        return jsonify({'error': 'Group tidak ditemukan'}), 404
+
+    existing = query("SELECT id FROM exam_group_members WHERE group_id=%s AND teacher_id=%s",
+                     (group_id, request.user_id), fetch='one')
+    if existing:
+        return jsonify({'error': 'Sudah bergabung di group ini'}), 409
+
+    query("""INSERT INTO exam_group_members (id, group_id, teacher_id, joined_at)
+             VALUES (%s, %s, %s, NOW())""",
+          (str(uuid.uuid4()), group_id, request.user_id), fetch='none')
+    return jsonify({'ok': True, 'group_name': grp['name']})
+
+@guru_bp.route('/api/exam-groups/<group_id>/leave', methods=['DELETE'])
+@require_guru
+def leave_exam_group(group_id):
+    """Guru keluar dari group ujian."""
+    query("DELETE FROM exam_group_members WHERE group_id=%s AND teacher_id=%s",
+          (group_id, request.user_id), fetch='none')
+    return jsonify({'ok': True})
+
+@guru_bp.route('/api/exam-groups/my', methods=['GET'])
+@require_guru
+def my_exam_groups():
+    """Group yang sudah diikuti oleh guru yang login."""
+    rows = query("""
+        SELECT eg.id, eg.name, eg.description,
+               COUNT(DISTINCT e.id) as exam_count,
+               egm.joined_at
+        FROM exam_groups eg
+        JOIN exam_group_members egm ON egm.group_id = eg.id
+        LEFT JOIN exams e ON e.group_id = eg.id
+        WHERE egm.teacher_id = %s AND eg.is_active = true
+        GROUP BY eg.id, eg.name, eg.description, egm.joined_at
+        ORDER BY egm.joined_at DESC
+    """, (request.user_id,))
+    return jsonify([dict(r) for r in rows])
