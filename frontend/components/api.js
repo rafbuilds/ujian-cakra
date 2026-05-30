@@ -1,10 +1,11 @@
-// ============================================================
-// api.js — API Fetch Wrapper
-// ============================================================
-
+// frontend/components/api.js
 const API = (() => {
-  const base = () =>
-    typeof CONFIG !== "undefined" ? CONFIG.API_BASE : "http://localhost:5000";
+  const base = () => {
+    if (typeof CONFIG !== "undefined" && CONFIG.API_BASE)
+      return CONFIG.API_BASE;
+    if (typeof Config !== "undefined" && Config.apiBase) return Config.apiBase;
+    return "http://localhost:5000";
+  };
 
   const headers = (extra = {}) => {
     const h = { "Content-Type": "application/json", ...extra };
@@ -19,31 +20,23 @@ const API = (() => {
     return data;
   };
 
-  // ── Methods ────────────────────────────────────────────
   const get = (path) =>
     fetch(base() + path, { headers: headers() }).then(handle);
-
   const post = (path, body) =>
     fetch(base() + path, {
       method: "POST",
       headers: headers(),
       body: JSON.stringify(body),
     }).then(handle);
-
   const patch = (path, body) =>
     fetch(base() + path, {
       method: "PATCH",
       headers: headers(),
       body: JSON.stringify(body),
     }).then(handle);
-
   const del = (path) =>
-    fetch(base() + path, {
-      method: "DELETE",
-      headers: headers(),
-    }).then(handle);
+    fetch(base() + path, { method: "DELETE", headers: headers() }).then(handle);
 
-  // Upload file (FormData)
   const upload = (path, formData) => {
     const h = {};
     const token = localStorage.getItem("ujian_token");
@@ -55,11 +48,9 @@ const API = (() => {
     }).then(handle);
   };
 
-  // Download file (blob)
   const download = async (path, filename) => {
     const token = localStorage.getItem("ujian_token");
-    const h = {};
-    if (token) h["Authorization"] = `Bearer ${token}`;
+    const h = token ? { Authorization: `Bearer ${token}` } : {};
     const res = await fetch(base() + path, { headers: h });
     if (!res.ok) throw new Error("Gagal mengunduh");
     const blob = await res.blob();
