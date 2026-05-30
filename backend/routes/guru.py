@@ -14,7 +14,7 @@ def get_taught_classes():
         SELECT c.* FROM classes c
         JOIN guru_classes gc ON gc.class_id=c.id
         WHERE gc.teacher_id=%s
-        ORDER BY c.grade, LENGTH(c.id), c.id
+        ORDER BY c.name
     """, (request.user_id,))
     return jsonify([dict(r) for r in rows])
 
@@ -110,7 +110,7 @@ def get_guru_siswa():
                 SELECT class_id FROM guru_classes WHERE teacher_id=%s
             )
             GROUP BY u.id, u.name, u.email, u.nisn, u.class_id, c.name
-            ORDER BY c.grade, LENGTH(c.id), c.id, u.name
+            ORDER BY c.name, u.name
         """, (request.user_id,))
     else:
         # Guru belum set kelas — tampilkan semua siswa
@@ -124,7 +124,7 @@ def get_guru_siswa():
             LEFT JOIN exam_sessions es ON es.student_id=u.id AND es.status='submitted'
             WHERE u.role='siswa'
             GROUP BY u.id, u.name, u.email, u.nisn, u.class_id, c.name
-            ORDER BY c.grade, LENGTH(c.id), c.id, u.name
+            ORDER BY c.name, u.name
         """)
     
     students = [dict(r) for r in rows]
