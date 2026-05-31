@@ -85,7 +85,9 @@ def start_exam(exam_id):
     randomize_o = exam.get('randomize_options', True)
     order_clause = "ORDER BY RANDOM()" if randomize_q else "ORDER BY q.order_num"
     questions = query(f"""
-        SELECT q.id, q.content, q.image_url FROM questions q
+        SELECT q.id, q.content, q.image_url,
+               q.type, q.attachment_url, q.audio_url
+        FROM questions q
         WHERE q.exam_id=%s {order_clause}
     """, (exam_id,))
 
