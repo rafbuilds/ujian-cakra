@@ -60,7 +60,7 @@ def get_exam(exam_id):
         opts = query("SELECT * FROM options WHERE question_id=%s ORDER BY label", (q['id'],))
         q_list.append({**dict(q), 'options': [dict(o) for o in opts]})
     classes = query("""SELECT c.* FROM classes c JOIN exam_classes ec ON ec.class_id=c.id
-                       WHERE ec.exam_id=%s ORDER BY c.grade, LENGTH(c.id), c.id""", (exam_id,))
+                       WHERE ec.exam_id=%s ORDER BY c.name""", (exam_id,))
     return jsonify({**dict(exam), 'questions': q_list, 'classes': [dict(c) for c in classes]})
 
 @exams_bp.route('/api/exams/<exam_id>', methods=['PATCH'])
@@ -207,7 +207,7 @@ def exam_results(exam_id):
         JOIN users u ON u.id=es.student_id
         LEFT JOIN classes c ON c.id=u.class_id
         LEFT JOIN results r ON r.session_id=es.id
-        WHERE es.exam_id=%s ORDER BY c.grade, LENGTH(c.id), c.id, u.name
+        WHERE es.exam_id=%s ORDER BY c.name, u.name
     """, (exam_id,))
     all_rows = [dict(r) for r in rows]
     submitted = [r for r in all_rows if r.get('submitted_at')]
@@ -314,7 +314,7 @@ def export_nilai(exam_id):
         FROM exam_sessions es JOIN users u ON u.id=es.student_id
         LEFT JOIN classes c ON c.id=u.class_id
         LEFT JOIN results r ON r.session_id=es.id
-        WHERE es.exam_id=%s ORDER BY c.grade, LENGTH(c.id), c.id, u.name
+        WHERE es.exam_id=%s ORDER BY c.name, u.name
     """, (exam_id,))
     wb = Workbook(); ws = wb.active; ws.title = 'Rekap Nilai'
     header_fill = PatternFill("solid", fgColor="0F4C35")
