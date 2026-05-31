@@ -32,7 +32,7 @@ APP_URL              = os.environ.get('APP_URL','http://localhost:5000')
 DEV_MODE             = os.environ.get('DEV_MODE','false').lower()=='true'
 ALLOWED_DOMAIN       = os.environ.get('ALLOWED_DOMAIN','')
 
-@app.route('/')
+@app.route('/api/health')
 def index():
     return jsonify({'status': 'ok', 'service': 'Ujian Online SMABA'})
 
@@ -328,6 +328,40 @@ def answer_multi(session_id):
         fetch='none')
 
     return jsonify({'ok': True})
+
+# ══════════════════════════════════════════════════════════════
+# SERVE FRONTEND — Flask serve static files langsung
+# Semua request non-API → serve dari folder static/
+# ══════════════════════════════════════════════════════════════
+import pathlib
+from flask import send_from_directory, send_file
+
+STATIC_DIR = pathlib.Path(__file__).parent / 'static'
+
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def serve_frontend(path):
+    # Jangan intercept API routes
+    if path.startswith('api/'):
+        return jsonify({'error': 'Not found'}), 404
+    
+    # Coba serve file langsung
+    target = STATIC_DIR / path
+    if target.is_file():
+        return send_from_directory(str(STATIC_DIR), path)
+    
+    # Coba tambahkan .html
+    if not path.endswith('.html'):
+        html_target = STATIC_DIR / (path + '.html')
+        if html_target.is_file():
+            return send_from_directory(str(STATIC_DIR), path + '.html')
+    
+    # Fallback ke index.html (SPA behavior)
+    index = STATIC_DIR / 'index.html'
+    if index.is_file():
+        return send_file(str(index))
+    
+    return jsonify({'error': 'Not found'}), 404
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)),
