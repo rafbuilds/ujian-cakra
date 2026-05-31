@@ -40,12 +40,14 @@ def index():
 def google_url():
     role = request.args.get('role','siswa')
     redirect_uri = f"{APP_URL}/api/auth/google/callback"
+    invite_token = request.environ.get('invite_token', '') or request.args.get('invite_token', '')
+    state = f"{role}|{invite_token}" if invite_token else role
     url = (f"https://accounts.google.com/o/oauth2/v2/auth"
            f"?client_id={GOOGLE_CLIENT_ID}"
            f"&redirect_uri={redirect_uri}"
            f"&response_type=code"
            f"&scope=openid email profile"
-           f"&state={role}")
+           f"&state={state}")
     return jsonify({'url': url})
 
 @app.route('/api/auth/google/callback')
@@ -53,7 +55,17 @@ def google_callback():
     from db import query
     import uuid
     code  = request.args.get('code')
-    role  = request.args.get('state','siswa')
+    state_raw = request.args.get('state', 'siswa')
+    # State bisa berupa "role" atau "role|invite_token"
+    if '|' in state_raw:
+        role, invite_token_state = state_raw.split('|', 1)
+        # Simpan di request untuk dipakai di bawah
+        request.environ['invite_token'] = invite_token_state
+    else:
+        role = state_raw
+        request.environ['invite_token'] = ''
+    # Baca invite_token dari environ
+    import builtins; _get_invite = lambda: request.environ.get('invite_token', '')
     redirect_uri = f"{APP_URL}/api/auth/google/callback"
     r = http_requests.post('https://oauth2.googleapis.com/token', data={
         'code': code, 'client_id': GOOGLE_CLIENT_ID,
@@ -75,12 +87,33 @@ def google_callback():
     if not user:
         if ALLOWED_DOMAIN and not email.endswith('@'+ALLOWED_DOMAIN) and role == 'siswa':
             return f"<script>window.location='{FRONTEND_URL}?error=domain'</script>"
-        # Guru masuk dulu sebagai guru_pending, admin aktivasi
-        assigned_role = 'guru_pending' if role == 'guru' else role
-        uid = str(uuid.uuid4())
-        query("""INSERT INTO users (id, google_id, email, name, avatar_url, role, is_active)
-                 VALUES (%s,%s,%s,%s,%s,%s,true)""",
-              (uid, google_id, email, name, avatar, assigned_role), fetch='none')
+        if role == 'guru':
+            # Validasi invite token — guru harus punya undangan dari admin
+            invite_token = request.environ.get('invite_token', '') or request.args.get('invite_token', '')
+            invite = query("""
+                SELECT * FROM guru_invites
+                WHERE token=%s AND email=%s AND used_at IS NULL AND expires_at > NOW()
+            """, (invite_token, email.lower()), fetch='one')
+
+            if not invite:
+                # Tidak punya invite valid — redirect dengan error
+                return f"<script>window.location='{FRONTEND_URL}?error=no_invite&email={email}'</script>"
+
+            # Invite valid — langsung jadi guru aktif
+            assigned_role = 'guru'
+            uid = str(uuid.uuid4())
+            query("""INSERT INTO users (id, google_id, email, name, avatar_url, role, is_active)
+                     VALUES (%s,%s,%s,%s,%s,%s,true)""",
+                  (uid, google_id, email, name or invite.get('name_hint',''), avatar, assigned_role), fetch='none')
+            # Mark invite as used
+            query("UPDATE guru_invites SET used_at=NOW(), used_by=%s WHERE id=%s",
+                  (uid, invite['id']), fetch='none')
+        else:
+            assigned_role = role
+            uid = str(uuid.uuid4())
+            query("""INSERT INTO users (id, google_id, email, name, avatar_url, role, is_active)
+                     VALUES (%s,%s,%s,%s,%s,%s,true)""",
+                  (uid, google_id, email, name, avatar, assigned_role), fetch='none')
         user = query("SELECT * FROM users WHERE id=%s", (uid,), fetch='one')
 
     query("UPDATE users SET last_login=NOW(), avatar_url=%s WHERE id=%s", (avatar, user['id']), fetch='none')
