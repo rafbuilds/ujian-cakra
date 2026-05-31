@@ -220,13 +220,16 @@ def upload_media(exam_id):
     b64  = base64.b64encode(data).decode()
     url  = f"data:{mime};base64,{b64}"
 
-    # Simpan ke DB (kolom media di exam)
-    media_id = str(_uuid.uuid4())
-    dbq("""INSERT INTO exam_media (id, exam_id, media_type, url, filename, uploaded_by, created_at)
-           VALUES (%s,%s,%s,%s,%s,%s,NOW())
-           ON CONFLICT DO NOTHING""",
-        (media_id, exam_id, ftype, url, secure_filename(file.filename), request.user_id),
-        fetch='none')
+    # Simpan ke DB (opsional — kalau tabel belum ada, tetap return URL)
+    try:
+        media_id = str(_uuid.uuid4())
+        dbq("""INSERT INTO exam_media (id, exam_id, media_type, url, filename, uploaded_by, created_at)
+               VALUES (%s,%s,%s,%s,%s,%s,NOW())
+               ON CONFLICT DO NOTHING""",
+            (media_id, exam_id, ftype, url, secure_filename(file.filename), request.user_id),
+            fetch='none')
+    except Exception:
+        media_id = None  # tabel belum ada, tidak masalah
 
     return jsonify({'ok': True, 'url': url, 'media_id': media_id})
 
