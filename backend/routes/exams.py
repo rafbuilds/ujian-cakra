@@ -252,8 +252,12 @@ def student_exam_detail(exam_id, student_id):
     sess = query("SELECT id FROM exam_sessions WHERE exam_id=%s AND student_id=%s LIMIT 1",
                  (exam_id, student_id), fetch='one')
     if not sess: return jsonify({'error': 'Siswa belum memulai ujian ini'}), 404
+    session_id = sess['id']
+
     questions = query("""
         SELECT q.id, q.content, q.order_num,
+               COALESCE(q.type, 'multiple_choice') as type,
+               q.attachment_url, q.audio_url,
                a.option_id as student_option_id,
                ao.label as student_label, ao.content as student_answer,
                ao.is_correct as is_correct,
@@ -263,8 +267,55 @@ def student_exam_detail(exam_id, student_id):
         LEFT JOIN options ao ON ao.id=a.option_id
         LEFT JOIN options co ON co.question_id=q.id AND co.is_correct=true
         WHERE q.exam_id=%s ORDER BY q.order_num, q.created_at
-    """, (sess['id'], exam_id))
-    return jsonify({'questions': [dict(q) for q in questions]})
+    """, (session_id, exam_id))
+
+    q_list = [dict(q) for q in questions]
+
+    # Ambil essay answers (camera_essay) dan gabungkan
+    try:
+        essays = query("""
+            SELECT question_id, essay_text, photo_b64, teacher_score, teacher_note
+            FROM essay_answers WHERE session_id=%s
+        """, (session_id,))
+        essay_map = {str(e['question_id']): dict(e) for e in essays}
+        for q in q_list:
+            if q['type'] == 'camera_essay':
+                essay = essay_map.get(str(q['id']), {})
+                q['essay_text']    = essay.get('essay_text', '')
+                q['photo_b64']     = essay.get('photo_b64', '')
+                q['teacher_score'] = essay.get('teacher_score')
+                q['teacher_note']  = essay.get('teacher_note')
+    except Exception:
+        pass  # tabel essay_answers belum ada, tidak masalah
+
+    # Ambil multi_answers dan gabungkan
+    try:
+        multis = query("""
+            SELECT ma.question_id, STRING_AGG(o.label, ', ' ORDER BY o.label) as student_answer,
+                   BOOL_AND(o.is_correct) as is_correct
+            FROM multi_answers ma
+            JOIN options o ON o.id=ma.option_id
+            WHERE ma.session_id=%s
+            GROUP BY ma.question_id
+        """, (session_id,))
+        multi_map = {str(m['question_id']): dict(m) for m in multis}
+        correct_multi = query("""
+            SELECT question_id, STRING_AGG(label, ', ' ORDER BY label) as correct_answer
+            FROM options WHERE question_id IN (
+                SELECT id FROM questions WHERE exam_id=%s AND type='multiple_answer'
+            ) AND is_correct=true GROUP BY question_id
+        """, (exam_id,))
+        correct_multi_map = {str(r['question_id']): r['correct_answer'] for r in correct_multi}
+        for q in q_list:
+            if q['type'] == 'multiple_answer':
+                multi = multi_map.get(str(q['id']), {})
+                q['student_answer'] = multi.get('student_answer', '')
+                q['is_correct']     = multi.get('is_correct', False)
+                q['correct_answer'] = correct_multi_map.get(str(q['id']), '—')
+    except Exception:
+        pass
+
+    return jsonify({'questions': q_list})
 
 # ── Sessions ───────────────────────────────────────────────────
 @exams_bp.route('/api/sessions/<session_id>/detail', methods=['GET'])
