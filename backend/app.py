@@ -122,13 +122,13 @@ def google_callback():
     # Redirect ke halaman yang sesuai role
     role_actual = user['role']
     if role_actual == 'guru_pending':
-        dest = f"{FRONTEND_URL}/pages/guru-pending.html"
+        dest = f"{FRONTEND_URL}/guru/pending.html"
     elif role_actual == 'guru':
-        dest = f"{FRONTEND_URL}/pages/guru-dashboard.html"
+        dest = f"{FRONTEND_URL}/guru/dashboard.html"
     elif role_actual == 'admin':
-        dest = f"{FRONTEND_URL}/pages/admin-dashboard.html"
+        dest = f"{FRONTEND_URL}/admin/dashboard.html"
     else:
-        dest = f"{FRONTEND_URL}/pages/siswa-ujian.html"
+        dest = f"{FRONTEND_URL}/siswa/siswa-ujian.html"
 
     return f"<script>localStorage.setItem('token','{token}');localStorage.setItem('user_role','{role_actual}');window.location='{dest}'</script>"
 
