@@ -1,0 +1,783 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+    <title>Daftar Ujian — Ujian Online</title>
+    <link rel="stylesheet" href="../style.css" />
+    <style>
+      .exam-row {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 1rem 1.25rem;
+        border-bottom: 0.5px solid var(--border);
+        transition: background 0.15s;
+        cursor: pointer;
+      }
+      .exam-row:hover {
+        background: #fafaf8;
+      }
+      .exam-row:last-child {
+        border-bottom: none;
+      }
+      .exam-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        flex-shrink: 0;
+      }
+      .exam-info {
+        flex: 1;
+        min-width: 0;
+      }
+      .exam-title {
+        font-weight: 600;
+        font-size: 15px;
+        margin-bottom: 3px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .exam-meta {
+        font-size: 12px;
+        color: var(--muted);
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .modal {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 200;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+        backdrop-filter: blur(4px);
+      }
+      .modal.show {
+        display: flex;
+      }
+      .modal-box {
+        background: #fff;
+        border-radius: 20px;
+        padding: 2rem;
+        max-width: 580px;
+        width: 100%;
+        max-height: 90vh;
+        overflow-y: auto;
+      }
+      .modal-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 1.5rem;
+      }
+      .modal-title {
+        font-family: "Playfair Display", serif;
+        font-size: 20px;
+        color: var(--green);
+      }
+      .class-checkbox-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 7px;
+      }
+      .cls-chk {
+        padding: 8px 10px;
+        border: 1.5px solid var(--border2);
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.15s;
+      }
+      .cls-chk.checked {
+        border-color: var(--green3);
+        background: var(--green4);
+        color: #0f6e56;
+      }
+      .toggle-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.75rem 0;
+        border-bottom: 0.5px solid #f0ede5;
+      }
+      .toggle-row:last-child {
+        border-bottom: none;
+      }
+      .filter-bar {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 1rem;
+        flex-wrap: wrap;
+      }
+      .filter-bar select,
+      .filter-bar input {
+        padding: 8px 12px;
+        border: 1px solid var(--border2);
+        border-radius: 9px;
+        font-size: 13px;
+        background: var(--white);
+        font-family: inherit;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-shell">
+      <nav class="sidebar">
+        <div class="sb-logo">
+          <div class="sb-logo-title">📋 Ujian Online</div>
+          <div class="sb-logo-sub">SMAN 1 Batangan</div>
+        </div>
+        <div class="sb-nav">
+          <div class="sb-section">Menu</div>
+          <a href="dashboard.html" class="sb-item" id="nav-dashboard">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path
+                d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+              <polyline
+                points="9 22 9 12 15 12 15 22"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+            Dashboard
+          </a>
+          <a href="ujian.html" class="sb-item active" id="nav-ujian">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path
+                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                stroke-linecap="round"
+              />
+            </svg>
+            Daftar Ujian
+          </a>
+          <a href="pengawas.html" class="sb-item" id="nav-pengawas">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path
+                d="M15 10l4.553-2.069A1 1 0 0121 8.82V15.18a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"
+                stroke-linecap="round"
+              />
+            </svg>
+            Pengawas Live
+          </a>
+          <a href="nilai.html" class="sb-item" id="nav-nilai">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <line x1="18" y1="20" x2="18" y2="10" stroke-linecap="round" />
+              <line x1="12" y1="20" x2="12" y2="4" stroke-linecap="round" />
+              <line x1="6" y1="20" x2="6" y2="14" stroke-linecap="round" />
+            </svg>
+            Nilai & Rekap
+          </a>
+          <a href="mapel.html" class="sb-item" id="nav-mapel">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path
+                d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+                stroke-linecap="round"
+              />
+            </svg>
+            Mata Pelajaran
+          </a>
+          <a href="siswa.html" class="sb-item" id="nav-siswa">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path
+                d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"
+                stroke-linecap="round"
+              />
+              <circle cx="9" cy="7" r="4" />
+              <path
+                d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"
+                stroke-linecap="round"
+              />
+            </svg>
+            Data Siswa
+          </a>
+        </div>
+
+        <div class="sb-user">
+          <div
+            style="
+              display: flex;
+              align-items: center;
+              gap: 8px;
+              margin-bottom: 8px;
+            "
+          >
+            <div class="sb-avatar" id="sb-avatar">G</div>
+            <div>
+              <div class="sb-user-name" id="sb-user-name">Guru</div>
+              <div class="sb-user-role">Guru Pengampu</div>
+            </div>
+          </div>
+          <button class="sb-logout" onclick="Auth.logout()">⏻ Keluar</button>
+        </div>
+      </nav>
+
+      <div class="main-wrap">
+        <div class="topbar">
+          <div class="topbar-title">Daftar Ujian</div>
+          <div class="topbar-right">
+            <button class="btn btn-primary" onclick="openModal()">
+              + Buat Ujian Baru
+            </button>
+          </div>
+        </div>
+
+        <div class="page-main">
+          <div class="filter-bar">
+            <select id="filter-status" onchange="loadExams()">
+              <option value="">Semua Status</option>
+              <option value="draft">Draft</option>
+              <option value="published">Terbuka</option>
+              <option value="ongoing">Berlangsung</option>
+              <option value="finished">Selesai</option>
+            </select>
+            <input
+              type="text"
+              id="search-exam"
+              placeholder="Cari judul ujian..."
+              oninput="loadExams()"
+              style="flex: 1; max-width: 300px"
+            />
+          </div>
+
+          <div
+            class="card"
+            style="padding: 0; overflow: hidden"
+            id="exam-list-card"
+          >
+            <div style="padding: 2rem; text-align: center">
+              <div class="loading-spinner"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL BUAT/EDIT UJIAN -->
+    <div class="modal" id="modal-ujian">
+      <div class="modal-box">
+        <div class="modal-header">
+          <div class="modal-title" id="modal-title">Buat Ujian Baru</div>
+          <button
+            onclick="closeModal()"
+            style="
+              background: none;
+              border: none;
+              font-size: 22px;
+              cursor: pointer;
+              color: var(--muted);
+            "
+          >
+            ✕
+          </button>
+        </div>
+
+        <div class="form-group">
+          <label>Judul Ujian *</label>
+          <input
+            class="form-control"
+            id="f-title"
+            placeholder="Contoh: UTS Seni Budaya Kelas X"
+          />
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label
+              >Mata Pelajaran
+              <button
+                type="button"
+                onclick="tambahMapel()"
+                style="
+                  background: none;
+                  border: none;
+                  color: var(--green3);
+                  font-size: 12px;
+                  cursor: pointer;
+                  font-weight: 600;
+                  margin-left: 6px;
+                "
+              >
+                + Tambah mapel
+              </button>
+            </label>
+            <select class="form-control" id="f-subject">
+              <option value="">— Pilih Mapel —</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Durasi (menit)</label>
+            <input
+              class="form-control"
+              id="f-duration"
+              type="number"
+              min="10"
+              max="300"
+              value="90"
+            />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Tanggal & Jam Mulai *</label>
+            <input class="form-control" id="f-start" type="datetime-local" />
+          </div>
+          <div class="form-group">
+            <label>Batas Waktu Masuk (menit)</label>
+            <input
+              class="form-control"
+              id="f-late"
+              type="number"
+              min="0"
+              value="15"
+              placeholder="0 = tidak ada batas"
+            />
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Petunjuk Ujian</label>
+          <textarea
+            class="form-control"
+            id="f-instruction"
+            rows="2"
+            placeholder="Petunjuk untuk siswa sebelum memulai ujian..."
+          ></textarea>
+        </div>
+
+        <div class="form-group">
+          <label>Kelas Peserta *</label>
+          <div class="class-checkbox-grid" id="class-grid"></div>
+        </div>
+
+        <div class="form-group">
+          <label
+            >Formula Nilai
+            <span style="font-weight: 400; color: var(--muted)"
+              >(Nilai = Benar × ?)</span
+            ></label
+          >
+          <div style="display: flex; align-items: center; gap: 10px">
+            <span style="font-size: 13px; color: var(--muted)">Nilai =</span>
+            <span style="font-size: 13px; color: var(--muted)"
+              >Jumlah Benar ×</span
+            >
+            <input
+              class="form-control"
+              id="f-spc"
+              type="number"
+              min="0.1"
+              max="100"
+              step="0.5"
+              value=""
+              placeholder="otomatis"
+              style="width: 100px"
+            />
+            <span style="font-size: 13px; color: var(--muted)"
+              >(kosong = otomatis 100/jumlah soal)</span
+            >
+          </div>
+          <div style="font-size: 11px; color: var(--muted); margin-top: 4px">
+            Contoh: 20 soal → isi 5 agar 20×5=100
+          </div>
+        </div>
+
+        <div class="card" style="margin-top: 0.5rem; margin-bottom: 0.5rem">
+          <div
+            class="card-title"
+            style="font-size: 13px; margin-bottom: 0.75rem"
+          >
+            Pengaturan
+          </div>
+          <div class="toggle-row">
+            <div>
+              <div style="font-size: 13px; font-weight: 500">
+                Acak urutan soal
+              </div>
+              <div style="font-size: 11px; color: var(--muted)">
+                Setiap siswa mendapat urutan berbeda
+              </div>
+            </div>
+            <label class="toggle-switch"
+              ><input type="checkbox" id="f-rq" checked />
+              <div class="ts-slider"></div
+            ></label>
+          </div>
+          <div class="toggle-row">
+            <div>
+              <div style="font-size: 13px; font-weight: 500">
+                Acak pilihan jawaban
+              </div>
+              <div style="font-size: 11px; color: var(--muted)">
+                Pilihan A/B/C/D diacak per siswa
+              </div>
+            </div>
+            <label class="toggle-switch"
+              ><input type="checkbox" id="f-ro" checked />
+              <div class="ts-slider"></div
+            ></label>
+          </div>
+          <div class="toggle-row">
+            <div>
+              <div style="font-size: 13px; font-weight: 500">
+                Tampilkan nilai setelah submit
+              </div>
+              <div style="font-size: 11px; color: var(--muted)">
+                Siswa langsung lihat nilainya
+              </div>
+            </div>
+            <label class="toggle-switch"
+              ><input type="checkbox" id="f-sr" checked />
+              <div class="ts-slider"></div
+            ></label>
+          </div>
+          <div class="toggle-row">
+            <div>
+              <div style="font-size: 13px; font-weight: 500">
+                Tampilkan kunci jawaban
+              </div>
+              <div style="font-size: 11px; color: var(--muted)">
+                Siswa bisa lihat jawaban benar
+              </div>
+            </div>
+            <label class="toggle-switch"
+              ><input type="checkbox" id="f-sk" />
+              <div class="ts-slider"></div
+            ></label>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-top: 1rem">
+          <button
+            class="btn btn-secondary"
+            onclick="closeModal()"
+            style="flex: 1"
+          >
+            Batal
+          </button>
+          <button
+            class="btn btn-primary"
+            onclick="saveExam()"
+            style="flex: 2"
+            id="f-submit"
+          >
+            Simpan & Tambah Soal
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script src="../config.js"></script>
+    <script src="../components/api.js"></script>
+    <script src="../components/auth.js"></script>
+    <script src="../components/common.js"></script>
+    <script>
+      if (!Auth.requireRole(["guru", "admin"])) throw new Error();
+      UI.initSidebar();
+
+      let allClasses = [],
+        allExams = [],
+        editingId = null;
+
+      async function init() {
+        [allClasses] = await Promise.all([
+          API.get("/api/classes"),
+          loadExams(),
+        ]);
+        loadSubjects();
+        // Cek URL param action=new
+        if (new URLSearchParams(location.search).get("action") === "new")
+          openModal();
+      }
+
+      async function loadSubjects() {
+        try {
+          const subs = await API.get("/api/subjects");
+          const sel = document.getElementById("f-subject");
+          sel.innerHTML =
+            '<option value="">— Pilih Mapel —</option>' +
+            subs
+              .map((s) => `<option value="${s.id}">${s.name}</option>`)
+              .join("");
+        } catch {}
+      }
+
+      async function loadExams() {
+        const status = document.getElementById("filter-status")?.value || "";
+        const search =
+          document.getElementById("search-exam")?.value.toLowerCase() || "";
+        try {
+          const res = await API.get("/api/exams");
+          allExams = Array.isArray(res) ? res : (res.exams || res.data || []);
+          let filtered = allExams;
+          if (status) filtered = filtered.filter((e) => e.status === status);
+          if (search)
+            filtered = filtered.filter((e) =>
+              e.title.toLowerCase().includes(search),
+            );
+          renderExams(filtered);
+        } catch {
+          UI.toast("Gagal memuat ujian", "error");
+        }
+      }
+
+      function renderExams(exams) {
+        const card = document.getElementById("exam-list-card");
+        if (!exams.length) {
+          card.innerHTML = `<div class="empty-state" style="padding:3rem">
+      <div class="empty-icon">📝</div>
+      <div class="empty-text">Belum ada ujian. <button class="btn btn-primary btn-sm" onclick="openModal()" style="margin-top:.75rem">Buat Ujian Pertama</button></div>
+    </div>`;
+          return;
+        }
+        const iconMap = {
+          draft: "📄",
+          published: "📋",
+          ongoing: "🟢",
+          finished: "✅",
+        };
+        const bgMap = {
+          draft: "var(--light)",
+          published: "#e6f1fb",
+          ongoing: "#eaf3de",
+          finished: "#f1efe8",
+        };
+        card.innerHTML = exams
+          .map(
+            (e) => `
+    <div class="exam-row" onclick="goToSoal('${e.id}')">
+      <div class="exam-icon" style="background:${bgMap[e.status] || "var(--light)"}">${iconMap[e.status] || "📋"}</div>
+      <div class="exam-info">
+        <div class="exam-title">${e.title}</div>
+        <div class="exam-meta">
+          <span>📚 ${e.subject_name || "—"}</span>
+          <span>⏱ ${e.duration_minutes} menit</span>
+          <span>📝 ${e.question_count || 0} soal</span>
+          <span>👥 ${e.classes?.map((c) => c.name).join(", ") || "Belum ada kelas"}</span>
+          <span>📅 ${UI.fmtDT(e.start_at)}</span>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;flex-shrink:0" onclick="event.stopPropagation()">
+        ${UI.examStatusBadge(e.status)}
+        ${e.status === "draft" ? `<button class="btn btn-success btn-sm" onclick="changeStatus('${e.id}','published')">Publish</button>` : ""}
+        ${e.status === "published" || e.status === "ongoing" ? `<button class="btn btn-secondary btn-sm" onclick="goMonitor('${e.id}')">👁 Monitor</button>` : ""}
+        ${e.status === "finished" ? `<button class="btn btn-secondary btn-sm" onclick="goNilai('${e.id}')">📊 Nilai</button>` : ""}
+        <button class="btn btn-secondary btn-sm" onclick="editExam('${e.id}')">✏️</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteExam('${e.id}','${e.title.replace(/'/g, "\\'")}')">🗑</button>
+      </div>
+    </div>
+  `,
+          )
+          .join("");
+      }
+
+      function goToSoal(id) {
+        location.href = `soal.html?id=${id}`;
+      }
+      function goMonitor(id) {
+        location.href = `pengawas.html?id=${id}`;
+      }
+      function goNilai(id) {
+        location.href = `nilai.html?id=${id}`;
+      }
+
+      async function changeStatus(id, status) {
+        try {
+          await API.patch(`/api/exams/${id}`, { status });
+          UI.toast(
+            `Ujian ${status === "published" ? "dipublish" : "diperbarui"}`,
+            "success",
+          );
+          loadExams();
+        } catch (e) {
+          UI.toast(e.error || "Gagal", "error");
+        }
+      }
+
+      async function deleteExam(id, title) {
+        UI.confirm(
+          "Hapus Ujian",
+          `Hapus ujian "<strong>${title}</strong>"? Semua soal dan data jawaban akan ikut terhapus.`,
+          async () => {
+            try {
+              await API.del(`/api/exams/${id}`);
+              UI.toast("Ujian dihapus", "success");
+              loadExams();
+            } catch (e) {
+              UI.toast(e.error || "Gagal menghapus", "error");
+            }
+          },
+        );
+      }
+
+      function openModal(exam = null) {
+        editingId = exam?.id || null;
+        document.getElementById("modal-title").textContent = exam
+          ? "Edit Ujian"
+          : "Buat Ujian Baru";
+        document.getElementById("f-title").value = exam?.title || "";
+        document.getElementById("f-subject").value = exam?.subject_id || "";
+        document.getElementById("f-duration").value =
+          exam?.duration_minutes || 90;
+        document.getElementById("f-start").value =
+          exam?.start_at?.slice(0, 16) || "";
+        document.getElementById("f-instruction").value =
+          exam?.instructions || "";
+        document.getElementById("f-spc").value = exam?.score_per_correct || "";
+        document.getElementById("f-rq").checked =
+          exam?.randomize_questions !== false;
+        document.getElementById("f-ro").checked =
+          exam?.randomize_options !== false;
+        document.getElementById("f-sr").checked =
+          exam?.show_result_after !== false;
+        document.getElementById("f-sk").checked = exam?.show_key_after || false;
+        document.getElementById("f-submit").textContent = exam
+          ? "Simpan Perubahan"
+          : "Simpan & Tambah Soal";
+
+        // Kelas checkbox
+        const selectedClasses = exam?.classes?.map((c) => c.id) || [];
+        // Grouping kelas: coba pakai c.grade, fallback ke nama (X/XI/XII prefix)
+        const gradeLabel = (cls) => {
+          if (cls.grade) return cls.grade;
+          const n = (cls.name||'').toUpperCase();
+          if (n.startsWith('XII')) return 12;
+          if (n.startsWith('XI')) return 11;
+          if (n.startsWith('X')) return 10;
+          return 0;
+        };
+        const byGrade = (g) => allClasses.filter((c) => gradeLabel(c) === g);
+        // Kelompok yang tidak masuk 10/11/12
+        const ungrouped = allClasses.filter(c => ![10,11,12].includes(gradeLabel(c)));
+        const gradeGroups = [10,11,12].filter(g => byGrade(g).length > 0);
+        const allGroups = ungrouped.length > 0
+          ? [...gradeGroups.map(g=>({label:`KELAS ${g}`,cls:byGrade(g)})),
+             ...(ungrouped.length?[{label:'KELAS LAINNYA',cls:ungrouped}]:[])]
+          : gradeGroups.map(g=>({label:`KELAS ${g}`,cls:byGrade(g)}));
+        // Fallback: kalau semua kosong, tampilkan semua tanpa group
+        const renderGroups = allGroups.length > 0 ? allGroups
+          : [{label:'SEMUA KELAS', cls: allClasses}];
+        document.getElementById("class-grid").innerHTML = renderGroups
+          .map(({label, cls}) => `
+    <div style="grid-column:1/-1;font-size:11px;font-weight:600;color:var(--muted);margin-top:.5rem">${label}</div>
+    ${cls.map(cls2 => `
+      <div class="cls-chk ${selectedClasses.includes(cls2.id) ? "checked" : ""}"
+           onclick="toggleClass(this,'${cls2.id}')" data-id="${cls2.id}">
+        <span>${selectedClasses.includes(cls2.id) ? "☑" : "☐"}</span> ${cls2.name}
+      </div>
+    `).join("")}
+  `).join("");
+
+        document.getElementById("modal-ujian").classList.add("show");
+      }
+
+      function toggleClass(el, id) {
+        el.classList.toggle("checked");
+        el.querySelector("span").textContent = el.classList.contains("checked")
+          ? "☑"
+          : "☐";
+      }
+
+      function closeModal() {
+        document.getElementById("modal-ujian").classList.remove("show");
+      }
+
+      async function editExam(id) {
+        const exam = allExams.find((e) => e.id === id);
+        if (!exam) return;
+        const full = await API.get(`/api/exams/${id}`);
+        openModal(full);
+      }
+
+      async function saveExam() {
+        const title = document.getElementById("f-title").value.trim();
+        if (!title) {
+          UI.toast("Judul ujian wajib diisi", "warn");
+          return;
+        }
+        const classIds = [...document.querySelectorAll(".cls-chk.checked")].map(
+          (el) => el.dataset.id,
+        );
+        if (!classIds.length) {
+          UI.toast("Pilih minimal 1 kelas", "warn");
+          return;
+        }
+        const startAt = document.getElementById("f-start").value;
+        if (!startAt) {
+          UI.toast("Tanggal & jam mulai wajib diisi", "warn");
+          return;
+        }
+
+        const spcVal = document.getElementById("f-spc")?.value;
+        const body = {
+          title,
+          class_ids: classIds,
+          subject_id: document.getElementById("f-subject").value || null,
+          duration_minutes: parseInt(
+            document.getElementById("f-duration").value,
+          ),
+          start_at: new Date(startAt).toISOString(),
+          instructions: document.getElementById("f-instruction").value,
+          randomize_questions: document.getElementById("f-rq").checked,
+          randomize_options: document.getElementById("f-ro").checked,
+          show_result_after: document.getElementById("f-sr").checked,
+          show_key_after: document.getElementById("f-sk").checked,
+          score_per_correct: spcVal ? parseFloat(spcVal) : null,
+        };
+
+        const btn = document.getElementById("f-submit");
+        btn.textContent = "Menyimpan...";
+        btn.disabled = true;
+        try {
+          if (editingId) {
+            await API.patch(`/api/exams/${editingId}`, body);
+            UI.toast("✅ Ujian diperbarui", "success");
+            closeModal();
+            loadExams();
+          } else {
+            const exam = await API.post("/api/exams", body);
+            UI.toast("✅ Ujian dibuat", "success");
+            closeModal();
+            location.href = `soal.html?id=${exam.id}`;
+          }
+        } catch (e) {
+          UI.toast(e.error || "Gagal menyimpan", "error");
+        } finally {
+          btn.textContent = editingId
+            ? "Simpan Perubahan"
+            : "Simpan & Tambah Soal";
+          btn.disabled = false;
+        }
+      }
+
+      async function tambahMapel() {
+        const name = prompt("Nama mata pelajaran baru:");
+        if (!name || !name.trim()) return;
+        try {
+          const sub = await API.post("/api/subjects", { name: name.trim() });
+          UI.toast(`✅ Mapel "${sub.name}" ditambahkan`, "success");
+          // Reload subjects
+          await loadSubjects();
+          document.getElementById("f-subject").value = sub.id;
+        } catch (e) {
+          UI.toast(e.error || "Gagal tambah mapel", "error");
+        }
+      }
+
+      init();
+    </script>
+  </body>
+</html>
