@@ -102,10 +102,11 @@ def get_guru_siswa():
             SELECT
                 u.id, u.name, u.email, u.nisn, u.class_id,
                 c.name as class_name,
-                ROUND(AVG(es.score)::numeric, 1) as avg_score
+                ROUND(AVG(r.score)::numeric, 1) as avg_score
             FROM users u
             LEFT JOIN classes c ON c.id=u.class_id
-            LEFT JOIN exam_sessions es ON es.student_id=u.id AND es.status='submitted'
+            LEFT JOIN exam_sessions es ON es.student_id=u.id AND es.submitted_at IS NOT NULL
+            LEFT JOIN results r ON r.session_id=es.id
             WHERE u.role='siswa' AND u.class_id IN (
                 SELECT class_id FROM guru_classes WHERE teacher_id=%s
             )
@@ -118,10 +119,11 @@ def get_guru_siswa():
             SELECT
                 u.id, u.name, u.email, u.nisn, u.class_id,
                 c.name as class_name,
-                ROUND(AVG(es.score)::numeric, 1) as avg_score
+                ROUND(AVG(r.score)::numeric, 1) as avg_score
             FROM users u
             LEFT JOIN classes c ON c.id=u.class_id
-            LEFT JOIN exam_sessions es ON es.student_id=u.id AND es.status='submitted'
+            LEFT JOIN exam_sessions es ON es.student_id=u.id AND es.submitted_at IS NOT NULL
+            LEFT JOIN results r ON r.session_id=es.id
             WHERE u.role='siswa'
             GROUP BY u.id, u.name, u.email, u.nisn, u.class_id, c.name
             ORDER BY c.name, u.name
