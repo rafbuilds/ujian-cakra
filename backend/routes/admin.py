@@ -451,3 +451,120 @@ def guru_leave_room(room_id):
     query("DELETE FROM room_teachers WHERE room_id=%s AND teacher_id=%s",
           (room_id, request.user_id), fetch='none')
     return jsonify({'ok': True})
+
+# ══════════════════════════════════════════════════════════════
+# GURU INVITATION SYSTEM — Hanya guru yang diundang admin bisa daftar
+# ══════════════════════════════════════════════════════════════
+
+@admin_bp.route('/api/admin/guru-invites', methods=['GET'])
+@require_admin
+def list_invites():
+    rows = query("""
+        SELECT gi.*, u.name as used_by_name
+        FROM guru_invites gi
+        LEFT JOIN users u ON u.id = gi.used_by
+        ORDER BY gi.created_at DESC
+    """)
+    return jsonify([dict(r) for r in rows])
+
+@admin_bp.route('/api/admin/guru-invites', methods=['POST'])
+@require_admin
+def create_invite():
+    import secrets
+    from datetime import datetime, timezone, timedelta
+    body = request.json or {}
+    email = body.get('email', '').strip().lower()
+    name  = body.get('name', '').strip()
+    if not email: return jsonify({'error': 'Email wajib diisi'}), 400
+
+    # Cek apakah email sudah punya akun
+    existing_user = query("SELECT id FROM users WHERE email=%s", (email,), fetch='one')
+    if existing_user: return jsonify({'error': 'Email sudah terdaftar sebagai user'}), 409
+
+    # Cek invite aktif
+    existing = query("SELECT id FROM guru_invites WHERE email=%s AND used_at IS NULL AND expires_at > NOW()",
+                     (email,), fetch='one')
+    if existing: return jsonify({'error': 'Undangan aktif sudah ada untuk email ini'}), 409
+
+    token = secrets.token_urlsafe(32)
+    expires = datetime.now(timezone.utc) + timedelta(days=7)
+
+    invite = query("""
+        INSERT INTO guru_invites (id, email, name_hint, token, created_by, expires_at)
+        VALUES (%s, %s, %s, %s, %s, %s) RETURNING *
+    """, (str(uuid.uuid4()), email, name, token, request.user_id, expires), fetch='one')
+
+    # Return token untuk dikirim manual via email/WA
+    invite_url = f"{body.get('frontend_url', '')}/index.html?invite={token}&role=guru"
+    return jsonify({**dict(invite), 'invite_url': invite_url, 'token': token}), 201
+
+@admin_bp.route('/api/admin/guru-invites/<invite_id>', methods=['DELETE'])
+@require_admin
+def revoke_invite(invite_id):
+    query("UPDATE guru_invites SET expires_at=NOW() WHERE id=%s", (invite_id,), fetch='none')
+    return jsonify({'ok': True})
+
+@admin_bp.route('/api/auth/verify-invite', methods=['GET'])
+def verify_invite():
+    """Frontend cek apakah token invite valid sebelum login Google."""
+    token = request.args.get('token', '')
+    if not token: return jsonify({'valid': False, 'error': 'Token kosong'}), 400
+    invite = query("""
+        SELECT id, email, name_hint, expires_at, used_at
+        FROM guru_invites WHERE token=%s
+    """, (token,), fetch='one')
+    if not invite: return jsonify({'valid': False, 'error': 'Token tidak ditemukan'}), 404
+    if invite['used_at']: return jsonify({'valid': False, 'error': 'Token sudah dipakai'}), 400
+    from datetime import datetime, timezone
+    exp = invite['expires_at']
+    if hasattr(exp, 'tzinfo') and exp.tzinfo is None: exp = exp.replace(tzinfo=timezone.utc)
+    if exp < datetime.now(timezone.utc): return jsonify({'valid': False, 'error': 'Token kedaluwarsa'}), 400
+    return jsonify({'valid': True, 'email': invite['email'], 'name_hint': invite['name_hint']})
+
+# ── Device Management ──────────────────────────────────────────
+@admin_bp.route('/api/admin/siswa/<siswa_id>/reset-device', methods=['POST'])
+@require_admin
+def reset_device(siswa_id):
+    query("UPDATE users SET device_id=NULL, device_info=NULL WHERE id=%s AND role='siswa'",
+          (siswa_id,), fetch='none')
+    return jsonify({'ok': True})
+
+@admin_bp.route('/api/admin/siswa/<siswa_id>/device', methods=['GET'])
+@require_admin
+def get_device_info(siswa_id):
+    user = query("""
+        SELECT id, name, email, device_id, device_info, last_login
+        FROM users WHERE id=%s AND role='siswa'
+    """, (siswa_id,), fetch='one')
+    if not user: return jsonify({'error': 'Siswa tidak ditemukan'}), 404
+    return jsonify(dict(user))
+
+@admin_bp.route('/api/admin/devices', methods=['GET'])
+@require_admin
+def list_devices():
+    """Semua siswa + status device mereka."""
+    rows = query("""
+        SELECT u.id, u.name, u.email, u.class_id, c.name as class_name,
+               u.device_id, u.device_info, u.last_login,
+               CASE WHEN u.device_id IS NOT NULL THEN true ELSE false END as has_device
+        FROM users u
+        LEFT JOIN classes c ON c.id=u.class_id
+        WHERE u.role='siswa'
+        ORDER BY c.name, u.name
+    """)
+    return jsonify([dict(r) for r in rows])
+
+# ── Guru invite check di Google callback ──────────────────────
+# (dipatch di app.py google_callback untuk validasi)
+def check_guru_invite(email, token):
+    """Return invite record kalau valid, None kalau tidak."""
+    if not token: return None
+    invite = query("""
+        SELECT * FROM guru_invites
+        WHERE token=%s AND email=%s AND used_at IS NULL AND expires_at > NOW()
+    """, (token, email.lower()), fetch='one')
+    return invite
+
+def mark_invite_used(token, user_id):
+    query("UPDATE guru_invites SET used_at=NOW(), used_by=%s WHERE token=%s",
+          (user_id, token), fetch='none')
