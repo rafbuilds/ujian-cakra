@@ -571,3 +571,40 @@ def check_guru_invite(email, token):
 def mark_invite_used(token, user_id):
     query("UPDATE guru_invites SET used_at=NOW(), used_by=%s WHERE token=%s",
           (user_id, token), fetch='none')
+
+# ── Settings CRUD ─────────────────────────────────────────────
+@admin_bp.route('/api/admin/settings', methods=['GET'])
+@require_admin
+def get_settings():
+    try:
+        rows = query("SELECT key, value FROM exam_settings")
+        return jsonify({r['key']: r['value'] for r in rows})
+    except Exception:
+        return jsonify({})  # tabel belum ada
+
+@admin_bp.route('/api/admin/settings', methods=['POST'])
+@require_admin
+def save_settings():
+    data = request.json or {}
+    for key, val in data.items():
+        try:
+            query("""INSERT INTO exam_settings (key, value) VALUES (%s, %s)
+                     ON CONFLICT (key) DO UPDATE SET value=%s""",
+                  (key, str(val), str(val)), fetch='none')
+        except Exception:
+            pass  # tabel belum ada
+    return jsonify({'ok': True})
+
+# ── Reset ALL devices ────────────────────────────────────────
+@admin_bp.route('/api/admin/devices/reset-all', methods=['POST'])
+@require_admin
+def reset_all_devices():
+    query("UPDATE users SET device_id=NULL, device_info=NULL WHERE role='siswa'", fetch='none')
+    return jsonify({'ok': True})
+
+# ── Cleanup finished exams ───────────────────────────────────
+@admin_bp.route('/api/admin/exams/cleanup', methods=['DELETE'])
+@require_admin
+def cleanup_exams():
+    query("DELETE FROM exams WHERE status='finished'", fetch='none')
+    return jsonify({'ok': True})
