@@ -1,6 +1,6 @@
 // frontend/config.js
 const CONFIG = {
-  API_BASE: "https://rafbuilds.github.io/my-smaba",
+  API_BASE: "https://my-smaba.onrender.com",
   DEV_MODE: false,
   // Base path untuk GitHub Pages — ganti sesuai nama repo
   // Contoh: "/my-smaba" untuk rafbuilds.github.io/my-smaba
