@@ -1,5 +1,8 @@
 // frontend/components/auth.js
 const Auth = (() => {
+  // Ambil base path dari config (untuk GitHub Pages subdirectory)
+  const getBase = () => (typeof CONFIG !== 'undefined' && CONFIG.BASE_PATH) ? CONFIG.BASE_PATH : '';
+
   const TOKEN_KEY = "ujian_token";
   const USER_KEY = "ujian_user";
 
@@ -14,30 +17,15 @@ const Auth = (() => {
   const logout = () => {
     clearToken();
     clearUser();
-    // Deteksi base path
-    const pathParts = window.location.pathname.split('/');
-    let basePath = '';
-    for (let i = 0; i < pathParts.length; i++) {
-      if (['admin','guru','siswa','index.html',''].includes(pathParts[i]) && i > 0) {
-        basePath = pathParts.slice(0, i).join('/');
-        break;
-      }
-    }
-    window.location.href = basePath + '/index.html';
+    window.location.href = getBase() + '/index.html';
   };
 
   const requireRole = (allowedRoles) => {
     const token = getToken();
     if (!token) {
       // Deteksi base path
-      const _parts = window.location.pathname.split('/');
-      let _base = '';
-      for (let i = 0; i < _parts.length; i++) {
-        if (['admin','guru','siswa','index.html',''].includes(_parts[i]) && i > 0) {
-          _base = _parts.slice(0, i).join('/'); break;
-        }
-      }
-      window.location.href = _base + '/index.html';
+
+      window.location.href = getBase() + '/index.html';
       return false;
     }
     const user = getUser();
@@ -49,7 +37,7 @@ const Auth = (() => {
           for (let i = 0; i < _p.length; i++) {
             if (['admin','guru','siswa','index.html',''].includes(_p[i]) && i > 0) { _b = _p.slice(0,i).join('/'); break; }
           }
-          window.location.href = _b + '/index.html';
+          window.location.href = getBase() + '/index.html';
           return;
         }
         if (!allowedRoles.includes(u.role)) redirectByRole(u.role);
@@ -92,26 +80,14 @@ const Auth = (() => {
   };
 
   const redirectByRole = (role) => {
-    // Deteksi base path otomatis dari URL saat ini
-    // Contoh: https://rafbuilds.github.io/my-smaba/admin/dashboard.html
-    // → basePath = /my-smaba
-    const pathParts = window.location.pathname.split('/');
-    // Cari segmen sebelum admin/guru/siswa/index.html
-    let basePath = '';
-    for (let i = 0; i < pathParts.length; i++) {
-      if (['admin','guru','siswa','index.html',''].includes(pathParts[i]) && i > 0) {
-        basePath = pathParts.slice(0, i).join('/');
-        break;
-      }
-    }
-
+    const base = getBase();
     const map = {
-      admin:       basePath + '/admin/dashboard.html',
-      guru:        basePath + '/guru/dashboard.html',
-      siswa:       basePath + '/siswa/ujian.html',
-      guru_pending: basePath + '/guru/pending.html',
+      admin:        base + '/admin/dashboard.html',
+      guru:         base + '/guru/dashboard.html',
+      siswa:        base + '/siswa/ujian.html',
+      guru_pending: base + '/guru/pending.html',
     };
-    window.location.href = map[role] || basePath + '/index.html';
+    window.location.href = map[role] || base + '/index.html';
   };
 
   return {
