@@ -409,3 +409,45 @@ def get_guru_rooms():
         GROUP BY r.id ORDER BY r.created_at DESC
     """, (request.user_id, request.user_id))
     return jsonify([dict(r) for r in rows])
+
+@admin_bp.route('/api/guru/rooms/all', methods=['GET'])
+@require_guru
+def get_all_rooms_for_guru():
+    """Semua rooms aktif + flag is_member untuk guru yang login."""
+    rows = query("""
+        SELECT r.*,
+               u.name as created_by_name,
+               COUNT(DISTINCT rc.class_id) as class_count,
+               COUNT(DISTINCT e.id) as exam_count,
+               BOOL_OR(rt2.teacher_id = %s) as is_member
+        FROM rooms r
+        LEFT JOIN users u ON u.id=r.created_by
+        LEFT JOIN room_teachers rt2 ON rt2.room_id=r.id
+        LEFT JOIN room_classes rc ON rc.room_id=r.id
+        LEFT JOIN exams e ON e.room_id=r.id
+        WHERE r.is_active=true
+        GROUP BY r.id, u.name
+        ORDER BY r.created_at DESC
+    """, (request.user_id,))
+    return jsonify([dict(r) for r in rows])
+
+@admin_bp.route('/api/guru/rooms/<room_id>/join', methods=['POST'])
+@require_guru
+def guru_join_room(room_id):
+    """Guru bergabung ke room ujian."""
+    room = query("SELECT id, name FROM rooms WHERE id=%s AND is_active=true", (room_id,), fetch='one')
+    if not room: return jsonify({'error': 'Room tidak ditemukan'}), 404
+    existing = query("SELECT id FROM room_teachers WHERE room_id=%s AND teacher_id=%s",
+                     (room_id, request.user_id), fetch='one')
+    if existing: return jsonify({'error': 'Sudah bergabung di room ini'}), 409
+    query("INSERT INTO room_teachers (room_id, teacher_id) VALUES (%s,%s) ON CONFLICT DO NOTHING",
+          (room_id, request.user_id), fetch='none')
+    return jsonify({'ok': True, 'room_name': room['name']})
+
+@admin_bp.route('/api/guru/rooms/<room_id>/leave', methods=['DELETE'])
+@require_guru
+def guru_leave_room(room_id):
+    """Guru keluar dari room ujian."""
+    query("DELETE FROM room_teachers WHERE room_id=%s AND teacher_id=%s",
+          (room_id, request.user_id), fetch='none')
+    return jsonify({'ok': True})
