@@ -188,7 +188,7 @@ def siswa_history(student_id):
 @guru_bp.route('/api/classes', methods=['GET'])
 @require_auth
 def get_classes():
-    rows = query("SELECT * FROM classes ORDER BY grade, LENGTH(id), id")
+    rows = query("SELECT * FROM classes ORDER BY name")
     return jsonify([dict(r) for r in rows])
 
 @guru_bp.route('/api/template-siswa', methods=['GET'])
