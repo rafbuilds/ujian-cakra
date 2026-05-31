@@ -88,9 +88,9 @@ const Auth = (() => {
 
   const redirectByRole = (role) => {
     const map = {
-      admin: "/admin/dashboard.html",
-      guru: "/guru/dashboard.html",
-      siswa: "/siswa/ujian.html",
+      admin:        "/admin/dashboard.html",
+      guru:         "/guru/dashboard.html",
+      siswa:        "/siswa/siswa-ujian.html",
       guru_pending: "/guru/pending.html",
     };
     window.location.href = map[role] || "/index.html";
