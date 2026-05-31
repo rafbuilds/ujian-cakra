@@ -90,16 +90,32 @@ def delete_exam(exam_id):
 @require_guru
 def add_question(exam_id):
     data = request.json or {}
-    q_id = str(uuid.uuid4())
+    q_id  = str(uuid.uuid4())
     total = query("SELECT COUNT(*) as n FROM questions WHERE exam_id=%s", (exam_id,), fetch='one')['n']
-    query("""INSERT INTO questions (id, exam_id, content, image_url, order_num, score)
-             VALUES (%s,%s,%s,%s,%s,%s)""",
-          (q_id, exam_id, data.get('content',''), data.get('image_url'),
-           total+1, data.get('score',1)), fetch='none')
+    q_type         = data.get('type', 'multiple_choice')
+    attachment_url = data.get('attachment_url')
+    audio_url      = data.get('audio_url')
+
+    # Pastikan kolom type/attachment_url/audio_url ada — jalankan migration dulu jika belum
+    try:
+        query("""INSERT INTO questions
+                   (id, exam_id, content, image_url, type, attachment_url, audio_url, order_num, score)
+                 VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+              (q_id, exam_id, data.get('content',''), data.get('image_url'),
+               q_type, attachment_url, audio_url,
+               total+1, data.get('score',1)), fetch='none')
+    except Exception:
+        # Fallback: kolom baru belum ada, insert tanpa kolom baru
+        query("""INSERT INTO questions (id, exam_id, content, image_url, order_num, score)
+                 VALUES (%s,%s,%s,%s,%s,%s)""",
+              (q_id, exam_id, data.get('content',''), data.get('image_url'),
+               total+1, data.get('score',1)), fetch='none')
+
     for opt in (data.get('options') or []):
         query("INSERT INTO options (id, question_id, label, content, is_correct) VALUES (%s,%s,%s,%s,%s)",
               (str(uuid.uuid4()), q_id, opt['label'], opt['content'], opt.get('is_correct',False)), fetch='none')
-    q = query("SELECT * FROM questions WHERE id=%s", (q_id,), fetch='one')
+
+    q    = query("SELECT * FROM questions WHERE id=%s", (q_id,), fetch='one')
     opts = query("SELECT * FROM options WHERE question_id=%s ORDER BY label", (q_id,))
     return jsonify({**dict(q), 'options': [dict(o) for o in opts]}), 201
 
