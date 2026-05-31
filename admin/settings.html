@@ -530,7 +530,7 @@ async function loadUjianCtrl() {
   } catch { tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--red2)">Gagal memuat</td></tr>'; }
 }
 
-function viewMonitor(id) { window.open('../guru/pengawas.html?id='+id,'_blank'); }
+function viewMonitor(id) { window.open('pengawas.html?id='+id,'_blank'); }
 async function publishUjian(id) {
   await API.patch('/api/exams/'+id, {status:'published'});
   UI.toast('✅ Dipublish','success'); loadUjianTab();
