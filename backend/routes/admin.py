@@ -495,7 +495,10 @@ def create_invite():
     """, (str(uuid.uuid4()), email, name, token, request.user_id, expires), fetch='one')
 
     # Return token untuk dikirim manual via email/WA
-    invite_url = f"{body.get('frontend_url', '')}/index.html?invite={token}&role=guru"
+    # Pakai FRONTEND_URL dari env, fallback ke frontend_url dari request
+    import os
+    frontend_base = os.environ.get('FRONTEND_URL', body.get('frontend_url', '')).rstrip('/')
+    invite_url = f"{frontend_base}/index.html?invite={token}&role=guru"
     return jsonify({**dict(invite), 'invite_url': invite_url, 'token': token}), 201
 
 @admin_bp.route('/api/admin/guru-invites/<invite_id>', methods=['DELETE'])
