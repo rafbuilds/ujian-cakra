@@ -14,20 +14,42 @@ const Auth = (() => {
   const logout = () => {
     clearToken();
     clearUser();
-    window.location.href = "/index.html";
+    // Deteksi base path
+    const pathParts = window.location.pathname.split('/');
+    let basePath = '';
+    for (let i = 0; i < pathParts.length; i++) {
+      if (['admin','guru','siswa','index.html',''].includes(pathParts[i]) && i > 0) {
+        basePath = pathParts.slice(0, i).join('/');
+        break;
+      }
+    }
+    window.location.href = basePath + '/index.html';
   };
 
   const requireRole = (allowedRoles) => {
     const token = getToken();
     if (!token) {
-      window.location.href = "/index.html";
+      // Deteksi base path
+      const _parts = window.location.pathname.split('/');
+      let _base = '';
+      for (let i = 0; i < _parts.length; i++) {
+        if (['admin','guru','siswa','index.html',''].includes(_parts[i]) && i > 0) {
+          _base = _parts.slice(0, i).join('/'); break;
+        }
+      }
+      window.location.href = _base + '/index.html';
       return false;
     }
     const user = getUser();
     if (!user) {
       fetchAndStoreUser().then((u) => {
         if (!u) {
-          window.location.href = "/index.html";
+          const _p = window.location.pathname.split('/');
+          let _b = '';
+          for (let i = 0; i < _p.length; i++) {
+            if (['admin','guru','siswa','index.html',''].includes(_p[i]) && i > 0) { _b = _p.slice(0,i).join('/'); break; }
+          }
+          window.location.href = _b + '/index.html';
           return;
         }
         if (!allowedRoles.includes(u.role)) redirectByRole(u.role);
@@ -70,36 +92,26 @@ const Auth = (() => {
   };
 
   const redirectByRole = (role) => {
-    // Deteksi apakah pakai struktur baru (admin/, guru/) atau lama (pages/)
-    const isNewStructure =
-      window.location.pathname.includes("/admin/") ||
-      window.location.pathname.includes("/guru/") ||
-      window.location.pathname.includes("/siswa/") ||
-      window.location.pathname === "/" ||
-      window.location.pathname === "/index.html";
+    // Deteksi base path otomatis dari URL saat ini
+    // Contoh: https://rafbuilds.github.io/my-smaba/admin/dashboard.html
+    // → basePath = /my-smaba
+    const pathParts = window.location.pathname.split('/');
+    // Cari segmen sebelum admin/guru/siswa/index.html
+    let basePath = '';
+    for (let i = 0; i < pathParts.length; i++) {
+      if (['admin','guru','siswa','index.html',''].includes(pathParts[i]) && i > 0) {
+        basePath = pathParts.slice(0, i).join('/');
+        break;
+      }
+    }
 
-    const newMap = {
-      admin: "/admin/dashboard.html",
-      guru: "/guru/dashboard.html",
-      siswa: "/siswa/ujian.html",
-      guru_pending: "/guru/pending.html",
+    const map = {
+      admin:       basePath + '/admin/dashboard.html',
+      guru:        basePath + '/guru/dashboard.html',
+      siswa:       basePath + '/siswa/ujian.html',
+      guru_pending: basePath + '/guru/pending.html',
     };
-    const oldMap = {
-      admin: "/pages/admin-dashboard.html",
-      guru: "/pages/guru-dashboard.html",
-      siswa: "/pages/siswa-ujian.html",
-      guru_pending: "/pages/guru-pending.html",
-    };
-
-    // Cek apakah folder baru ada
-    fetch("/admin/dashboard.html", { method: "HEAD" })
-      .then((r) => {
-        const map = r.ok ? newMap : oldMap;
-        window.location.href = map[role] || "/index.html";
-      })
-      .catch(() => {
-        window.location.href = oldMap[role] || "/index.html";
-      });
+    window.location.href = map[role] || basePath + '/index.html';
   };
 
   return {
