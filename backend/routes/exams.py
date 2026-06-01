@@ -142,26 +142,58 @@ def delete_question(question_id):
 @exams_bp.route('/api/exams/<exam_id>/import', methods=['POST'])
 @require_guru
 def import_questions(exam_id):
-    from openpyxl import load_workbook
-    file = request.files.get('file')
-    if not file: return jsonify({'error': 'File tidak ada'}), 400
-    wb = load_workbook(file); ws = wb.active
-    imported = 0
-    for i, row in enumerate(ws.iter_rows(min_row=2, values_only=True)):
-        if not row or not row[0]: continue
-        content = str(row[0]).strip()
-        options = [str(row[j] or '').strip() for j in range(1,6)]
-        correct = str(row[6] or '').strip().upper() if len(row) > 6 else 'A'
-        q_id = str(uuid.uuid4())
-        query("INSERT INTO questions (id, exam_id, content, order_num, score) VALUES (%s,%s,%s,%s,1)",
-              (q_id, exam_id, content, i+1), fetch='none')
-        labels = ['A','B','C','D','E']
-        for j, (label, opt_content) in enumerate(zip(labels, options)):
-            if not opt_content: continue
-            query("INSERT INTO options (id, question_id, label, content, is_correct) VALUES (%s,%s,%s,%s,%s)",
-                  (str(uuid.uuid4()), q_id, label, opt_content, label==correct), fetch='none')
-        imported += 1
-    return jsonify({'ok': True, 'saved': imported, 'total': imported})
+    import traceback
+    try:
+        from openpyxl import load_workbook
+        file = request.files.get('file')
+        if not file: return jsonify({'error': 'File tidak ada'}), 400
+
+        filename = file.filename or ''
+        imported = 0
+
+        # Support CSV
+        if filename.lower().endswith('.csv'):
+            import csv, io as _io
+            content_str = file.read().decode('utf-8-sig', errors='replace')
+            reader = csv.reader(_io.StringIO(content_str))
+            rows = list(reader)
+            data_rows = rows[1:] if rows else []  # skip header
+            for i, row in enumerate(data_rows):
+                if not row or not row[0].strip(): continue
+                content = row[0].strip()
+                options = [row[j].strip() if j < len(row) else '' for j in range(1,6)]
+                correct = row[6].strip().upper() if len(row) > 6 and row[6].strip() else 'A'
+                q_id = str(uuid.uuid4())
+                query("INSERT INTO questions (id, exam_id, content, order_num, score) VALUES (%s,%s,%s,%s,1)",
+                      (q_id, exam_id, content, i+1), fetch='none')
+                for label, opt_content in zip(['A','B','C','D','E'], options):
+                    if not opt_content: continue
+                    query("INSERT INTO options (id, question_id, label, content, is_correct) VALUES (%s,%s,%s,%s,%s)",
+                          (str(uuid.uuid4()), q_id, label, opt_content, label==correct), fetch='none')
+                imported += 1
+        else:
+            # Excel
+            wb = load_workbook(file)
+            ws = wb.active
+            for i, row in enumerate(ws.iter_rows(min_row=2, values_only=True)):
+                if not row or not row[0]: continue
+                content = str(row[0]).strip()
+                options = [str(row[j] or '').strip() for j in range(1,6)]
+                correct = str(row[6] or '').strip().upper() if len(row) > 6 else 'A'
+                q_id = str(uuid.uuid4())
+                query("INSERT INTO questions (id, exam_id, content, order_num, score) VALUES (%s,%s,%s,%s,1)",
+                      (q_id, exam_id, content, i+1), fetch='none')
+                for label, opt_content in zip(['A','B','C','D','E'], options):
+                    if not opt_content: continue
+                    query("INSERT INTO options (id, question_id, label, content, is_correct) VALUES (%s,%s,%s,%s,%s)",
+                          (str(uuid.uuid4()), q_id, label, opt_content, label==correct), fetch='none')
+                imported += 1
+
+        return jsonify({'ok': True, 'saved': imported, 'total': imported})
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
 # ── Monitor ────────────────────────────────────────────────────
 @exams_bp.route('/api/exams/<exam_id>/monitor', methods=['GET'])
