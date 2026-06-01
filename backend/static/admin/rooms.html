@@ -74,21 +74,32 @@
 
     <!-- Tab: Semua Ujian -->
     <div id="tab-content-allujian" style="display:none">
+      <!-- Stat mini -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.75rem;margin-bottom:1rem" id="ujian-stats">
+        <div class="stat-card"><div class="stat-num" id="ust-total">—</div><div class="stat-label">Total Ujian</div></div>
+        <div class="stat-card"><div class="stat-num" id="ust-live" style="color:#3b6d11">—</div><div class="stat-label">🟢 Berlangsung</div></div>
+        <div class="stat-card"><div class="stat-num" id="ust-open">—</div><div class="stat-label">Terbuka</div></div>
+        <div class="stat-card"><div class="stat-num" id="ust-done">—</div><div class="stat-label">Selesai</div></div>
+      </div>
       <div style="display:flex;gap:8px;margin-bottom:.875rem;flex-wrap:wrap">
         <select id="uj-status" onchange="loadAllUjian()" class="form-control" style="width:auto">
           <option value="">Semua Status</option>
-          <option value="draft">Draft</option>
+          <option value="ongoing">🟢 Berlangsung</option>
           <option value="published">Terbuka</option>
-          <option value="ongoing">Berlangsung</option>
           <option value="finished">Selesai</option>
+          <option value="draft">Draft</option>
+        </select>
+        <select id="uj-room" onchange="loadAllUjian()" class="form-control" style="width:auto">
+          <option value="">Semua Room</option>
         </select>
         <input id="uj-search" type="text" placeholder="🔍 Cari judul atau guru..." oninput="loadAllUjian()"
-          style="flex:1;max-width:300px;padding:8px 12px;border:1px solid var(--border2);border-radius:8px;font-size:13px"/>
+          style="flex:1;max-width:280px;padding:8px 12px;border:1px solid var(--border2);border-radius:8px;font-size:13px"/>
+        <div style="margin-left:auto;align-self:center;font-size:13px;color:var(--muted)" id="uj-count"></div>
       </div>
       <div class="card" style="padding:0;overflow:hidden">
         <div class="tbl-wrap">
           <table>
-            <thead><tr><th>Judul Ujian</th><th>Guru</th><th>Room</th><th>Soal</th><th>Status</th><th>Waktu Mulai</th><th>Aksi</th></tr></thead>
+            <thead><tr><th>Judul Ujian</th><th>Guru</th><th>Room</th><th>Kelas</th><th>Soal</th><th>Status</th><th>Aksi</th></tr></thead>
             <tbody id="allujian-tbody"></tbody>
           </table>
         </div>
@@ -262,25 +273,49 @@ async function openDetail(roomId) {
 
     // Ujian list
     const statusBadge = s => ({draft:'<span style="background:var(--light);color:var(--muted);padding:1px 7px;border-radius:20px;font-size:10px;font-weight:600">Draft</span>',published:'<span style="background:#e6f1fb;color:#185fa5;padding:1px 7px;border-radius:20px;font-size:10px;font-weight:600">Terbuka</span>',ongoing:'<span style="background:#eaf3de;color:#3b6d11;padding:1px 7px;border-radius:20px;font-size:10px;font-weight:600">Berlangsung</span>',finished:'<span style="background:#faeeda;color:#854f0b;padding:1px 7px;border-radius:20px;font-size:10px;font-weight:600">Selesai</span>'}[s]||s);
-    document.getElementById('dp-exams').innerHTML = room.exams.length
-      ? room.exams.map(e=>`
-          <div style="padding:.625rem;margin-bottom:6px;background:var(--light);border-radius:10px">
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
-              <div style="flex:1">
-                <div style="font-size:13px;font-weight:600">${e.title||''}</div>
-                <div style="font-size:11px;color:var(--muted);margin-top:2px">${e.teacher_name||'—'} · ${e.duration_minutes||90} menit · ${e.question_count||0} soal</div>
-              </div>
-              ${statusBadge(e.status)}
+    // Filter ujian per kelas yang ada di room ini
+    const roomClassIds = room.classes.map(rc=>rc.id);
+    
+    // Render dengan info kelas ujian + filter
+    const renderExams = (exams) => {
+      if (!exams.length) return '<div style="font-size:13px;color:var(--muted);padding:.5rem">Belum ada ujian di room ini</div>';
+      return exams.map(e=>`
+        <div style="padding:.75rem;margin-bottom:8px;background:#fff;border:0.5px solid var(--border);border-radius:12px">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px">
+            <div style="flex:1">
+              <div style="font-size:13px;font-weight:600;margin-bottom:2px">${e.title||''}</div>
+              <div style="font-size:11px;color:var(--muted)">${e.teacher_name||'—'} · ${e.subject_name||'—'}</div>
+              <div style="font-size:11px;color:var(--muted)">${e.duration_minutes||90} menit · ${e.question_count||0} soal · ${e.class_names||''}</div>
             </div>
-            <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
-              <button class="btn btn-secondary btn-sm" onclick="viewSoal('${e.id}')" style="font-size:11px;padding:3px 8px">👁 Soal</button>
-              <button class="btn btn-secondary btn-sm" onclick="viewNilai('${e.id}')" style="font-size:11px;padding:3px 8px">📊 Nilai</button>
-              ${['published','ongoing'].includes(e.status)?`<button class="btn btn-secondary btn-sm" style="font-size:11px;padding:3px 8px;border-color:#e57373;color:#c62828" onclick="forceFinishExam('${e.id}')">⏹ Paksa Selesai</button>`:''}
-              ${e.status==='draft'?`<button class="btn btn-primary btn-sm" style="font-size:11px;padding:3px 8px" onclick="publishExam('${e.id}')">✅ Publish</button>`:''}
-              <button class="btn btn-danger btn-sm" onclick="deleteExam('${e.id}')" style="font-size:11px;padding:3px 8px">🗑</button>
-            </div>
-          </div>`).join('')
-      : '<div style="font-size:13px;color:var(--muted)">Belum ada ujian</div>';
+            ${statusBadge(e.status)}
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button class="btn btn-secondary btn-sm" onclick="viewSoal('${e.id}')" style="font-size:11px;padding:3px 8px">👁 Soal</button>
+            <button class="btn btn-secondary btn-sm" onclick="viewNilai('${e.id}')" style="font-size:11px;padding:3px 8px">📊 Nilai</button>
+            <button class="btn btn-secondary btn-sm" onclick="viewMonitorExam('${e.id}')" style="font-size:11px;padding:3px 8px">🖥 Monitor</button>
+            ${e.status==='draft'?`<button class="btn btn-primary btn-sm" style="font-size:11px;padding:3px 8px" onclick="publishExam('${e.id}')">✅ Publish</button>`:''}
+            ${['published','ongoing'].includes(e.status)?`<button class="btn btn-secondary btn-sm" style="font-size:11px;padding:3px 8px;border-color:#e57373;color:#c62828" onclick="forceFinishExam('${e.id}')">⏹ Stop</button>`:''}
+            <button class="btn btn-danger btn-sm" onclick="deleteExam('${e.id}')" style="font-size:11px;padding:3px 8px">🗑</button>
+          </div>
+        </div>`).join('');
+    };
+
+    // Filter bar per status
+    const examStatuses = [...new Set(room.exams.map(e=>e.status))];
+    let filterHtml = '';
+    if (room.exams.length > 0) {
+      filterHtml = `<div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">
+        <button onclick="filterRoomExams('all')" id="ef-all" class="btn btn-primary btn-sm" style="font-size:11px;padding:3px 10px">Semua (${room.exams.length})</button>
+        ${['ongoing','published','finished','draft'].filter(s=>examStatuses.includes(s)).map(s=>`
+          <button onclick="filterRoomExams('${s}')" id="ef-${s}" class="btn btn-secondary btn-sm" style="font-size:11px;padding:3px 10px">
+            ${{'ongoing':'🟢 Live','published':'Terbuka','finished':'Selesai','draft':'Draft'}[s]} (${room.exams.filter(e=>e.status===s).length})
+          </button>`).join('')}
+      </div>`;
+    }
+
+    window._roomExams = room.exams;
+    document.getElementById('dp-exams').innerHTML = filterHtml + '<div id="exam-list">' + renderExams(room.exams) + '</div>';
+    window._renderExams = renderExams;
 
 
     // Dropdown tambah guru (yang belum ada)
@@ -390,67 +425,119 @@ const STATUS_BADGE = {
   finished:  '<span style="background:#faeeda;color:#854f0b;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600">Selesai</span>',
 };
 
+let _allExamsCache = [];
+
 async function loadAllUjian() {
   const status = document.getElementById('uj-status').value;
+  const roomF  = document.getElementById('uj-room').value;
   const q      = document.getElementById('uj-search').value.toLowerCase();
   const tbody  = document.getElementById('allujian-tbody');
   tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem"><div class="loading-spinner" style="margin:auto"></div></td></tr>';
   try {
-    let exams = await API.get('/api/admin/exams');
+    // Ambil fresh kalau belum ada cache
+    if (!_allExamsCache.length) {
+      _allExamsCache = await API.get('/api/admin/exams');
+      
+      // Update stats
+      document.getElementById('ust-total').textContent = _allExamsCache.length;
+      document.getElementById('ust-live').textContent  = _allExamsCache.filter(e=>e.status==='ongoing').length;
+      document.getElementById('ust-open').textContent  = _allExamsCache.filter(e=>e.status==='published').length;
+      document.getElementById('ust-done').textContent  = _allExamsCache.filter(e=>e.status==='finished').length;
+
+      // Populate room filter
+      const rooms = [...new Map(_allExamsCache.filter(e=>e.room_name).map(e=>[e.room_id,e])).values()];
+      const roomSel = document.getElementById('uj-room');
+      roomSel.innerHTML = '<option value="">Semua Room</option>' +
+        rooms.map(e=>`<option value="${e.room_id}">${e.room_name}</option>`).join('');
+    }
+
+    let exams = _allExamsCache;
     if (status) exams = exams.filter(e => e.status === status);
+    if (roomF)  exams = exams.filter(e => e.room_id === roomF);
     if (q) exams = exams.filter(e =>
       (e.title||'').toLowerCase().includes(q) ||
-      (e.teacher_name||'').toLowerCase().includes(q)
+      (e.teacher_name||'').toLowerCase().includes(q) ||
+      (e.class_names||'').toLowerCase().includes(q)
     );
+
+    document.getElementById('uj-count').textContent = exams.length + ' ujian';
+
     if (!exams.length) {
       tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--muted)">Belum ada ujian</td></tr>';
       return;
     }
+
     tbody.innerHTML = exams.map(e => `<tr>
-      <td><div style="font-weight:500;font-size:13px">${e.title||''}</div>
-          <div style="font-size:11px;color:var(--muted)">${e.class_names||''}</div></td>
+      <td>
+        <div style="font-weight:500;font-size:13px">${e.title||''}</div>
+        <div style="font-size:11px;color:var(--muted)">${e.start_at?UI.fmtDT(e.start_at):''}</div>
+      </td>
       <td style="font-size:13px">${e.teacher_name||'—'}</td>
       <td style="font-size:12px;color:var(--muted)">${e.room_name||'—'}</td>
+      <td style="font-size:12px;color:var(--muted)">${e.class_names||'—'}</td>
       <td style="text-align:center">
         <span style="background:var(--green4);color:var(--green);padding:2px 8px;border-radius:6px;font-size:12px;font-weight:700">${e.question_count||0}</span>
       </td>
       <td>${STATUS_BADGE[e.status]||e.status}</td>
-      <td style="font-size:12px;color:var(--muted)">${UI.fmtDT(e.start_at)||'—'}</td>
       <td>
         <div class="action-btns">
           <button class="btn btn-secondary btn-sm" onclick="viewSoal('${e.id}')">👁 Soal</button>
           <button class="btn btn-secondary btn-sm" onclick="viewNilai('${e.id}')">📊 Nilai</button>
+          ${['published','ongoing'].includes(e.status)?`<button class="btn btn-secondary btn-sm" onclick="viewMonitorExam('${e.id}')">🖥 Monitor</button>`:''}
           ${e.status==='draft'?`<button class="btn btn-primary btn-sm" onclick="publishUjian('${e.id}')">✅ Publish</button>`:''}
-          ${['published','ongoing'].includes(e.status)?`<button class="btn btn-secondary btn-sm" style="border-color:#e57373;color:#c62828" onclick="forceFinishUjian('${e.id}','${(e.title||'').replace(/'/g,"\'")}')">⏹ Paksa Selesai</button>`:''}
-          <button class="btn btn-danger btn-sm" onclick="delUjian('${e.id}','${(e.title||'').replace(/'/g,"\'")}')">🗑 Hapus</button>
+          ${['published','ongoing'].includes(e.status)?`<button class="btn btn-secondary btn-sm" style="border-color:#e57373;color:#c62828" onclick="forceFinishUjian('${e.id}','${(e.title||'').replace(/'/g,"\'")}')">⏹ Stop</button>`:''}
+          <button class="btn btn-danger btn-sm" onclick="delUjian('${e.id}','${(e.title||'').replace(/'/g,"\'")}')">🗑</button>
         </div>
       </td>
     </tr>`).join('');
-  } catch { UI.toast('Gagal memuat ujian','error'); }
+  } catch(err) { 
+    console.error(err);
+    UI.toast('Gagal memuat ujian','error'); 
+  }
 }
+
+// Reset cache saat ada perubahan
+function _invalidateExamCache() { _allExamsCache = []; }
 
 async function publishUjian(id) {
   await API.patch('/api/exams/'+id, {status:'published'});
-  UI.toast('✅ Ujian dipublish','success'); loadAllUjian();
+  UI.toast('✅ Ujian dipublish','success'); _invalidateExamCache(); loadAllUjian();
 }
 
 async function forceFinishUjian(id, title) {
   UI.confirm('Paksa Selesai','Paksa selesaikan <strong>'+title+'</strong>?', async()=>{
     const r = await API.post('/api/admin/exams/'+id+'/force-finish');
-    UI.toast('✅ '+(r.submitted||0)+' sesi di-submit','success'); loadAllUjian();
+    UI.toast('✅ '+(r.submitted||0)+' sesi di-submit','success'); _invalidateExamCache(); loadAllUjian();
   });
 }
 
 async function delUjian(id, title) {
   UI.confirm('Hapus Ujian','Hapus <strong>'+title+'</strong> beserta semua data?', async()=>{
     await API.del('/api/admin/exams/'+id);
-    UI.toast('Ujian dihapus','success'); loadAllUjian();
+    UI.toast('Ujian dihapus','success'); _invalidateExamCache(); loadAllUjian();
   });
 }
 
 // ── Ujian management dari rooms ─────────────────────────────
 function viewSoal(examId) {
-  window.open('../admin/soal.html?id='+examId, '_blank');
+  window.open('soal.html?id='+examId, '_blank');
+}
+
+function viewMonitorExam(examId) {
+  window.open('pengawas.html?id='+examId, '_blank');
+}
+
+function filterRoomExams(status) {
+  // Update button styles
+  document.querySelectorAll('[id^="ef-"]').forEach(b => {
+    b.className = 'btn btn-secondary btn-sm';
+    b.style.fontSize = '11px'; b.style.padding = '3px 10px';
+  });
+  const active = document.getElementById('ef-'+status);
+  if(active) { active.className = 'btn btn-primary btn-sm'; active.style.fontSize='11px'; active.style.padding='3px 10px'; }
+  
+  const filtered = status === 'all' ? window._roomExams : window._roomExams.filter(e=>e.status===status);
+  document.getElementById('exam-list').innerHTML = window._renderExams(filtered);
 }
 function viewNilai(examId) {
   window.open('nilai.html?id='+examId, '_blank');
