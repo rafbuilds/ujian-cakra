@@ -175,18 +175,57 @@ def import_questions(exam_id):
                         imported += save_question(cells[0], opts, correct, imported+1)
             else:
                 current_q, current_opts, current_correct = None, {}, 'A'
+
+                def split_inline_option(text):
+                    """
+                    Pisahkan soal dan opsi pertama jika nempel di baris yang sama.
+                    Contoh: "Musik tradisional ... adalah .... a. saron"
+                    Return: (soal_bersih, label_opsi, isi_opsi) atau (text, None, None)
+                    """
+                    # Cari pola " a. " atau " a) " di dalam teks (bukan di awal)
+                    m = re.search(r'\s([a-eA-E])[.)]\s+(.+)$', text)
+                    if m:
+                        soal_part = text[:m.start()].strip()
+                        label = m.group(1).upper()
+                        isi   = m.group(2).strip()
+                        # Hanya split jika bagian soal mengandung angka/teks soal (bukan baris opsi biasa)
+                        if re.search(r'\d|\.{2,}|disebut|adalah|merupakan|fungsi|teknik|tujuan', soal_part, re.I):
+                            return soal_part, label, isi
+                    return text, None, None
+
                 for para in doc.paragraphs:
                     text = para.text.strip()
                     if not text: continue
+
+                    # Cek kunci jawaban
                     m_key = re.match(r'^(?:jawaban|kunci|answer)\s*[:\-]?\s*([A-E])', text, re.I)
-                    if m_key: current_correct = m_key.group(1).upper(); continue
-                    m_opt = re.match(r'^([A-E])[.)\s]\s*(.+)', text, re.I)
-                    if m_opt: current_opts[m_opt.group(1).upper()] = m_opt.group(2).strip(); continue
+                    if m_key:
+                        current_correct = m_key.group(1).upper()
+                        continue
+
+                    # Cek baris opsi murni (dimulai dengan a. / b. / A) / B) dll)
+                    m_opt = re.match(r'^([a-eA-E])[.)]\s*(.+)', text)
+                    if m_opt:
+                        current_opts[m_opt.group(1).upper()] = m_opt.group(2).strip()
+                        continue
+
+                    # Bukan opsi, berarti kemungkinan baris soal baru
+                    # Simpan soal sebelumnya dulu
                     if current_q and current_opts:
                         imported += save_question(current_q, current_opts, current_correct, imported+1)
-                    m_q = re.match(r'^(?:\d+[.)\s]\s*)?(.*)', text)
-                    current_q = m_q.group(1).strip() if m_q else text
-                    current_opts, current_correct = {}, 'A'
+
+                    # Strip nomor soal di depan: "1. " / "1) " / "1 "
+                    m_q = re.match(r'^\d+[.)]\s*(.*)', text)
+                    raw_q = m_q.group(1).strip() if m_q else text
+
+                    # Cek apakah opsi pertama nempel di akhir soal
+                    soal_clean, first_label, first_isi = split_inline_option(raw_q)
+                    current_q = soal_clean
+                    current_opts = {}
+                    current_correct = 'A'
+                    if first_label and first_isi:
+                        current_opts[first_label] = first_isi
+
                 if current_q and current_opts:
                     imported += save_question(current_q, current_opts, current_correct, imported+1)
 
