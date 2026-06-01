@@ -197,7 +197,7 @@ UI.initSidebar();
 
 let currentRoomId = null, allTeachers = [], allKelas = [], currentRoom = null;
 
-async function init() {
+async async function init() {
   [allTeachers, allKelas] = await Promise.all([
     API.get('/api/admin/users').then(u=>u.filter(x=>x.role==='guru')),
     API.get('/api/classes'),
