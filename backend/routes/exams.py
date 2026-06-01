@@ -142,59 +142,74 @@ def delete_question(question_id):
 @exams_bp.route('/api/exams/<exam_id>/import', methods=['POST'])
 @require_guru
 def import_questions(exam_id):
-    import traceback
+    import traceback, re
     try:
-        from openpyxl import load_workbook
         file = request.files.get('file')
         if not file: return jsonify({'error': 'File tidak ada'}), 400
-
         filename = (file.filename or '').lower()
-        content_type = (file.content_type or '').lower()
         imported = 0
 
-        # Deteksi CSV dari extension atau content-type
-        is_csv = filename.endswith('.csv') or 'csv' in content_type or 'text' in content_type
-        if is_csv:
-            import csv, io as _io
+        def save_question(content, opts_dict, correct_label, idx):
+            if not content.strip(): return 0
+            q_id = str(uuid.uuid4())
+            query("INSERT INTO questions (id, exam_id, content, order_num, score) VALUES (%s,%s,%s,%s,1)",
+                  (q_id, exam_id, content.strip(), idx), fetch='none')
+            for label, opt_content in opts_dict.items():
+                if not opt_content: continue
+                query("INSERT INTO options (id, question_id, label, content, is_correct) VALUES (%s,%s,%s,%s,%s)",
+                      (str(uuid.uuid4()), q_id, label, opt_content, label == correct_label.upper()), fetch='none')
+            return 1
+
+        if filename.endswith('.docx'):
+            from docx import Document
+            doc = Document(io.BytesIO(file.read()))
+            if doc.tables:
+                for table in doc.tables:
+                    headers = [c.text.strip().lower() for c in table.rows[0].cells]
+                    start = 1 if any(h in ['pertanyaan','soal','question'] for h in headers) else 0
+                    for row in table.rows[start:]:
+                        cells = [c.text.strip() for c in row.cells]
+                        if len(cells) < 3 or not cells[0]: continue
+                        opts = {l: v for l, v in zip(['A','B','C','D','E'], cells[1:6]) if v}
+                        correct = cells[6].strip().upper() if len(cells) > 6 and cells[6].strip() else 'A'
+                        imported += save_question(cells[0], opts, correct, imported+1)
+            else:
+                current_q, current_opts, current_correct = None, {}, 'A'
+                for para in doc.paragraphs:
+                    text = para.text.strip()
+                    if not text: continue
+                    m_key = re.match(r'^(?:jawaban|kunci|answer)\s*[:\-]?\s*([A-E])', text, re.I)
+                    if m_key: current_correct = m_key.group(1).upper(); continue
+                    m_opt = re.match(r'^([A-E])[.)\s]\s*(.+)', text, re.I)
+                    if m_opt: current_opts[m_opt.group(1).upper()] = m_opt.group(2).strip(); continue
+                    if current_q and current_opts:
+                        imported += save_question(current_q, current_opts, current_correct, imported+1)
+                    m_q = re.match(r'^(?:\d+[.)\s]\s*)?(.*)', text)
+                    current_q = m_q.group(1).strip() if m_q else text
+                    current_opts, current_correct = {}, 'A'
+                if current_q and current_opts:
+                    imported += save_question(current_q, current_opts, current_correct, imported+1)
+
+        elif filename.endswith('.csv'):
+            import csv
             content_str = file.read().decode('utf-8-sig', errors='replace')
-            reader = csv.reader(_io.StringIO(content_str))
-            rows = list(reader)
-            data_rows = rows[1:] if rows else []  # skip header
-            for i, row in enumerate(data_rows):
-                if not row or not row[0].strip(): continue
-                content = row[0].strip()
-                options = [row[j].strip() if j < len(row) else '' for j in range(1,6)]
+            for i, row in enumerate(csv.reader(io.StringIO(content_str))):
+                if i == 0 or not row or not row[0].strip(): continue
+                opts = {l: v.strip() for l, v in zip(['A','B','C','D','E'], row[1:6]) if v.strip()}
                 correct = row[6].strip().upper() if len(row) > 6 and row[6].strip() else 'A'
-                q_id = str(uuid.uuid4())
-                query("INSERT INTO questions (id, exam_id, content, order_num, score) VALUES (%s,%s,%s,%s,1)",
-                      (q_id, exam_id, content, i+1), fetch='none')
-                for label, opt_content in zip(['A','B','C','D','E'], options):
-                    if not opt_content: continue
-                    query("INSERT INTO options (id, question_id, label, content, is_correct) VALUES (%s,%s,%s,%s,%s)",
-                          (str(uuid.uuid4()), q_id, label, opt_content, label==correct), fetch='none')
-                imported += 1
+                imported += save_question(row[0], opts, correct, imported+1)
+
         else:
-            # Excel (.xlsx/.xls) — baca ke BytesIO dulu
-            import io as _io2
-            file_bytes = _io2.BytesIO(file.read())
-            wb = load_workbook(file_bytes)
+            from openpyxl import load_workbook
+            wb = load_workbook(io.BytesIO(file.read()))
             ws = wb.active
             for i, row in enumerate(ws.iter_rows(min_row=2, values_only=True)):
                 if not row or not row[0]: continue
-                content = str(row[0]).strip()
-                options = [str(row[j] or '').strip() for j in range(1,6)]
-                correct = str(row[6] or '').strip().upper() if len(row) > 6 else 'A'
-                q_id = str(uuid.uuid4())
-                query("INSERT INTO questions (id, exam_id, content, order_num, score) VALUES (%s,%s,%s,%s,1)",
-                      (q_id, exam_id, content, i+1), fetch='none')
-                for label, opt_content in zip(['A','B','C','D','E'], options):
-                    if not opt_content: continue
-                    query("INSERT INTO options (id, question_id, label, content, is_correct) VALUES (%s,%s,%s,%s,%s)",
-                          (str(uuid.uuid4()), q_id, label, opt_content, label==correct), fetch='none')
-                imported += 1
+                opts = {l: str(v).strip() for l, v in zip(['A','B','C','D','E'], row[1:6]) if v and str(v).strip()}
+                correct = str(row[6]).strip().upper() if len(row) > 6 and row[6] else 'A'
+                imported += save_question(str(row[0]), opts, correct, imported+1)
 
         return jsonify({'ok': True, 'saved': imported, 'total': imported})
-
     except Exception as e:
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
@@ -424,13 +439,10 @@ def export_nilai(exam_id):
 @exams_bp.route('/api/template-soal', methods=['GET'])
 @require_guru
 def template_soal():
-    import csv, io as _io
-    output = _io.StringIO()
-    writer = csv.writer(output)
-    writer.writerow(['Pertanyaan','Pilihan A','Pilihan B','Pilihan C','Pilihan D','Pilihan E','Kunci (A/B/C/D/E)'])
-    writer.writerow(['Ibu kota Indonesia adalah?','Jakarta','Surabaya','Bandung','Medan','','A'])
-    writer.writerow(['2 + 2 = ?','3','4','5','6','','B'])
-    csv_bytes = output.getvalue().encode('utf-8-sig')  # BOM untuk Excel compatibility
-    buf = io.BytesIO(csv_bytes)
-    return send_file(buf, mimetype='text/csv; charset=utf-8',
-                     as_attachment=True, download_name='template_soal.csv')
+    from openpyxl import Workbook
+    wb = Workbook(); ws = wb.active; ws.title = 'Template Soal'
+    ws.append(['Pertanyaan','Pilihan A','Pilihan B','Pilihan C','Pilihan D','Pilihan E','Kunci (A/B/C/D/E)'])
+    ws.append(['Contoh: Ibu kota Indonesia adalah?','Jakarta','Surabaya','Bandung','Medan','','A'])
+    buf = io.BytesIO(); wb.save(buf); buf.seek(0)
+    return send_file(buf, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                     as_attachment=True, download_name='template_soal.xlsx')
