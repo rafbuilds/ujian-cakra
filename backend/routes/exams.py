@@ -161,7 +161,7 @@ def import_questions(exam_id):
             query("INSERT INTO options (id, question_id, label, content, is_correct) VALUES (%s,%s,%s,%s,%s)",
                   (str(uuid.uuid4()), q_id, label, opt_content, label==correct), fetch='none')
         imported += 1
-    return jsonify({'ok': True, 'imported': imported})
+    return jsonify({'ok': True, 'saved': imported, 'total': imported})
 
 # ── Monitor ────────────────────────────────────────────────────
 @exams_bp.route('/api/exams/<exam_id>/monitor', methods=['GET'])
