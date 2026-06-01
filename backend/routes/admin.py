@@ -351,7 +351,10 @@ def get_room_detail(room_id):
     """, (room_id,))
     exams = query("""
         SELECT e.*, u.name as teacher_name, s.name as subject_name,
-               (SELECT COUNT(*) FROM questions q WHERE q.exam_id=e.id) as question_count
+               (SELECT COUNT(*) FROM questions q WHERE q.exam_id=e.id) as question_count,
+               (SELECT STRING_AGG(c.name, ', ' ORDER BY c.name)
+                FROM exam_classes ec JOIN classes c ON c.id=ec.class_id
+                WHERE ec.exam_id=e.id) as class_names
         FROM exams e
         JOIN users u ON u.id=e.teacher_id
         LEFT JOIN subjects s ON s.id=e.subject_id
