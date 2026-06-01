@@ -172,8 +172,10 @@ def import_questions(exam_id):
                           (str(uuid.uuid4()), q_id, label, opt_content, label==correct), fetch='none')
                 imported += 1
         else:
-            # Excel
-            wb = load_workbook(file)
+            # Excel — baca ke BytesIO dulu
+            import io as _io2
+            file_bytes = _io2.BytesIO(file.read())
+            wb = load_workbook(file_bytes)
             ws = wb.active
             for i, row in enumerate(ws.iter_rows(min_row=2, values_only=True)):
                 if not row or not row[0]: continue
