@@ -148,11 +148,13 @@ def import_questions(exam_id):
         file = request.files.get('file')
         if not file: return jsonify({'error': 'File tidak ada'}), 400
 
-        filename = file.filename or ''
+        filename = (file.filename or '').lower()
+        content_type = (file.content_type or '').lower()
         imported = 0
 
-        # Support CSV
-        if filename.lower().endswith('.csv'):
+        # Deteksi CSV dari extension atau content-type
+        is_csv = filename.endswith('.csv') or 'csv' in content_type or 'text' in content_type
+        if is_csv:
             import csv, io as _io
             content_str = file.read().decode('utf-8-sig', errors='replace')
             reader = csv.reader(_io.StringIO(content_str))
@@ -172,7 +174,7 @@ def import_questions(exam_id):
                           (str(uuid.uuid4()), q_id, label, opt_content, label==correct), fetch='none')
                 imported += 1
         else:
-            # Excel — baca ke BytesIO dulu
+            # Excel (.xlsx/.xls) — baca ke BytesIO dulu
             import io as _io2
             file_bytes = _io2.BytesIO(file.read())
             wb = load_workbook(file_bytes)
@@ -422,10 +424,13 @@ def export_nilai(exam_id):
 @exams_bp.route('/api/template-soal', methods=['GET'])
 @require_guru
 def template_soal():
-    from openpyxl import Workbook
-    wb = Workbook(); ws = wb.active; ws.title = 'Template Soal'
-    ws.append(['Pertanyaan','Pilihan A','Pilihan B','Pilihan C','Pilihan D','Pilihan E','Kunci (A/B/C/D/E)'])
-    ws.append(['Contoh: Ibu kota Indonesia adalah?','Jakarta','Surabaya','Bandung','Medan','','A'])
-    buf = io.BytesIO(); wb.save(buf); buf.seek(0)
-    return send_file(buf, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                     as_attachment=True, download_name='template_soal.xlsx')
+    import csv, io as _io
+    output = _io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['Pertanyaan','Pilihan A','Pilihan B','Pilihan C','Pilihan D','Pilihan E','Kunci (A/B/C/D/E)'])
+    writer.writerow(['Ibu kota Indonesia adalah?','Jakarta','Surabaya','Bandung','Medan','','A'])
+    writer.writerow(['2 + 2 = ?','3','4','5','6','','B'])
+    csv_bytes = output.getvalue().encode('utf-8-sig')  # BOM untuk Excel compatibility
+    buf = io.BytesIO(csv_bytes)
+    return send_file(buf, mimetype='text/csv; charset=utf-8',
+                     as_attachment=True, download_name='template_soal.csv')
