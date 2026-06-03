@@ -1,0 +1,678 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+    <title>Dashboard Admin — Ujian Online</title>
+    <link rel="stylesheet" href="../style.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+      .dash-stats { display:grid; grid-template-columns:repeat(6,1fr); gap:.75rem; margin-bottom:1rem; }
+      @media(max-width:1200px){ .dash-stats{ grid-template-columns:repeat(3,1fr); } }
+      @media(max-width:700px){ .dash-stats{ grid-template-columns:repeat(2,1fr); } }
+
+      .stat-card { background:#fff; border-radius:12px; padding:1rem .875rem;
+        box-shadow:0 1px 4px rgba(0,0,0,.07); border:.5px solid var(--border);
+        display:flex; flex-direction:column; gap:4px; }
+      .stat-card.green  { border-left:3px solid var(--green); }
+      .stat-card.blue   { border-left:3px solid #3b82f6; }
+      .stat-card.amber  { border-left:3px solid var(--amber); }
+      .stat-card.red    { border-left:3px solid #ef4444; }
+      .stat-card.purple { border-left:3px solid #8b5cf6; }
+      .stat-card.teal   { border-left:3px solid #14b8a6; }
+      .stat-num { font-size:1.75rem; font-weight:800; line-height:1; }
+      .stat-label { font-size:11px; color:var(--muted); font-weight:500; }
+      .stat-sub   { font-size:10px; color:var(--muted); margin-top:2px; }
+
+      .period-banner { background:linear-gradient(135deg,var(--green),#3b82f6);
+        color:#fff; border-radius:12px; padding:.875rem 1.25rem;
+        display:flex; align-items:center; gap:1rem; margin-bottom:1rem;
+        flex-wrap:wrap; }
+      .period-banner-empty { background:var(--light); color:var(--muted);
+        border:1px dashed var(--border); border-radius:12px; padding:.75rem 1rem;
+        font-size:13px; margin-bottom:1rem; text-align:center; }
+
+      .chart-grid { display:grid; grid-template-columns:1.4fr 1fr; gap:1rem; margin-bottom:1rem; }
+      @media(max-width:900px){ .chart-grid{ grid-template-columns:1fr; } }
+
+      .bottom-grid { display:grid; grid-template-columns:1.2fr 1fr; gap:1rem; margin-bottom:1rem; }
+      @media(max-width:900px){ .bottom-grid{ grid-template-columns:1fr; } }
+
+      .card { background:#fff; border-radius:12px; padding:1rem 1.125rem;
+        box-shadow:0 1px 4px rgba(0,0,0,.07); border:.5px solid var(--border); }
+
+      .section-title { font-size:13px; font-weight:700; margin-bottom:.75rem;
+        display:flex; align-items:center; gap:6px; }
+
+      .log-row { display:flex; align-items:flex-start; gap:8px;
+        padding:.4rem 0; border-bottom:.5px solid var(--border); font-size:12px; }
+      .log-row:last-child { border-bottom:none; }
+      .log-icon { width:28px; height:28px; border-radius:50%; display:flex;
+        align-items:center; justify-content:center; font-size:13px; flex-shrink:0; }
+
+      .badge { display:inline-block; padding:2px 7px; border-radius:20px;
+        font-size:10px; font-weight:700; }
+      .badge-green  { background:#eaf3de; color:#3b6d11; }
+      .badge-blue   { background:#e6f1fb; color:#185fa5; }
+      .badge-amber  { background:#fff3cd; color:#856404; }
+      .badge-red    { background:#fde8e8; color:#b91c1c; }
+      .badge-gray   { background:#f3f4f6; color:#6b7280; }
+
+      .monitor-row { display:flex; align-items:center; gap:8px;
+        padding:.5rem 0; border-bottom:.5px solid var(--border); font-size:12px; }
+      .monitor-row:last-child { border-bottom:none; }
+      .progress-bar { height:6px; background:#e5e7eb; border-radius:3px; flex:1; min-width:60px; }
+      .progress-fill { height:100%; border-radius:3px; background:var(--green); transition:width .3s; }
+
+      .class-chip { background:var(--light); border-radius:8px; padding:.5rem .625rem;
+        text-align:center; }
+
+      .pending-row { display:flex; align-items:center; gap:8px; padding:.4rem 0; }
+
+      canvas { max-height:220px; }
+
+      .year-info { font-size:13px; font-weight:600; }
+      .year-sub  { font-size:11px; opacity:.8; }
+
+      .refresh-btn { margin-left:auto; background:rgba(255,255,255,.2);
+        border:none; color:#fff; padding:4px 12px; border-radius:6px;
+        font-size:11px; cursor:pointer; transition:background .2s; }
+      .refresh-btn:hover { background:rgba(255,255,255,.35); }
+
+      .dot-live { width:8px; height:8px; border-radius:50%; background:#22c55e;
+        animation:blink 1.5s infinite; display:inline-block; }
+      @keyframes blink {
+        0%,100%{ opacity:1; } 50%{ opacity:.4; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-shell">
+      <nav class="sidebar">
+        <div class="sb-logo">
+          <div class="sb-logo-title">⚙️ Admin Panel</div>
+          <div class="sb-logo-sub">SMAN 1 Batangan</div>
+        </div>
+        <div class="sb-nav">
+          <div class="sb-section">MENU</div>
+          <a href="dashboard.html" class="sb-item active" id="nav-dashboard">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" stroke-linecap="round"/>
+              <polyline points="9 22 9 12 15 12 15 22" stroke-linecap="round"/>
+            </svg>Dashboard
+          </a>
+          <a href="siswa.html" class="sb-item" id="nav-siswa">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke-linecap="round"/>
+              <circle cx="9" cy="7" r="4"/>
+            </svg>Data Siswa
+          </a>
+          <a href="rooms.html" class="sb-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke-linecap="round"/>
+              <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke-linecap="round"/>
+            </svg>Room Ujian
+          </a>
+          <a href="settings.html" class="sb-item" id="nav-settings">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" stroke-linecap="round"/>
+            </svg>Pengaturan
+          </a>
+        </div>
+        <div class="sb-user">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+            <div class="sb-avatar" id="sb-avatar">A</div>
+            <div>
+              <div class="sb-user-name" id="sb-user-name">Admin</div>
+              <div class="sb-user-role">Administrator</div>
+            </div>
+          </div>
+          <button class="sb-logout" onclick="Auth.logout()">⏻ Keluar</button>
+        </div>
+      </nav>
+
+      <div class="main-wrap">
+        <div class="topbar">
+          <div class="topbar-title">Dashboard Analitik</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-left:auto;">
+            <span style="font-size:12px;color:var(--muted)" id="last-updated"></span>
+            <button class="btn btn-primary btn-sm" onclick="loadAll()">↻ Refresh</button>
+          </div>
+        </div>
+
+        <div class="page-main">
+
+          <!-- Period Banner -->
+          <div id="period-banner"></div>
+
+          <!-- Stats Row -->
+          <div class="dash-stats">
+            <div class="stat-card green">
+              <div class="stat-num" id="st-guru">—</div>
+              <div class="stat-label">👨‍🏫 Guru Aktif</div>
+              <div class="stat-sub" id="st-guru-pending"></div>
+            </div>
+            <div class="stat-card blue">
+              <div class="stat-num" id="st-siswa">—</div>
+              <div class="stat-label">🎓 Total Siswa</div>
+              <div class="stat-sub" id="st-device"></div>
+            </div>
+            <div class="stat-card teal">
+              <div class="stat-num" id="st-kelas">—</div>
+              <div class="stat-label">🏫 Kelas Aktif</div>
+            </div>
+            <div class="stat-card amber">
+              <div class="stat-num" id="st-ujian">—</div>
+              <div class="stat-label">📋 Total Ujian</div>
+              <div class="stat-sub" id="st-ujian-bulan"></div>
+            </div>
+            <div class="stat-card red">
+              <div class="stat-num" id="st-aktif">—</div>
+              <div class="stat-label">🔴 Ujian Berlangsung</div>
+            </div>
+            <div class="stat-card purple">
+              <div class="stat-num" id="st-pass">—%</div>
+              <div class="stat-label">✅ Tingkat Kelulusan</div>
+              <div class="stat-sub" id="st-avg"></div>
+            </div>
+          </div>
+
+          <!-- Chart Row -->
+          <div class="chart-grid">
+            <div class="card">
+              <div class="section-title">📊 Rata-rata Nilai per Mata Pelajaran</div>
+              <canvas id="chart-subjects"></canvas>
+              <div id="chart-subjects-empty" style="display:none;color:var(--muted);font-size:13px;text-align:center;padding:2rem">
+                Belum ada data nilai
+              </div>
+            </div>
+            <div class="card">
+              <div class="section-title">📈 Tren Ujian (6 Bulan Terakhir)</div>
+              <canvas id="chart-trend"></canvas>
+              <div id="chart-trend-empty" style="display:none;color:var(--muted);font-size:13px;text-align:center;padding:2rem">
+                Belum ada data ujian
+              </div>
+              <div style="margin-top:1rem;padding-top:.75rem;border-top:.5px solid var(--border)">
+                <div class="section-title" style="margin-bottom:.5rem">🎯 Distribusi Nilai</div>
+                <div style="display:flex;gap:.5rem;flex-wrap:wrap;" id="grade-dist"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Monitor + Activity Log -->
+          <div class="bottom-grid">
+            <div class="card">
+              <div class="section-title">
+                <span class="dot-live"></span>&nbsp;Monitor Ujian Aktif
+                <span style="margin-left:auto;font-size:11px;color:var(--muted)" id="monitor-count"></span>
+              </div>
+              <div id="monitor-list"><div class="loading-spinner"></div></div>
+            </div>
+            <div class="card">
+              <div class="section-title">📋 Log Aktivitas Terbaru</div>
+              <div id="activity-log"><div class="loading-spinner"></div></div>
+            </div>
+          </div>
+
+          <!-- Guru + Classes -->
+          <div class="bottom-grid">
+            <div class="card">
+              <div class="section-title">👨‍🏫 Guru &amp; Admin</div>
+              <div id="users-list"><div class="loading-spinner"></div></div>
+              <div id="pending-section" style="display:none;margin-top:1rem;padding-top:.75rem;border-top:.5px solid var(--border)">
+                <div style="font-size:12px;font-weight:700;color:var(--amber);margin-bottom:.5rem">⏳ MENUNGGU APPROVAL</div>
+                <div id="pending-list"></div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="section-title">🏫 Ringkasan Kelas</div>
+              <div id="classes-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:6px;"></div>
+            </div>
+          </div>
+
+          <!-- Tahun Ajaran -->
+          <div class="card" style="margin-bottom:1rem">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:.875rem;flex-wrap:wrap">
+              <div class="section-title" style="margin:0">📅 Tahun Ajaran &amp; Semester</div>
+              <button class="btn btn-primary btn-sm" style="margin-left:auto" onclick="showYearModal()">+ Tahun Ajaran</button>
+              <button class="btn btn-sm" style="background:var(--light)" onclick="showSemModal()">+ Semester</button>
+            </div>
+            <div id="year-list"><div class="loading-spinner"></div></div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: Tahun Ajaran -->
+    <div id="modal-year" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;align-items:center;justify-content:center">
+      <div class="card" style="width:360px;max-width:95vw">
+        <div class="section-title" style="margin-bottom:.875rem">📅 Tambah Tahun Ajaran</div>
+        <div style="display:flex;flex-direction:column;gap:.625rem">
+          <input id="year-name"  class="form-input" placeholder="Nama (misal: 2025/2026)" />
+          <label style="font-size:11px;color:var(--muted)">Tanggal Mulai</label>
+          <input id="year-start" type="date" class="form-input" />
+          <label style="font-size:11px;color:var(--muted)">Tanggal Selesai</label>
+          <input id="year-end"   type="date" class="form-input" />
+        </div>
+        <div style="display:flex;gap:.5rem;margin-top:.875rem;justify-content:flex-end">
+          <button class="btn btn-sm" style="background:var(--light)" onclick="closeModal('modal-year')">Batal</button>
+          <button class="btn btn-primary btn-sm" onclick="saveYear()">Simpan</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: Semester -->
+    <div id="modal-sem" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;align-items:center;justify-content:center">
+      <div class="card" style="width:360px;max-width:95vw">
+        <div class="section-title" style="margin-bottom:.875rem">📆 Tambah Semester</div>
+        <div style="display:flex;flex-direction:column;gap:.625rem">
+          <label style="font-size:11px;color:var(--muted)">Tahun Ajaran</label>
+          <select id="sem-year"  class="form-input"></select>
+          <input  id="sem-name"  class="form-input" placeholder="Nama (misal: Semester 1)" />
+          <label style="font-size:11px;color:var(--muted)">Tanggal Mulai</label>
+          <input  id="sem-start" type="date" class="form-input" />
+          <label style="font-size:11px;color:var(--muted)">Tanggal Selesai</label>
+          <input  id="sem-end"   type="date" class="form-input" />
+        </div>
+        <div style="display:flex;gap:.5rem;margin-top:.875rem;justify-content:flex-end">
+          <button class="btn btn-sm" style="background:var(--light)" onclick="closeModal('modal-sem')">Batal</button>
+          <button class="btn btn-primary btn-sm" onclick="saveSem()">Simpan</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="../config.js"></script>
+    <script src="../components/api.js"></script>
+    <script src="../components/auth.js"></script>
+    <script src="../components/common.js"></script>
+    <script>
+      if (!Auth.requireRole(['admin'])) throw new Error();
+      UI.initSidebar();
+
+      let _subjectChart = null, _trendChart = null, _years = [];
+
+      function fmtDate(d) {
+        if (!d) return '—';
+        return new Date(d).toLocaleDateString('id-ID', {day:'2-digit', month:'short', year:'numeric'});
+      }
+      function fmtTime(d) {
+        if (!d) return '';
+        return new Date(d).toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'});
+      }
+      function openModal(id)  { document.getElementById(id).style.display = 'flex'; }
+      function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+      async function loadAll() {
+        document.getElementById('last-updated').textContent = 'Memuat...';
+        await Promise.all([
+          loadAnalytics(), loadSubjectChart(), loadTrendChart(),
+          loadMonitor(), loadActivityLog(),
+          loadUsers(), loadClasses(), loadPeriod(), loadYears(),
+        ]);
+        document.getElementById('last-updated').textContent =
+          'Diperbarui ' + new Date().toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'});
+      }
+
+      // ── Period Banner ──────────────────────────────────────────
+      async function loadPeriod() {
+        try {
+          const d  = await API.get('/api/admin/active-period');
+          const el = document.getElementById('period-banner');
+          if (d.academic_year) {
+            el.className = 'period-banner';
+            el.innerHTML = `
+              <div>
+                <div class="year-info">📅 Tahun Ajaran: ${d.academic_year.name}</div>
+                ${d.semester
+                  ? `<div class="year-sub">Semester aktif: ${d.semester.name} &nbsp;(${fmtDate(d.semester.start_date)} – ${fmtDate(d.semester.end_date)})</div>`
+                  : '<div class="year-sub">Belum ada semester aktif</div>'}
+              </div>
+              <button class="refresh-btn" onclick="loadPeriod(); loadYears()">↻</button>`;
+          } else {
+            el.className = 'period-banner-empty';
+            el.innerHTML = '⚠️ Belum ada tahun ajaran aktif. <a href="#year-list" style="color:var(--green);font-weight:600" onclick="showYearModal()">Buat sekarang</a>';
+          }
+        } catch(e) { document.getElementById('period-banner').innerHTML = ''; }
+      }
+
+      // ── Analytics ──────────────────────────────────────────────
+      async function loadAnalytics() {
+        try {
+          const a = await API.get('/api/admin/analytics');
+          document.getElementById('st-guru').textContent  = a.total_guru;
+          document.getElementById('st-siswa').textContent = a.total_siswa;
+          document.getElementById('st-kelas').textContent = a.total_kelas;
+          document.getElementById('st-ujian').textContent = a.total_ujian;
+          document.getElementById('st-aktif').textContent = a.ujian_aktif;
+          document.getElementById('st-pass').textContent  = (a.pass_rate ?? 0) + '%';
+          document.getElementById('st-device').textContent    = (a.device_terdaftar ?? 0) + ' device terdaftar';
+          document.getElementById('st-avg').textContent       = 'Rata-rata nilai: ' + (a.avg_score ?? 0);
+          document.getElementById('st-ujian-bulan').textContent = (a.ujian_bulan_ini ?? 0) + ' ujian bulan ini';
+          if ((a.guru_pending ?? 0) > 0) {
+            document.getElementById('st-guru-pending').textContent = a.guru_pending + ' menunggu approval';
+          }
+          const dist  = a.grade_distribution || {};
+          const total = (dist.A||0)+(dist.B||0)+(dist.C||0)+(dist.D||0);
+          document.getElementById('grade-dist').innerHTML = total ? `
+            <span class="badge badge-green">A (≥90): ${dist.A||0}</span>
+            <span class="badge badge-blue">B (75-89): ${dist.B||0}</span>
+            <span class="badge badge-amber">C (60-74): ${dist.C||0}</span>
+            <span class="badge badge-red">D (&lt;60): ${dist.D||0}</span>
+            <span class="badge badge-gray">KKM: ${a.passing_grade}</span>`
+            : '<span style="font-size:12px;color:var(--muted)">Belum ada data</span>';
+        } catch(e) {}
+      }
+
+      // ── Subject Chart ──────────────────────────────────────────
+      async function loadSubjectChart() {
+        try {
+          const rows   = await API.get('/api/admin/analytics/grades-by-subject');
+          const canvas = document.getElementById('chart-subjects');
+          const empty  = document.getElementById('chart-subjects-empty');
+          if (!rows.length) { canvas.style.display = 'none'; empty.style.display = 'block'; return; }
+          canvas.style.display = ''; empty.style.display = 'none';
+          const labels = rows.map(r => r.subject_name);
+          const data   = rows.map(r => parseFloat(r.avg_score || 0));
+          const colors = data.map(v => v >= 75 ? '#4ade80' : v >= 60 ? '#fbbf24' : '#f87171');
+          if (_subjectChart) _subjectChart.destroy();
+          _subjectChart = new Chart(canvas, {
+            type: 'bar',
+            data: { labels, datasets: [{ label: 'Rata-rata Nilai', data, backgroundColor: colors, borderRadius: 6 }] },
+            options: {
+              responsive: true, maintainAspectRatio: true,
+              plugins: { legend: { display: false },
+                tooltip: { callbacks: { afterLabel: ctx => {
+                  const r = rows[ctx.dataIndex];
+                  return `${r.total_sessions} sesi · ${r.lulus} lulus`;
+                }}}},
+              scales: {
+                y: { min: 0, max: 100, ticks: { font: { size: 10 } }, grid: { color: '#f3f4f6' } },
+                x: { ticks: { font: { size: 10 }, maxRotation: 35 }, grid: { display: false } }
+              }
+            }
+          });
+        } catch(e) {}
+      }
+
+      // ── Trend Chart ────────────────────────────────────────────
+      async function loadTrendChart() {
+        try {
+          const rows   = await API.get('/api/admin/analytics/exam-trend');
+          const canvas = document.getElementById('chart-trend');
+          const empty  = document.getElementById('chart-trend-empty');
+          if (!rows.length) { canvas.style.display = 'none'; empty.style.display = 'block'; return; }
+          canvas.style.display = ''; empty.style.display = 'none';
+          const labels = rows.map(r => {
+            const [y, m] = r.month.split('-');
+            return new Date(y, m-1).toLocaleDateString('id-ID', {month:'short', year:'2-digit'});
+          });
+          if (_trendChart) _trendChart.destroy();
+          _trendChart = new Chart(canvas, {
+            type: 'line',
+            data: { labels, datasets: [{
+              label: 'Jumlah Ujian', data: rows.map(r => parseInt(r.total)),
+              borderColor: '#3b82f6', backgroundColor: '#dbeafe55',
+              tension: .4, fill: true, pointRadius: 4, pointBackgroundColor: '#3b82f6'
+            }]},
+            options: {
+              responsive: true, maintainAspectRatio: true,
+              plugins: { legend: { display: false } },
+              scales: {
+                y: { min: 0, ticks: { stepSize: 1, font: { size: 10 } }, grid: { color: '#f3f4f6' } },
+                x: { ticks: { font: { size: 10 } }, grid: { display: false } }
+              }
+            }
+          });
+        } catch(e) {}
+      }
+
+      // ── Exam Monitor ───────────────────────────────────────────
+      async function loadMonitor() {
+        const el  = document.getElementById('monitor-list');
+        const cnt = document.getElementById('monitor-count');
+        try {
+          const rows = await API.get('/api/admin/exam-monitor');
+          cnt.textContent = rows.length + ' sesi aktif';
+          if (!rows.length) {
+            el.innerHTML = '<div style="color:var(--muted);font-size:13px;text-align:center;padding:1.5rem">Tidak ada ujian berlangsung saat ini</div>';
+            return;
+          }
+          el.innerHTML = rows.slice(0, 10).map(r => {
+            const pct = r.total_questions > 0 ? Math.round(r.answered_count / r.total_questions * 100) : 0;
+            const vBadge = r.tab_violations > 0
+              ? `<span class="badge badge-red">${r.tab_violations}× pelanggaran</span>` : '';
+            return `
+              <div class="monitor-row">
+                <div style="flex:1;min-width:0">
+                  <div style="font-weight:500;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.student_name}</div>
+                  <div style="font-size:10px;color:var(--muted)">${r.class_name||'—'} · ${r.exam_title}</div>
+                  <div style="display:flex;align-items:center;gap:6px;margin-top:4px">
+                    <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+                    <span style="font-size:10px;color:var(--muted);white-space:nowrap">${r.answered_count}/${r.total_questions}</span>
+                    ${vBadge}
+                  </div>
+                </div>
+              </div>`;
+          }).join('');
+        } catch(e) {
+          el.innerHTML = '<div style="color:var(--muted);font-size:13px">Gagal memuat monitor</div>';
+        }
+      }
+
+      // ── Activity Log ───────────────────────────────────────────
+      async function loadActivityLog() {
+        const el = document.getElementById('activity-log');
+        try {
+          const rows = await API.get('/api/admin/activity-logs?limit=12');
+          if (rows.length) {
+            const iconMap = { LOGIN:'🔑', LOGOUT:'🚪', UJIAN_BUAT:'📝', UJIAN_SELESAI:'✅',
+                              TAHUN_AJARAN_BUAT:'📅', DEFAULT:'📌' };
+            el.innerHTML = rows.map(r => `
+              <div class="log-row">
+                <div class="log-icon" style="background:var(--light)">${iconMap[r.action] || iconMap.DEFAULT}</div>
+                <div style="flex:1;min-width:0">
+                  <div style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.user_name || 'Sistem'}</div>
+                  <div style="font-size:10px;color:var(--muted)">${r.detail || r.action} · ${fmtDate(r.created_at)} ${fmtTime(r.created_at)}</div>
+                </div>
+                <span class="badge badge-gray" style="font-size:9px;white-space:nowrap">${r.action}</span>
+              </div>`).join('');
+            return;
+          }
+          // Fallback: riwayat login
+          const logins = await API.get('/api/admin/login-history?limit=12');
+          if (!logins.length) {
+            el.innerHTML = '<div style="color:var(--muted);font-size:13px;text-align:center;padding:1.5rem">Belum ada aktivitas</div>';
+            return;
+          }
+          el.innerHTML = logins.map(u => `
+            <div class="log-row">
+              <div class="log-icon" style="background:${u.role==='admin'?'#e6f1fb':'#eaf3de'}">${u.role==='admin'?'🔑':'👤'}</div>
+              <div style="flex:1;min-width:0">
+                <div style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${u.name}</div>
+                <div style="font-size:10px;color:var(--muted)">Login · ${fmtDate(u.last_login)} ${fmtTime(u.last_login)}</div>
+              </div>
+              <span class="badge ${u.role==='admin'?'badge-blue':'badge-green'}">${u.role}</span>
+            </div>`).join('');
+        } catch(e) {
+          el.innerHTML = '<div style="color:var(--muted);font-size:13px">Gagal memuat log</div>';
+        }
+      }
+
+      // ── Users & Pending ────────────────────────────────────────
+      async function loadUsers() {
+        try {
+          const users   = await API.get('/api/admin/users');
+          const gurus   = users.filter(u => u.role === 'guru');
+          const admins  = users.filter(u => u.role === 'admin');
+          const pending = users.filter(u => u.role === 'guru_pending');
+          const allStaff = [...admins, ...gurus];
+          document.getElementById('users-list').innerHTML = allStaff.slice(0, 6).map(u => `
+            <div style="display:flex;align-items:center;gap:10px;padding:.4rem 0;border-bottom:.5px solid var(--border)">
+              <div style="width:30px;height:30px;border-radius:50%;background:${u.role==='admin'?'#3b82f6':'var(--green)'};display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:12px;flex-shrink:0">${(u.name||'?')[0]}</div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${u.name}</div>
+                <div style="font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${u.email||''}</div>
+              </div>
+              <span class="badge ${u.role==='admin'?'badge-blue':'badge-green'}">${u.role==='admin'?'Admin':'Guru'}</span>
+            </div>`).join('') || '<div style="color:var(--muted);font-size:13px">Belum ada guru</div>';
+
+          if (pending.length) {
+            document.getElementById('pending-section').style.display = 'block';
+            document.getElementById('pending-list').innerHTML = pending.map(u => `
+              <div class="pending-row">
+                <div style="flex:1;font-size:12px;font-weight:500">${u.name}</div>
+                <div style="font-size:10px;color:var(--muted);flex:1;overflow:hidden;text-overflow:ellipsis">${u.email||''}</div>
+                <button class="btn btn-primary btn-sm" onclick="approveGuru('${u.id}')">✓ Setujui</button>
+                <button class="btn btn-danger btn-sm"  onclick="rejectGuru('${u.id}')">✗</button>
+              </div>`).join('');
+          } else {
+            document.getElementById('pending-section').style.display = 'none';
+          }
+        } catch(e) {}
+      }
+
+      // ── Classes ────────────────────────────────────────────────
+      async function loadClasses() {
+        try {
+          const classes = await API.get('/api/admin/classes-detail');
+          document.getElementById('classes-grid').innerHTML = classes.map(c => `
+            <div class="class-chip">
+              <div style="font-weight:700;font-size:13px;color:var(--green)">${c.name}</div>
+              <div style="font-size:10px;color:var(--muted)">${c.student_count||0} siswa</div>
+            </div>`).join('');
+        } catch(e) {}
+      }
+
+      // ── Academic Years ─────────────────────────────────────────
+      async function loadYears() {
+        try {
+          _years = await API.get('/api/admin/academic-years');
+          const sems     = await API.get('/api/admin/semesters');
+          const semByYear = {};
+          sems.forEach(s => {
+            if (!semByYear[s.academic_year_id]) semByYear[s.academic_year_id] = [];
+            semByYear[s.academic_year_id].push(s);
+          });
+          document.getElementById('year-list').innerHTML = _years.length
+            ? _years.map(y => {
+                const ySems = semByYear[y.id] || [];
+                return `
+                  <div style="border:.5px solid var(--border);border-radius:8px;padding:.625rem .875rem;margin-bottom:.5rem">
+                    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                      <span style="font-weight:700;font-size:13px">${y.name}</span>
+                      ${y.is_active ? '<span class="badge badge-green">Aktif</span>' : ''}
+                      <span style="font-size:11px;color:var(--muted)">${fmtDate(y.start_date)} – ${fmtDate(y.end_date)}</span>
+                      <div style="margin-left:auto;display:flex;gap:4px">
+                        ${!y.is_active ? `<button class="btn btn-primary btn-sm" onclick="setActiveYear('${y.id}')">Aktifkan</button>` : ''}
+                        <button class="btn btn-danger btn-sm" onclick="deleteYear('${y.id}','${y.name}')">Hapus</button>
+                      </div>
+                    </div>
+                    <div style="margin-top:.5rem;display:flex;gap:6px;flex-wrap:wrap">
+                      ${ySems.map(s => `
+                        <div style="background:var(--light);border-radius:6px;padding:3px 8px;font-size:11px;display:flex;align-items:center;gap:5px">
+                          ${s.is_active ? '<span class="badge badge-green" style="padding:1px 5px;font-size:9px">Aktif</span>' : ''}
+                          <span>${s.name}</span>
+                          <span style="color:var(--muted)">${fmtDate(s.start_date)}–${fmtDate(s.end_date)}</span>
+                          ${!s.is_active ? `<button style="background:none;border:none;color:var(--green);cursor:pointer;font-size:10px;padding:0" onclick="setActiveSem('${s.id}')">Aktifkan</button>` : ''}
+                          <button style="background:none;border:none;color:#ef4444;cursor:pointer;font-size:11px;padding:0;line-height:1" onclick="deleteSem('${s.id}')">✗</button>
+                        </div>`).join('')}
+                      ${!ySems.length ? '<span style="font-size:11px;color:var(--muted)">Belum ada semester</span>' : ''}
+                    </div>
+                  </div>`;
+              }).join('')
+            : '<div style="color:var(--muted);font-size:13px;text-align:center;padding:1.5rem">Belum ada tahun ajaran. Klik "+ Tahun Ajaran".</div>';
+        } catch(e) {
+          document.getElementById('year-list').innerHTML = '<div style="color:var(--muted);font-size:13px">Gagal memuat</div>';
+        }
+      }
+
+      // ── Year/Semester Actions ──────────────────────────────────
+      function showYearModal() {
+        document.getElementById('year-name').value  = '';
+        document.getElementById('year-start').value = '';
+        document.getElementById('year-end').value   = '';
+        openModal('modal-year');
+      }
+      async function saveYear() {
+        const name  = document.getElementById('year-name').value.trim();
+        const start = document.getElementById('year-start').value;
+        const end   = document.getElementById('year-end').value;
+        if (!name) { UI.toast('Nama tahun ajaran wajib diisi','error'); return; }
+        try {
+          await API.post('/api/admin/academic-years', {name, start_date: start||null, end_date: end||null});
+          UI.toast('Tahun ajaran berhasil ditambah','success');
+          closeModal('modal-year');
+          loadYears(); loadPeriod();
+        } catch(e) { UI.toast('Gagal: '+(e.message||''),'error'); }
+      }
+
+      function showSemModal() {
+        const sel = document.getElementById('sem-year');
+        sel.innerHTML = _years.map(y => `<option value="${y.id}">${y.name}</option>`).join('');
+        if (!_years.length) { UI.toast('Tambah tahun ajaran terlebih dahulu','error'); return; }
+        document.getElementById('sem-name').value  = '';
+        document.getElementById('sem-start').value = '';
+        document.getElementById('sem-end').value   = '';
+        openModal('modal-sem');
+      }
+      async function saveSem() {
+        const yid   = document.getElementById('sem-year').value;
+        const name  = document.getElementById('sem-name').value.trim();
+        const start = document.getElementById('sem-start').value;
+        const end   = document.getElementById('sem-end').value;
+        if (!name) { UI.toast('Nama semester wajib','error'); return; }
+        try {
+          await API.post('/api/admin/semesters', {academic_year_id: yid, name, start_date: start||null, end_date: end||null});
+          UI.toast('Semester berhasil ditambah','success');
+          closeModal('modal-sem');
+          loadYears();
+        } catch(e) { UI.toast('Gagal: '+(e.message||''),'error'); }
+      }
+
+      async function setActiveYear(id) {
+        await API.patch('/api/admin/academic-years/' + id, {is_active: true});
+        UI.toast('Tahun ajaran diaktifkan','success');
+        loadYears(); loadPeriod();
+      }
+      async function deleteYear(id, name) {
+        UI.confirm('Hapus Tahun Ajaran', `Hapus "${name}"? Semua semesternya ikut terhapus.`, async () => {
+          await API.del('/api/admin/academic-years/' + id);
+          UI.toast('Dihapus','success');
+          loadYears(); loadPeriod();
+        });
+      }
+      async function setActiveSem(id) {
+        await API.patch('/api/admin/semesters/' + id, {is_active: true});
+        UI.toast('Semester diaktifkan','success');
+        loadYears(); loadPeriod();
+      }
+      async function deleteSem(id) {
+        UI.confirm('Hapus Semester','Yakin hapus semester ini?', async () => {
+          await API.del('/api/admin/semesters/' + id);
+          UI.toast('Dihapus','success');
+          loadYears();
+        });
+      }
+
+      // ── Guru Approval ──────────────────────────────────────────
+      async function approveGuru(id) {
+        await API.patch('/api/admin/users/' + id, {role: 'guru'});
+        UI.toast('✅ Guru disetujui','success');
+        loadUsers(); loadAnalytics();
+      }
+      async function rejectGuru(id) {
+        UI.confirm('Tolak Guru','Hapus pendaftaran guru ini?', async () => {
+          await API.del('/api/admin/users/' + id);
+          UI.toast('Guru ditolak','success');
+          loadUsers(); loadAnalytics();
+        });
+      }
+
+      // ── Init ───────────────────────────────────────────────────
+      loadAll();
+      setInterval(loadMonitor, 30000); // refresh monitor tiap 30 detik
+    </script>
+  </body>
+</html>

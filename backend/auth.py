@@ -11,7 +11,7 @@ GOOGLE_TOKEN_URL   = "https://oauth2.googleapis.com/token"
 GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v3/userinfo"
 SECRET_KEY         = os.environ.get("SECRET_KEY", "dev-secret-key")
 ALLOWED_DOMAIN     = os.environ.get("ALLOWED_DOMAIN", "sman1batangan.sch.id")
-DEV_MODE           = os.environ.get("DEV_MODE", "true").lower() == "true"
+DEV_MODE           = os.environ.get("DEV_MODE", "false").lower() == "true"
 TOKEN_HOURS        = 8  # sesi login expired 8 jam
 
 # ── JWT ────────────────────────────────────────────────────

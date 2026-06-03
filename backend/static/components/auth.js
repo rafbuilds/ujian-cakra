@@ -1,5 +1,9 @@
 // frontend/components/auth.js
 const Auth = (() => {
+  // Ambil base path dari config (untuk GitHub Pages subdirectory)
+  const getBase = () =>
+    typeof CONFIG !== "undefined" && CONFIG.BASE_PATH ? CONFIG.BASE_PATH : "";
+
   const TOKEN_KEY = "ujian_token";
   const USER_KEY = "ujian_user";
 
@@ -20,6 +24,8 @@ const Auth = (() => {
   const requireRole = (allowedRoles) => {
     const token = getToken();
     if (!token) {
+      // Deteksi base path
+
       window.location.href = "/index.html";
       return false;
     }
@@ -27,6 +33,17 @@ const Auth = (() => {
     if (!user) {
       fetchAndStoreUser().then((u) => {
         if (!u) {
+          const _p = window.location.pathname.split("/");
+          let _b = "";
+          for (let i = 0; i < _p.length; i++) {
+            if (
+              ["admin", "guru", "siswa", "index.html", ""].includes(_p[i]) &&
+              i > 0
+            ) {
+              _b = _p.slice(0, i).join("/");
+              break;
+            }
+          }
           window.location.href = "/index.html";
           return;
         }
@@ -70,36 +87,13 @@ const Auth = (() => {
   };
 
   const redirectByRole = (role) => {
-    // Deteksi apakah pakai struktur baru (admin/, guru/) atau lama (pages/)
-    const isNewStructure =
-      window.location.pathname.includes("/admin/") ||
-      window.location.pathname.includes("/guru/") ||
-      window.location.pathname.includes("/siswa/") ||
-      window.location.pathname === "/" ||
-      window.location.pathname === "/index.html";
-
-    const newMap = {
+    const map = {
       admin: "/admin/dashboard.html",
       guru: "/guru/dashboard.html",
-      siswa: "/siswa/ujian.html",
+      siswa: "/siswa/siswa-ujian.html",
       guru_pending: "/guru/pending.html",
     };
-    const oldMap = {
-      admin: "/pages/admin-dashboard.html",
-      guru: "/pages/guru-dashboard.html",
-      siswa: "/pages/siswa-ujian.html",
-      guru_pending: "/pages/guru-pending.html",
-    };
-
-    // Cek apakah folder baru ada
-    fetch("/admin/dashboard.html", { method: "HEAD" })
-      .then((r) => {
-        const map = r.ok ? newMap : oldMap;
-        window.location.href = map[role] || "/index.html";
-      })
-      .catch(() => {
-        window.location.href = oldMap[role] || "/index.html";
-      });
+    window.location.href = map[role] || "/index.html";
   };
 
   return {

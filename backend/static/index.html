@@ -320,6 +320,28 @@
 
           <div id="err-msg" class="err-box" style="display: none"></div>
 
+          <!-- Invite Banner (muncul kalau ada ?invite= di URL) -->
+          <div
+            id="invite-banner"
+            style="
+              display: none;
+              background: #e6f1fb;
+              border: 1px solid #90caf9;
+              border-radius: 12px;
+              padding: 12px 16px;
+              margin-bottom: 1rem;
+              font-size: 13px;
+              color: #185fa5;
+            "
+          >
+            🎉 <strong id="invite-name">Selamat datang!</strong><br />
+            Kamu diundang sebagai <strong>Guru</strong> di SMAN 1 Batangan.<br />
+            <span
+              id="invite-email"
+              style="font-size: 11px; opacity: 0.8"
+            ></span>
+          </div>
+
           <!-- Deskripsi role -->
           <div
             id="role-desc"
@@ -410,9 +432,21 @@
         document.getElementById("role-desc").innerHTML = roleDescs[role];
       }
 
+      // Simpan invite token dari URL
+      const _inviteParams = new URLSearchParams(location.search);
+      const _inviteToken = _inviteParams.get("invite");
+      const _inviteRole = _inviteParams.get("role");
+
       async function loginGoogle() {
         try {
-          const r = await API.get(`/api/auth/google/url?role=${currentRole}`);
+          // Kalau ada invite token, pakai role=guru dan sertakan token
+          const role = _inviteToken ? "guru" : currentRole;
+          const extraParam = _inviteToken
+            ? `&invite_token=${_inviteToken}`
+            : "";
+          const r = await API.get(
+            `/api/auth/google/url?role=${role}${extraParam}`,
+          );
           window.location.href = r.url;
         } catch (e) {
           const el = document.getElementById("err-msg");
@@ -426,12 +460,18 @@
         try {
           UI.loading(true, "Login...");
           const d = await API.post("/api/dev/login-as", { email });
-          Auth.setToken(d.token);
-          Auth.setUser(d.user);
-          Auth.redirectByRole(d.user.role);
+          localStorage.setItem("ujian_token", d.token);
+          // Redirect berdasarkan role
+          if (d.role === "admin")
+            window.location.href = "/admin/dashboard.html";
+          else if (d.role === "guru")
+            window.location.href = "/guru/dashboard.html";
+          else window.location.href = "/siswa/ujian.html";
         } catch (e) {
           UI.loading(false);
-          UI.toast(e.error || "Gagal login dummy", "error");
+          const el = document.getElementById("err-msg");
+          el.textContent = e.error || "Gagal login";
+          el.style.display = "block";
         }
       }
 
@@ -469,6 +509,45 @@
             document.getElementById("dev-section").style.display = "block";
           }
         } catch {}
+
+        // ── Guru Invite Handler ─────────────────────────────────
+        if (_inviteToken && _inviteRole === "guru") {
+          // Sembunyikan tab role (guru harus pakai invite link)
+          document.querySelector(".role-tabs").style.display = "none";
+
+          // Verifikasi token ke backend
+          try {
+            const res = await fetch(
+              CONFIG.API_BASE + "/api/auth/verify-invite?token=" + _inviteToken,
+            );
+            const data = await res.json();
+            const banner = document.getElementById("invite-banner");
+            banner.style.display = "block";
+            if (data.valid) {
+              document.getElementById("invite-name").textContent =
+                data.name_hint
+                  ? "Selamat datang, " + data.name_hint + "!"
+                  : "Selamat datang!";
+              document.getElementById("invite-email").textContent =
+                "Masuk dengan email: " + (data.email || "");
+            } else {
+              // Token tidak valid
+              banner.style.background = "#fcebeb";
+              banner.style.borderColor = "#f7c1c1";
+              banner.style.color = "#a32d2d";
+              banner.innerHTML =
+                "❌ <strong>Link undangan tidak valid atau sudah kadaluarsa.</strong><br>" +
+                '<span style="font-size:12px">' +
+                (data.error || "Hubungi admin untuk link baru.") +
+                "</span>";
+            }
+          } catch {
+            // Backend tidak bisa dihubungi, tampilkan banner generik
+            document.getElementById("invite-banner").style.display = "block";
+            document.getElementById("invite-name").textContent =
+              "Kamu diundang sebagai Guru!";
+          }
+        }
       })();
     </script>
   </body>

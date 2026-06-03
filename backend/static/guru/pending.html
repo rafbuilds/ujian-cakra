@@ -140,7 +140,7 @@
         Auth.logout();
       }
       if (user?.role === "guru") {
-        location.href = "guru-dashboard.html";
+        location.href = "dashboard.html";
       }
       document.getElementById("user-av").textContent = (user?.name || "G")[0];
       document.getElementById("user-name").textContent = user?.name || "—";
@@ -154,7 +154,7 @@
           Auth.setUser(u);
           if (u.role === "guru") {
             msg.textContent = "✅ Akun sudah disetujui! Mengalihkan...";
-            setTimeout(() => (location.href = "guru-dashboard.html"), 1000);
+            setTimeout(() => (location.href = "dashboard.html"), 1000);
           } else {
             msg.textContent = "Belum disetujui. Silakan coba lagi nanti.";
           }

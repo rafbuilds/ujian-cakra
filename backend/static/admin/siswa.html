@@ -36,13 +36,17 @@
               <circle cx="9" cy="7" r="4" /></svg
             >Data Siswa</a
           >
-          <a href="ujian.html" class="sb-item"
+          <a href="rooms.html" class="sb-item"
             ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path
-                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"
+                stroke-linecap="round"
+              />
+              <path
+                d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"
                 stroke-linecap="round"
               /></svg
-            >Semua Ujian</a
+            >Room Ujian</a
           >
           <a href="settings.html" class="sb-item"
             ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -160,8 +164,8 @@
                     <th>Nama Siswa</th>
                     <th>NISN</th>
                     <th>Kelas</th>
-                    <th>Email</th>
                     <th>Device</th>
+                    <th>Kode HP</th>
                     <th>Status</th>
                     <th>Aksi</th>
                   </tr>
@@ -309,8 +313,7 @@
       <td><div style="font-weight:500">${s.name || ""}</div><div style="font-size:11px;color:var(--muted)">${s.email || ""}</div></td>
       <td style="font-size:12px">${s.nisn || "—"}</td>
       <td>${s.class_name || "—"}</td>
-      <td style="font-size:11px;color:var(--muted)">${s.email || "—"}</td>
-      <td>${s.device_id ? '<span style="background:#eaf3de;color:#3b6d11;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600">✓ Terdaftar</span>' : '<span style="background:var(--light);color:var(--muted);padding:2px 8px;border-radius:20px;font-size:11px">Belum</span>'}</td>
+            <td>${s.device_id ? '<span style="background:#eaf3de;color:#3b6d11;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600">✓ Terdaftar</span>' : '<span style="background:var(--light);color:var(--muted);padding:2px 8px;border-radius:20px;font-size:11px">Belum</span>'}</td>
       <td><span style="background:${s.last_login ? "#eaf3de" : "var(--light)"};color:${s.last_login ? "#3b6d11" : "var(--muted)"};padding:2px 8px;border-radius:20px;font-size:11px">${s.last_login ? "Login" : "Belum"}</span></td>
       <td>
         <div class="action-btns">
@@ -356,13 +359,22 @@
         load();
       }
 
-      async function resetDev(id, name) {
+      async function resetDev(id, name, deviceId) {
+        const kode = deviceId
+          ? '<br><small style="font-family:monospace;color:var(--muted)">Kode: ' +
+            deviceId +
+            "</small>"
+          : "";
         UI.confirm(
-          "Reset Device",
-          "Reset device <strong>" + name + "</strong>?",
+          "Reset Device HP",
+          "Reset HP <strong>" +
+            name +
+            "</strong>?" +
+            kode +
+            "<br><br>Siswa harus login ulang dari HP baru.",
           async () => {
             await API.post("/api/admin/siswa/" + id + "/reset-device");
-            UI.toast("✅ Device direset", "success");
+            UI.toast("✅ Device " + name + " direset", "success");
             load();
           },
         );

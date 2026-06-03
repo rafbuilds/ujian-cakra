@@ -68,14 +68,15 @@ def start_exam(exam_id):
     if not existing:
         # Buat sesi baru
         session_id = str(uuid.uuid4())
-        expires_at = datetime.now(timezone.utc) + timedelta(minutes=int(exam.get('duration_minutes') or 90))
+        now_utc    = datetime.now(timezone.utc)
+        expires_at = now_utc + timedelta(minutes=int(exam.get('duration_minutes') or 90))
         token = uuid.uuid4().hex
         query("""INSERT INTO exam_sessions
-                 (id, exam_id, student_id, token, device_key, ip_address, status, expires_at)
-                 VALUES (%s,%s,%s,%s,%s,%s,'ongoing',%s)""",
+                 (id, exam_id, student_id, token, device_key, ip_address, status, started_at, expires_at)
+                 VALUES (%s,%s,%s,%s,%s,%s,'ongoing',%s,%s)""",
               (session_id, exam_id, request.user_id, token,
                request.json.get('device_id') if request.json else None,
-               request.remote_addr, expires_at), fetch='none')
+               request.remote_addr, now_utc, expires_at), fetch='none')
     else:
         session_id = str(existing['id'])
         expires_at = existing.get('expires_at')
@@ -85,7 +86,9 @@ def start_exam(exam_id):
     randomize_o = exam.get('randomize_options', True)
     order_clause = "ORDER BY RANDOM()" if randomize_q else "ORDER BY q.order_num"
     questions = query(f"""
-        SELECT q.id, q.content, q.image_url FROM questions q
+        SELECT q.id, q.content, q.image_url,
+               q.type, q.attachment_url, q.audio_url
+        FROM questions q
         WHERE q.exam_id=%s {order_clause}
     """, (exam_id,))
 
@@ -207,8 +210,13 @@ def check_exit(session_id):
 @siswa_bp.route('/api/siswa/<siswa_id>/history', methods=['GET'])
 @require_auth
 def siswa_history(siswa_id):
+    # Siswa hanya bisa lihat riwayatnya sendiri; guru/admin bisa lihat semua
+    if request.user_role == 'siswa' and siswa_id != request.user_id:
+        return jsonify({'error': 'Akses ditolak'}), 403
     rows = query("""
-        SELECT es.*, e.title, s.name as subject_name, r.score, r.correct_count
+        SELECT es.id, es.exam_id, es.submitted_at, es.auto_submitted, es.tab_violations,
+               e.title, s.name as subject_name, r.score, r.correct_count,
+               r.wrong_count, r.empty_count
         FROM exam_sessions es
         JOIN exams e ON e.id=es.exam_id
         LEFT JOIN subjects s ON s.id=e.subject_id

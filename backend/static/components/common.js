@@ -182,15 +182,12 @@ const UI = (() => {
     if (avatarEl) avatarEl.textContent = (user.name || "?")[0].toUpperCase();
 
     // Kalau admin masuk halaman guru, tambahkan tombol balik ke admin panel
-    if (
-      user.role === "admin" &&
-      window.location.pathname.includes("/pages/guru-")
-    ) {
+    if (user.role === "admin" && window.location.pathname.includes("/guru/")) {
       const sbNav = document.querySelector(".sb-nav");
       if (sbNav && !document.getElementById("btn-back-admin")) {
         const backBtn = document.createElement("a");
         backBtn.id = "btn-back-admin";
-        backBtn.href = "/pages/admin-dashboard.html";
+        backBtn.href = "/admin/dashboard.html";
         backBtn.className = "sb-item";
         backBtn.style.cssText =
           "background:rgba(255,255,255,.1);margin:0 .75rem .5rem;border-radius:8px";

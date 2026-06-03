@@ -50,22 +50,31 @@ def create_exam():
     return jsonify({'id': exam_id}), 201
 
 @exams_bp.route('/api/exams/<exam_id>', methods=['GET'])
-@require_auth
+@require_guru
 def get_exam(exam_id):
+    """Hanya guru/admin yang bisa melihat soal + kunci jawaban."""
     exam = query("SELECT * FROM exams WHERE id=%s", (exam_id,), fetch='one')
     if not exam: return jsonify({'error': 'Tidak ditemukan'}), 404
+    # Guru hanya bisa akses ujian miliknya; admin bisa semua
+    if request.user_role != 'admin' and str(exam['teacher_id']) != request.user_id:
+        return jsonify({'error': 'Akses ditolak'}), 403
     questions = query("SELECT * FROM questions WHERE exam_id=%s ORDER BY order_num", (exam_id,))
     q_list = []
     for q in questions:
         opts = query("SELECT * FROM options WHERE question_id=%s ORDER BY label", (q['id'],))
         q_list.append({**dict(q), 'options': [dict(o) for o in opts]})
     classes = query("""SELECT c.* FROM classes c JOIN exam_classes ec ON ec.class_id=c.id
-                       WHERE ec.exam_id=%s ORDER BY c.grade, LENGTH(c.id), c.id""", (exam_id,))
+                       WHERE ec.exam_id=%s ORDER BY c.name""", (exam_id,))
     return jsonify({**dict(exam), 'questions': q_list, 'classes': [dict(c) for c in classes]})
 
 @exams_bp.route('/api/exams/<exam_id>', methods=['PATCH'])
 @require_guru
 def update_exam(exam_id):
+    # Pastikan guru hanya bisa edit ujian miliknya (admin bebas)
+    if request.user_role != 'admin':
+        owner = query("SELECT id FROM exams WHERE id=%s AND teacher_id=%s", (exam_id, request.user_id), fetch='one')
+        if not owner:
+            return jsonify({'error': 'Ujian tidak ditemukan atau bukan milik Anda'}), 403
     data = request.json or {}
     allowed = ['title','instructions','duration_minutes','start_at','status',
                'randomize_questions','randomize_options','show_result_after',
@@ -90,16 +99,32 @@ def delete_exam(exam_id):
 @require_guru
 def add_question(exam_id):
     data = request.json or {}
-    q_id = str(uuid.uuid4())
+    q_id  = str(uuid.uuid4())
     total = query("SELECT COUNT(*) as n FROM questions WHERE exam_id=%s", (exam_id,), fetch='one')['n']
-    query("""INSERT INTO questions (id, exam_id, content, image_url, order_num, score)
-             VALUES (%s,%s,%s,%s,%s,%s)""",
-          (q_id, exam_id, data.get('content',''), data.get('image_url'),
-           total+1, data.get('score',1)), fetch='none')
+    q_type         = data.get('type', 'multiple_choice')
+    attachment_url = data.get('attachment_url')
+    audio_url      = data.get('audio_url')
+
+    # Pastikan kolom type/attachment_url/audio_url ada — jalankan migration dulu jika belum
+    try:
+        query("""INSERT INTO questions
+                   (id, exam_id, content, image_url, type, attachment_url, audio_url, order_num, score)
+                 VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+              (q_id, exam_id, data.get('content',''), data.get('image_url'),
+               q_type, attachment_url, audio_url,
+               total+1, data.get('score',1)), fetch='none')
+    except Exception:
+        # Fallback: kolom baru belum ada, insert tanpa kolom baru
+        query("""INSERT INTO questions (id, exam_id, content, image_url, order_num, score)
+                 VALUES (%s,%s,%s,%s,%s,%s)""",
+              (q_id, exam_id, data.get('content',''), data.get('image_url'),
+               total+1, data.get('score',1)), fetch='none')
+
     for opt in (data.get('options') or []):
         query("INSERT INTO options (id, question_id, label, content, is_correct) VALUES (%s,%s,%s,%s,%s)",
               (str(uuid.uuid4()), q_id, opt['label'], opt['content'], opt.get('is_correct',False)), fetch='none')
-    q = query("SELECT * FROM questions WHERE id=%s", (q_id,), fetch='one')
+
+    q    = query("SELECT * FROM questions WHERE id=%s", (q_id,), fetch='one')
     opts = query("SELECT * FROM options WHERE question_id=%s ORDER BY label", (q_id,))
     return jsonify({**dict(q), 'options': [dict(o) for o in opts]}), 201
 
@@ -126,26 +151,116 @@ def delete_question(question_id):
 @exams_bp.route('/api/exams/<exam_id>/import', methods=['POST'])
 @require_guru
 def import_questions(exam_id):
-    from openpyxl import load_workbook
-    file = request.files.get('file')
-    if not file: return jsonify({'error': 'File tidak ada'}), 400
-    wb = load_workbook(file); ws = wb.active
-    imported = 0
-    for i, row in enumerate(ws.iter_rows(min_row=2, values_only=True)):
-        if not row or not row[0]: continue
-        content = str(row[0]).strip()
-        options = [str(row[j] or '').strip() for j in range(1,6)]
-        correct = str(row[6] or '').strip().upper() if len(row) > 6 else 'A'
-        q_id = str(uuid.uuid4())
-        query("INSERT INTO questions (id, exam_id, content, order_num, score) VALUES (%s,%s,%s,%s,1)",
-              (q_id, exam_id, content, i+1), fetch='none')
-        labels = ['A','B','C','D','E']
-        for j, (label, opt_content) in enumerate(zip(labels, options)):
-            if not opt_content: continue
-            query("INSERT INTO options (id, question_id, label, content, is_correct) VALUES (%s,%s,%s,%s,%s)",
-                  (str(uuid.uuid4()), q_id, label, opt_content, label==correct), fetch='none')
-        imported += 1
-    return jsonify({'ok': True, 'imported': imported})
+    import traceback, re
+    try:
+        file = request.files.get('file')
+        if not file: return jsonify({'error': 'File tidak ada'}), 400
+        filename = (file.filename or '').lower()
+        imported = 0
+
+        def save_question(content, opts_dict, correct_label, idx):
+            if not content.strip(): return 0
+            q_id = str(uuid.uuid4())
+            query("INSERT INTO questions (id, exam_id, content, order_num, score) VALUES (%s,%s,%s,%s,1)",
+                  (q_id, exam_id, content.strip(), idx), fetch='none')
+            for label, opt_content in opts_dict.items():
+                if not opt_content: continue
+                query("INSERT INTO options (id, question_id, label, content, is_correct) VALUES (%s,%s,%s,%s,%s)",
+                      (str(uuid.uuid4()), q_id, label, opt_content, label == correct_label.upper()), fetch='none')
+            return 1
+
+        if filename.endswith('.docx'):
+            from docx import Document
+            doc = Document(io.BytesIO(file.read()))
+            if doc.tables:
+                for table in doc.tables:
+                    headers = [c.text.strip().lower() for c in table.rows[0].cells]
+                    start = 1 if any(h in ['pertanyaan','soal','question'] for h in headers) else 0
+                    for row in table.rows[start:]:
+                        cells = [c.text.strip() for c in row.cells]
+                        if len(cells) < 3 or not cells[0]: continue
+                        opts = {l: v for l, v in zip(['A','B','C','D','E'], cells[1:6]) if v}
+                        correct = cells[6].strip().upper() if len(cells) > 6 and cells[6].strip() else 'A'
+                        imported += save_question(cells[0], opts, correct, imported+1)
+            else:
+                current_q, current_opts, current_correct = None, {}, 'A'
+
+                def split_inline_option(text):
+                    """
+                    Pisahkan soal dan opsi pertama jika nempel di baris yang sama.
+                    Contoh: "Musik tradisional ... adalah .... a. saron"
+                    Return: (soal_bersih, label_opsi, isi_opsi) atau (text, None, None)
+                    """
+                    # Cari pola " a. " atau " a) " di dalam teks (bukan di awal)
+                    m = re.search(r'\s([a-eA-E])[.)]\s+(.+)$', text)
+                    if m:
+                        soal_part = text[:m.start()].strip()
+                        label = m.group(1).upper()
+                        isi   = m.group(2).strip()
+                        # Hanya split jika bagian soal mengandung angka/teks soal (bukan baris opsi biasa)
+                        if re.search(r'\d|\.{2,}|disebut|adalah|merupakan|fungsi|teknik|tujuan', soal_part, re.I):
+                            return soal_part, label, isi
+                    return text, None, None
+
+                for para in doc.paragraphs:
+                    text = para.text.strip()
+                    if not text: continue
+
+                    # Cek kunci jawaban
+                    m_key = re.match(r'^(?:jawaban|kunci|answer)\s*[:\-]?\s*([A-E])', text, re.I)
+                    if m_key:
+                        current_correct = m_key.group(1).upper()
+                        continue
+
+                    # Cek baris opsi murni (dimulai dengan a. / b. / A) / B) dll)
+                    m_opt = re.match(r'^([a-eA-E])[.)]\s*(.+)', text)
+                    if m_opt:
+                        current_opts[m_opt.group(1).upper()] = m_opt.group(2).strip()
+                        continue
+
+                    # Bukan opsi, berarti kemungkinan baris soal baru
+                    # Simpan soal sebelumnya dulu
+                    if current_q and current_opts:
+                        imported += save_question(current_q, current_opts, current_correct, imported+1)
+
+                    # Strip nomor soal di depan: "1. " / "1) " / "1 "
+                    m_q = re.match(r'^\d+[.)]\s*(.*)', text)
+                    raw_q = m_q.group(1).strip() if m_q else text
+
+                    # Cek apakah opsi pertama nempel di akhir soal
+                    soal_clean, first_label, first_isi = split_inline_option(raw_q)
+                    current_q = soal_clean
+                    current_opts = {}
+                    current_correct = 'A'
+                    if first_label and first_isi:
+                        current_opts[first_label] = first_isi
+
+                if current_q and current_opts:
+                    imported += save_question(current_q, current_opts, current_correct, imported+1)
+
+        elif filename.endswith('.csv'):
+            import csv
+            content_str = file.read().decode('utf-8-sig', errors='replace')
+            for i, row in enumerate(csv.reader(io.StringIO(content_str))):
+                if i == 0 or not row or not row[0].strip(): continue
+                opts = {l: v.strip() for l, v in zip(['A','B','C','D','E'], row[1:6]) if v.strip()}
+                correct = row[6].strip().upper() if len(row) > 6 and row[6].strip() else 'A'
+                imported += save_question(row[0], opts, correct, imported+1)
+
+        else:
+            from openpyxl import load_workbook
+            wb = load_workbook(io.BytesIO(file.read()))
+            ws = wb.active
+            for i, row in enumerate(ws.iter_rows(min_row=2, values_only=True)):
+                if not row or not row[0]: continue
+                opts = {l: str(v).strip() for l, v in zip(['A','B','C','D','E'], row[1:6]) if v and str(v).strip()}
+                correct = str(row[6]).strip().upper() if len(row) > 6 and row[6] else 'A'
+                imported += save_question(str(row[0]), opts, correct, imported+1)
+
+        return jsonify({'ok': True, 'saved': imported, 'total': imported})
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
 # ── Monitor ────────────────────────────────────────────────────
 @exams_bp.route('/api/exams/<exam_id>/monitor', methods=['GET'])
@@ -191,7 +306,7 @@ def exam_results(exam_id):
         JOIN users u ON u.id=es.student_id
         LEFT JOIN classes c ON c.id=u.class_id
         LEFT JOIN results r ON r.session_id=es.id
-        WHERE es.exam_id=%s ORDER BY c.grade, LENGTH(c.id), c.id, u.name
+        WHERE es.exam_id=%s ORDER BY c.name, u.name
     """, (exam_id,))
     all_rows = [dict(r) for r in rows]
     submitted = [r for r in all_rows if r.get('submitted_at')]
@@ -236,8 +351,12 @@ def student_exam_detail(exam_id, student_id):
     sess = query("SELECT id FROM exam_sessions WHERE exam_id=%s AND student_id=%s LIMIT 1",
                  (exam_id, student_id), fetch='one')
     if not sess: return jsonify({'error': 'Siswa belum memulai ujian ini'}), 404
+    session_id = sess['id']
+
     questions = query("""
         SELECT q.id, q.content, q.order_num,
+               COALESCE(q.type, 'multiple_choice') as type,
+               q.attachment_url, q.audio_url,
                a.option_id as student_option_id,
                ao.label as student_label, ao.content as student_answer,
                ao.is_correct as is_correct,
@@ -247,8 +366,55 @@ def student_exam_detail(exam_id, student_id):
         LEFT JOIN options ao ON ao.id=a.option_id
         LEFT JOIN options co ON co.question_id=q.id AND co.is_correct=true
         WHERE q.exam_id=%s ORDER BY q.order_num, q.created_at
-    """, (sess['id'], exam_id))
-    return jsonify({'questions': [dict(q) for q in questions]})
+    """, (session_id, exam_id))
+
+    q_list = [dict(q) for q in questions]
+
+    # Ambil essay answers (camera_essay) dan gabungkan
+    try:
+        essays = query("""
+            SELECT question_id, essay_text, photo_b64, teacher_score, teacher_note
+            FROM essay_answers WHERE session_id=%s
+        """, (session_id,))
+        essay_map = {str(e['question_id']): dict(e) for e in essays}
+        for q in q_list:
+            if q['type'] == 'camera_essay':
+                essay = essay_map.get(str(q['id']), {})
+                q['essay_text']    = essay.get('essay_text', '')
+                q['photo_b64']     = essay.get('photo_b64', '')
+                q['teacher_score'] = essay.get('teacher_score')
+                q['teacher_note']  = essay.get('teacher_note')
+    except Exception:
+        pass  # tabel essay_answers belum ada, tidak masalah
+
+    # Ambil multi_answers dan gabungkan
+    try:
+        multis = query("""
+            SELECT ma.question_id, STRING_AGG(o.label, ', ' ORDER BY o.label) as student_answer,
+                   BOOL_AND(o.is_correct) as is_correct
+            FROM multi_answers ma
+            JOIN options o ON o.id=ma.option_id
+            WHERE ma.session_id=%s
+            GROUP BY ma.question_id
+        """, (session_id,))
+        multi_map = {str(m['question_id']): dict(m) for m in multis}
+        correct_multi = query("""
+            SELECT question_id, STRING_AGG(label, ', ' ORDER BY label) as correct_answer
+            FROM options WHERE question_id IN (
+                SELECT id FROM questions WHERE exam_id=%s AND type='multiple_answer'
+            ) AND is_correct=true GROUP BY question_id
+        """, (exam_id,))
+        correct_multi_map = {str(r['question_id']): r['correct_answer'] for r in correct_multi}
+        for q in q_list:
+            if q['type'] == 'multiple_answer':
+                multi = multi_map.get(str(q['id']), {})
+                q['student_answer'] = multi.get('student_answer', '')
+                q['is_correct']     = multi.get('is_correct', False)
+                q['correct_answer'] = correct_multi_map.get(str(q['id']), '—')
+    except Exception:
+        pass
+
+    return jsonify({'questions': q_list})
 
 # ── Sessions ───────────────────────────────────────────────────
 @exams_bp.route('/api/sessions/<session_id>/detail', methods=['GET'])
@@ -298,7 +464,7 @@ def export_nilai(exam_id):
         FROM exam_sessions es JOIN users u ON u.id=es.student_id
         LEFT JOIN classes c ON c.id=u.class_id
         LEFT JOIN results r ON r.session_id=es.id
-        WHERE es.exam_id=%s ORDER BY c.grade, LENGTH(c.id), c.id, u.name
+        WHERE es.exam_id=%s ORDER BY c.name, u.name
     """, (exam_id,))
     wb = Workbook(); ws = wb.active; ws.title = 'Rekap Nilai'
     header_fill = PatternFill("solid", fgColor="0F4C35")

@@ -1,10 +1,11 @@
 // frontend/components/api.js
 const API = (() => {
   const base = () => {
-    if (typeof CONFIG !== "undefined" && CONFIG.API_BASE)
+    // Cek CONFIG.API_BASE — bisa string kosong "" (valid untuk same-domain)
+    if (typeof CONFIG !== "undefined" && CONFIG.API_BASE !== undefined)
       return CONFIG.API_BASE;
     if (typeof Config !== "undefined" && Config.apiBase) return Config.apiBase;
-    return "http://localhost:5000";
+    return ""; // default: same domain
   };
 
   const headers = (extra = {}) => {
