@@ -79,26 +79,21 @@
       <div class="main-wrap">
         <div class="topbar">
           <div class="topbar-title">Data Siswa</div>
-          <div class="topbar-right">
-            <button
-              class="btn btn-secondary btn-sm"
-              onclick="downloadTemplate()"
-            >
-              ⬇ Template
-            </button>
-            <button
-              class="btn btn-primary btn-sm"
-              onclick="document.getElementById('imp').click()"
-            >
-              ⬆ Import Excel
-            </button>
-            <input
-              type="file"
-              id="imp"
-              accept=".xlsx,.xls"
-              style="display: none"
-              onchange="importSiswa(this)"
-            />
+          <div class="topbar-right" style="gap:6px">
+            <!-- Export dropdown -->
+            <div style="position:relative;display:inline-block" id="export-wrap">
+              <button class="btn btn-secondary btn-sm" onclick="toggleExportMenu()">⬇ Export ▾</button>
+              <div id="export-menu" style="display:none;position:absolute;right:0;top:110%;background:#fff;border:.5px solid var(--border);border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:100;min-width:180px;padding:4px 0">
+                <div onclick="exportSiswa('')"         style="padding:8px 14px;font-size:13px;cursor:pointer">📋 Semua Siswa</div>
+                <div onclick="exportSiswa('?grade=10')" style="padding:8px 14px;font-size:13px;cursor:pointer">🎓 Kelas 10 saja</div>
+                <div onclick="exportSiswa('?grade=11')" style="padding:8px 14px;font-size:13px;cursor:pointer">🎓 Kelas 11 saja</div>
+                <div onclick="exportSiswa('?grade=12')" style="padding:8px 14px;font-size:13px;cursor:pointer">🎓 Kelas 12 saja</div>
+                <div id="export-kelas-item" onclick="exportByKelas()" style="padding:8px 14px;font-size:13px;cursor:pointer;display:none">📂 Kelas dipilih</div>
+              </div>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="downloadTemplate()">📄 Template</button>
+            <button class="btn btn-primary btn-sm" onclick="document.getElementById('imp').click()">⬆ Import</button>
+            <input type="file" id="imp" accept=".xlsx,.xls,.docx" style="display:none" onchange="importSiswa(this)" />
           </div>
         </div>
         <div class="page-main">
@@ -313,12 +308,15 @@
       <td><div style="font-weight:500">${s.name || ""}</div><div style="font-size:11px;color:var(--muted)">${s.email || ""}</div></td>
       <td style="font-size:12px">${s.nisn || "—"}</td>
       <td>${s.class_name || "—"}</td>
-            <td>${s.device_id ? '<span style="background:#eaf3de;color:#3b6d11;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600">✓ Terdaftar</span>' : '<span style="background:var(--light);color:var(--muted);padding:2px 8px;border-radius:20px;font-size:11px">Belum</span>'}</td>
-      <td><span style="background:${s.last_login ? "#eaf3de" : "var(--light)"};color:${s.last_login ? "#3b6d11" : "var(--muted)"};padding:2px 8px;border-radius:20px;font-size:11px">${s.last_login ? "Login" : "Belum"}</span></td>
+      <td>${s.device_id
+        ? '<span style="background:#eaf3de;color:#3b6d11;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600">✓ Terdaftar</span>'
+        : '<span style="background:var(--light);color:var(--muted);padding:2px 8px;border-radius:20px;font-size:11px">Belum</span>'
+      }</td>
+      <td><span style="background:${s.last_login ? "#eaf3de" : "var(--light)"};color:${s.last_login ? "#3b6d11" : "var(--muted)"};padding:2px 8px;border-radius:20px;font-size:11px">${s.last_login ? UI.fmtDate(s.last_login) : "Belum"}</span></td>
       <td>
         <div class="action-btns">
           <button class="btn btn-secondary btn-sm" onclick='openEdit(${JSON.stringify(s)})'>✏️ Edit</button>
-          ${s.device_id ? `<button class="btn btn-secondary btn-sm" onclick="resetDev('${s.id}','${(s.name || "").replace(/'/g, "\\'")}')">📱 Reset HP</button>` : ""}
+          <button class="btn btn-secondary btn-sm" onclick="resetDev('${s.id}','${(s.name || "").replace(/'/g, "\\'")}')" ${!s.device_id ? 'style="opacity:.45" title="Belum ada device"' : ""}>📱 Reset HP</button>
           <button class="btn btn-danger btn-sm" onclick="delSiswa('${s.id}','${(s.name || "").replace(/'/g, "\\'")}')">🗑 Hapus</button>
         </div>
       </td>
@@ -393,22 +391,60 @@
       async function downloadTemplate() {
         await API.download("/api/admin/siswa/template", "template_siswa.xlsx");
       }
+
       async function importSiswa(input) {
         const file = input.files[0];
         if (!file) return;
-        UI.loading(true, "Mengimport...");
+        const ext = file.name.split('.').pop().toLowerCase();
+        if (!['xlsx','xls','docx'].includes(ext)) {
+          UI.toast('Format tidak didukung. Gunakan .xlsx atau .docx', 'error');
+          input.value = ''; return;
+        }
+        UI.loading(true, 'Mengimport ' + file.name + '...');
         const fd = new FormData();
-        fd.append("file", file);
+        fd.append('file', file);
         try {
-          await API.upload("/api/admin/siswa/import", fd);
-          UI.toast("✅ Import berhasil", "success");
+          const r = await API.upload('/api/admin/siswa/import', fd);
+          UI.toast('✅ Berhasil import ' + (r.imported || 0) + ' siswa', 'success');
           load();
         } catch (e) {
-          UI.toast(e.error || "Gagal", "error");
+          UI.toast(e.error || 'Gagal import', 'error');
         } finally {
           UI.loading(false);
-          input.value = "";
+          input.value = '';
         }
+      }
+
+      // ── Export ──────────────────────────────────────────────────
+      function toggleExportMenu() {
+        const m = document.getElementById('export-menu');
+        m.style.display = m.style.display === 'none' ? 'block' : 'none';
+        if (m.style.display === 'block') {
+          // Tampilkan opsi kelas jika kelas tertentu dipilih di filter
+          const cls = document.getElementById('fc').value;
+          document.getElementById('export-kelas-item').style.display = cls ? 'block' : 'none';
+        }
+      }
+      document.addEventListener('click', e => {
+        if (!document.getElementById('export-wrap').contains(e.target))
+          document.getElementById('export-menu').style.display = 'none';
+      });
+
+      async function exportSiswa(query) {
+        document.getElementById('export-menu').style.display = 'none';
+        UI.loading(true, 'Menyiapkan export...');
+        try {
+          await API.download('/api/admin/siswa/export' + (query || ''), 'data_siswa.xlsx');
+        } catch(e) { UI.toast('Gagal export', 'error'); }
+        finally { UI.loading(false); }
+      }
+      async function exportByKelas() {
+        const cls = document.getElementById('fc').value;
+        const grade = document.getElementById('fg').value;
+        let q = '';
+        if (cls)   q = '?class_id=' + cls;
+        else if (grade) q = '?grade=' + grade;
+        await exportSiswa(q);
       }
 
       init();

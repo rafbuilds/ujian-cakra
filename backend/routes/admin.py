@@ -91,30 +91,55 @@ def reset_siswa_device(siswa_id):
           (siswa_id,), fetch='none')
     return jsonify({'ok': True, 'message': 'Device berhasil direset'})
 
+def _upsert_siswa_row(name, nisn, class_id, email):
+    """Helper: insert atau update satu baris data siswa."""
+    if not name: return False
+    dummy_gid = f"import_{uuid.uuid4().hex[:12]}"
+    existing = query("SELECT id FROM users WHERE email=%s AND role='siswa'",
+                     (email,), fetch='one') if email else None
+    if existing:
+        query("UPDATE users SET name=%s, nisn=%s, class_id=%s WHERE id=%s",
+              (name, nisn or None, class_id or None, existing['id']), fetch='none')
+    else:
+        query("""INSERT INTO users (id, google_id, email, name, nisn, class_id, role, is_active)
+                 VALUES (%s,%s,%s,%s,%s,%s,'siswa',true)
+                 ON CONFLICT (google_id) DO NOTHING""",
+              (str(uuid.uuid4()), dummy_gid, email or None, name,
+               nisn or None, class_id or None), fetch='none')
+    return True
+
 @admin_bp.route('/api/admin/siswa/import', methods=['POST'])
 @require_admin
 def import_siswa():
-    from openpyxl import load_workbook
     file = request.files.get('file')
     if not file: return jsonify({'error': 'File tidak ada'}), 400
-    wb = load_workbook(file)
-    ws = wb.active
+    fname = (file.filename or '').lower()
     imported = 0
-    for row in ws.iter_rows(min_row=2, values_only=True):
-        if not row or not row[0]: continue
-        name, nisn, class_id, email = (str(row[i] or '').strip() for i in range(4))
-        if not name: continue
-        dummy_gid = f"import_{uuid.uuid4().hex[:12]}"
-        existing = query("SELECT id FROM users WHERE email=%s AND role='siswa'", (email,), fetch='one') if email else None
-        if existing:
-            query("UPDATE users SET name=%s, nisn=%s, class_id=%s WHERE id=%s",
-                  (name, nisn or None, class_id or None, existing['id']), fetch='none')
-        else:
-            query("""INSERT INTO users (id, google_id, email, name, nisn, class_id, role, is_active)
-                     VALUES (%s,%s,%s,%s,%s,%s,'siswa',true)
-                     ON CONFLICT (google_id) DO NOTHING""",
-                  (str(uuid.uuid4()), dummy_gid, email or None, name, nisn or None, class_id or None), fetch='none')
-        imported += 1
+
+    if fname.endswith('.docx'):
+        from docx import Document
+        doc = Document(file)
+        for table in doc.tables:
+            for i, row in enumerate(table.rows):
+                if i == 0: continue  # skip header
+                cells = [c.text.strip() for c in row.cells]
+                if len(cells) < 1 or not cells[0]: continue
+                name     = cells[0] if len(cells) > 0 else ''
+                nisn     = cells[1] if len(cells) > 1 else ''
+                class_id = cells[2] if len(cells) > 2 else ''
+                email    = cells[3] if len(cells) > 3 else ''
+                if _upsert_siswa_row(name, nisn, class_id, email):
+                    imported += 1
+    else:
+        from openpyxl import load_workbook
+        wb = load_workbook(file)
+        ws = wb.active
+        for row in ws.iter_rows(min_row=2, values_only=True):
+            if not row or not row[0]: continue
+            name, nisn, class_id, email = (str(row[i] or '').strip() for i in range(4))
+            if _upsert_siswa_row(name, nisn, class_id, email):
+                imported += 1
+
     return jsonify({'ok': True, 'imported': imported})
 
 @admin_bp.route('/api/admin/siswa/template', methods=['GET'])
@@ -128,6 +153,60 @@ def siswa_template():
     buf = io.BytesIO(); wb.save(buf); buf.seek(0)
     return send_file(buf, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
                      as_attachment=True, download_name='template_siswa.xlsx')
+
+@admin_bp.route('/api/admin/siswa/export', methods=['GET'])
+@require_admin
+def export_siswa():
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment
+    grade    = request.args.get('grade', '')
+    class_id = request.args.get('class_id', '')
+
+    where  = ["u.role='siswa'"]
+    params = []
+    if grade:    where.append("c.grade=%s");    params.append(int(grade))
+    if class_id: where.append("u.class_id=%s"); params.append(class_id)
+
+    rows = query(f"""
+        SELECT u.name, u.nisn, u.class_id, c.name as class_name, c.grade,
+               u.email, u.device_id, u.last_login, u.is_active
+        FROM users u
+        LEFT JOIN classes c ON c.id=u.class_id
+        WHERE {' AND '.join(where)}
+        ORDER BY c.grade, LENGTH(c.id), c.id, u.name
+    """, params)
+
+    wb = Workbook(); ws = wb.active
+    ws.title = 'Data Siswa'
+
+    header = ['No','Nama Lengkap','NISN','Kelas','Tingkat','Email','Device','Login Terakhir','Status']
+    ws.append(header)
+    for cell in ws[1]:
+        cell.font      = Font(bold=True, color='FFFFFF')
+        cell.fill      = PatternFill('solid', fgColor='0F4C35')
+        cell.alignment = Alignment(horizontal='center')
+
+    for i, r in enumerate(rows, 1):
+        ws.append([
+            i,
+            r['name'] or '',
+            r['nisn']  or '',
+            r['class_name'] or '',
+            r['grade']  or '',
+            r['email']  or '',
+            'Terdaftar' if r['device_id'] else 'Belum',
+            str(r['last_login'])[:16] if r['last_login'] else '',
+            'Aktif' if r['is_active'] else 'Nonaktif',
+        ])
+
+    for col in ws.columns:
+        ws.column_dimensions[col[0].column_letter].width = max(len(str(c.value or '')) for c in col) + 4
+
+    buf = io.BytesIO(); wb.save(buf); buf.seek(0)
+    label = f"_kelas{grade}" if grade else (f"_{class_id}" if class_id else "_semua")
+    return send_file(buf,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        as_attachment=True, download_name=f'data_siswa{label}.xlsx')
 
 # ── Classes ────────────────────────────────────────────────────
 @admin_bp.route('/api/admin/classes-detail', methods=['GET'])

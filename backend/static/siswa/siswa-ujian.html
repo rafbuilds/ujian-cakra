@@ -1122,6 +1122,19 @@
         // Ambil token dari URL
         const params = new URLSearchParams(location.search);
         const urlToken = params.get("token");
+        function _deviceFingerprint() {
+          const raw = [
+            navigator.userAgent,
+            navigator.language,
+            screen.width + 'x' + screen.height,
+            new Date().getTimezoneOffset(),
+            navigator.hardwareConcurrency || 0,
+          ].join('|');
+          let h = 0;
+          for (let i = 0; i < raw.length; i++) { h = Math.imul(31, h) + raw.charCodeAt(i) | 0; }
+          return 'dev_' + Math.abs(h).toString(36);
+        }
+
         if (urlToken) {
           setToken(urlToken);
           window.history.replaceState({}, "", location.pathname);
@@ -1140,6 +1153,16 @@
               return;
             }
             localStorage.setItem("ujian_user", JSON.stringify(user));
+
+            // Daftarkan device otomatis saat login
+            try {
+              const fp = _deviceFingerprint();
+              await apiFetch("/api/student/register-device", "POST", {
+                device_id: fp,
+                device_info: navigator.userAgent.substring(0, 250),
+              });
+            } catch (_) { /* silent — mungkin device berbeda, biarkan server tolak */ }
+
             await loadExams();
             page = "list";
           } catch {
