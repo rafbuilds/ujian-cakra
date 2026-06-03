@@ -571,6 +571,32 @@
       </div>
     </div>
 
+    <!-- Modal Monitor -->
+    <div id="modal-monitor" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:400;align-items:center;justify-content:center;padding:1rem">
+      <div style="background:#fff;border-radius:16px;width:720px;max-width:97vw;max-height:90vh;display:flex;flex-direction:column;overflow:hidden">
+        <div style="background:linear-gradient(135deg,#0a3323,#1a6b4a);padding:1.25rem 1.5rem;display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+          <div>
+            <div id="mm-title" style="font-weight:700;font-size:16px;color:#fff"></div>
+            <div id="mm-subtitle" style="font-size:12px;color:rgba(255,255,255,.6);margin-top:2px"></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <button onclick="refreshMonitor()" style="background:rgba(255,255,255,.15);border:none;color:#fff;padding:4px 12px;border-radius:6px;font-size:11px;cursor:pointer">↻ Refresh</button>
+            <button onclick="closeMonitor()" style="background:rgba(255,255,255,.15);border:none;color:#fff;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:16px">✕</button>
+          </div>
+        </div>
+        <div style="display:flex;gap:.75rem;padding:.75rem 1.25rem;background:var(--light);border-bottom:.5px solid var(--border);flex-shrink:0;flex-wrap:wrap">
+          <div style="text-align:center;flex:1"><div id="mm-aktif"  style="font-size:1.3rem;font-weight:800;color:#3b6d11">—</div><div style="font-size:11px;color:var(--muted)">Aktif</div></div>
+          <div style="text-align:center;flex:1"><div id="mm-selesai" style="font-size:1.3rem;font-weight:800;color:#185fa5">—</div><div style="font-size:11px;color:var(--muted)">Selesai</div></div>
+          <div style="text-align:center;flex:1"><div id="mm-belum"  style="font-size:1.3rem;font-weight:800;color:var(--muted)">—</div><div style="font-size:11px;color:var(--muted)">Belum mulai</div></div>
+          <div style="text-align:center;flex:1"><div id="mm-viol"  style="font-size:1.3rem;font-weight:800;color:#ef4444">—</div><div style="font-size:11px;color:var(--muted)">Pelanggaran</div></div>
+        </div>
+        <div style="overflow-y:auto;flex:1;padding:.75rem 1rem">
+          <div id="mm-loading" style="text-align:center;padding:2rem"><div class="loading-spinner" style="margin:auto"></div></div>
+          <div id="mm-body"></div>
+        </div>
+      </div>
+    </div>
+
     <!-- Modal Room -->
     <div
       id="modal-room"
@@ -1023,8 +1049,89 @@
       function viewSoal(id) {
         window.open('admin_soal.html?id=' + id, '_blank');
       }
-      function viewMonitor(id) {
-        window.open('pengawas.html?id=' + id, '_blank');
+      let _monitorExamId = null, _monitorTimer = null;
+
+      async function viewMonitor(examId) {
+        _monitorExamId = examId;
+        document.getElementById('modal-monitor').style.display = 'flex';
+        document.getElementById('mm-loading').style.display = 'block';
+        document.getElementById('mm-body').innerHTML = '';
+        document.getElementById('mm-title').textContent = 'Memuat...';
+        ['mm-aktif','mm-selesai','mm-belum','mm-viol'].forEach(id => document.getElementById(id).textContent = '—');
+        await _loadMonitorData(examId);
+        // auto-refresh setiap 15 detik selama modal terbuka
+        _monitorTimer = setInterval(() => _loadMonitorData(_monitorExamId), 15000);
+      }
+
+      async function refreshMonitor() { await _loadMonitorData(_monitorExamId); }
+
+      async function _loadMonitorData(examId) {
+        try {
+          const data = await API.get('/api/exams/' + examId + '/monitor');
+          document.getElementById('mm-loading').style.display = 'none';
+          document.getElementById('mm-title').textContent = data.exam?.title || 'Monitor Ujian';
+          document.getElementById('mm-subtitle').textContent =
+            (data.exam?.subject_name || '') + ' · ' + (data.exam?.teacher_name || '');
+
+          const students = data.students || [];
+          const aktif    = students.filter(s => !s.submitted_at).length;
+          const selesai  = students.filter(s =>  s.submitted_at).length;
+          const belum    = (data.total_registered || 0) - students.length;
+          const viol     = students.reduce((a,s) => a + (s.tab_violations||0), 0);
+
+          document.getElementById('mm-aktif').textContent   = aktif;
+          document.getElementById('mm-selesai').textContent = selesai;
+          document.getElementById('mm-belum').textContent   = Math.max(0, belum);
+          document.getElementById('mm-viol').textContent    = viol;
+
+          if (!students.length) {
+            document.getElementById('mm-body').innerHTML =
+              '<div style="text-align:center;padding:2rem;color:var(--muted)">Belum ada siswa yang mulai</div>';
+            return;
+          }
+
+          document.getElementById('mm-body').innerHTML = students.map(s => {
+            const pct = (s.total_questions > 0) ? Math.round(s.answered_count / s.total_questions * 100) : 0;
+            const done = !!s.submitted_at;
+            const vBadge = s.tab_violations > 0
+              ? `<span style="background:#fde8e8;color:#b91c1c;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:700">${s.tab_violations}× pelanggaran</span>` : '';
+            return `
+              <div style="display:flex;align-items:center;gap:10px;padding:.5rem 0;border-bottom:.5px solid var(--border)">
+                <div style="width:30px;height:30px;border-radius:50%;background:${done?'#185fa5':'var(--green)'};display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:12px;flex-shrink:0">${(s.name||'?')[0]}</div>
+                <div style="flex:1;min-width:0">
+                  <div style="font-size:13px;font-weight:500;display:flex;align-items:center;gap:6px">
+                    ${s.name}
+                    <span style="font-size:10px;font-weight:600;padding:1px 6px;border-radius:10px;background:${done?'#e6f1fb':'#eaf3de'};color:${done?'#185fa5':'#3b6d11'}">${done?'Selesai':'Mengerjakan'}</span>
+                    ${vBadge}
+                  </div>
+                  <div style="font-size:11px;color:var(--muted)">${s.class_name||'—'} · IP: ${s.ip_address||'—'}</div>
+                  ${!done ? `<div style="display:flex;align-items:center;gap:6px;margin-top:4px">
+                    <div style="height:5px;background:#e5e7eb;border-radius:3px;flex:1"><div style="height:100%;width:${pct}%;background:var(--green);border-radius:3px"></div></div>
+                    <span style="font-size:10px;color:var(--muted)">${s.answered_count||0}/${s.total_questions||0} soal</span>
+                  </div>` : ''}
+                </div>
+                ${!done ? `<button class="btn btn-sm" style="font-size:10px;padding:2px 8px;background:var(--light)" onclick="allowExit('${s.session_id}')">Izinkan Keluar</button>` : ''}
+              </div>`;
+          }).join('');
+        } catch(e) {
+          document.getElementById('mm-loading').style.display = 'none';
+          document.getElementById('mm-body').innerHTML =
+            '<div style="text-align:center;padding:2rem;color:var(--muted)">Gagal memuat data monitor</div>';
+        }
+      }
+
+      async function allowExit(sessionId) {
+        try {
+          await API.patch('/api/exams/sessions/' + sessionId + '/allow-exit', {});
+          UI.toast('Izin keluar diberikan', 'success');
+        } catch(e) { UI.toast('Gagal', 'error'); }
+      }
+
+      function closeMonitor() {
+        clearInterval(_monitorTimer);
+        _monitorTimer = null;
+        _monitorExamId = null;
+        document.getElementById('modal-monitor').style.display = 'none';
       }
 
       async function viewNilai(examId) {
