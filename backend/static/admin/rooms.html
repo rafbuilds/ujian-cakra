@@ -1,0 +1,1150 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+    <title>Room Ujian — Admin</title>
+    <link rel="stylesheet" href="../style.css" />
+    <style>
+      .room-card {
+        background: #fff;
+        border: 0.5px solid var(--border);
+        border-radius: 16px;
+        padding: 1.25rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .room-card:hover {
+        border-color: var(--green3);
+        box-shadow: 0 4px 20px rgba(15, 76, 53, 0.1);
+        transform: translateY(-2px);
+      }
+      .room-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 1rem;
+      }
+      .class-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: var(--light);
+        border: 0.5px solid var(--border);
+        border-radius: 20px;
+        padding: 4px 10px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .detail-panel {
+        position: fixed;
+        top: 0;
+        right: -520px;
+        width: 520px;
+        height: 100vh;
+        background: #fff;
+        box-shadow: -8px 0 40px rgba(0, 0, 0, 0.15);
+        z-index: 200;
+        transition: right 0.3s;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+      }
+      .detail-panel.open {
+        right: 0;
+      }
+      .detail-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.3);
+        z-index: 199;
+        display: none;
+        backdrop-filter: blur(2px);
+      }
+      .detail-overlay.show {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-shell">
+      <nav class="sidebar">
+        <div class="sb-logo">
+          <div class="sb-logo-title">⚙️ Admin Panel</div>
+          <div class="sb-logo-sub">SMAN 1 Batangan</div>
+        </div>
+        <div class="sb-nav">
+          <div class="sb-section">MENU</div>
+          <a href="dashboard.html" class="sb-item"
+            ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path
+                d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"
+                stroke-linecap="round"
+              /></svg
+            >Dashboard</a
+          >
+          <a href="siswa.html" class="sb-item"
+            ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path
+                d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"
+                stroke-linecap="round"
+              />
+              <circle cx="9" cy="7" r="4" /></svg
+            >Data Siswa</a
+          >
+          <a href="rooms.html" class="sb-item active"
+            ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path
+                d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"
+                stroke-linecap="round"
+              />
+              <path
+                d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"
+                stroke-linecap="round"
+              /></svg
+            >Room Ujian</a
+          >
+          <a href="settings.html" class="sb-item"
+            ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <circle cx="12" cy="12" r="3" />
+              <path
+                d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"
+                stroke-linecap="round"
+              /></svg
+            >Pengaturan</a
+          >
+        </div>
+        <div class="sb-user">
+          <div
+            style="
+              display: flex;
+              align-items: center;
+              gap: 8px;
+              margin-bottom: 8px;
+            "
+          >
+            <div class="sb-avatar" id="sb-avatar">A</div>
+            <div>
+              <div class="sb-user-name" id="sb-user-name">Admin</div>
+              <div class="sb-user-role">Administrator</div>
+            </div>
+          </div>
+          <button class="sb-logout" onclick="Auth.logout()">⏻ Keluar</button>
+        </div>
+      </nav>
+
+      <div class="main-wrap">
+        <!-- Topbar dengan Tab -->
+        <div
+          class="topbar"
+          style="padding: 0 1.25rem; gap: 0; align-items: stretch"
+        >
+          <div style="display: flex; gap: 0; align-items: center; flex: 1">
+            <button
+              id="tab-rooms"
+              onclick="switchTab('rooms')"
+              style="
+                padding: 0.75rem 1.25rem;
+                font-size: 13px;
+                font-weight: 600;
+                border: none;
+                background: none;
+                cursor: pointer;
+                color: var(--green);
+                border-bottom: 2px solid var(--green);
+              "
+            >
+              🏠 Room Ujian
+            </button>
+            <button
+              id="tab-allujian"
+              onclick="switchTab('allujian')"
+              style="
+                padding: 0.75rem 1.25rem;
+                font-size: 13px;
+                font-weight: 600;
+                border: none;
+                background: none;
+                cursor: pointer;
+                color: var(--muted);
+                border-bottom: 2px solid transparent;
+              "
+            >
+              📋 Semua Ujian
+            </button>
+          </div>
+          <div class="topbar-right">
+            <button
+              class="btn btn-primary btn-sm"
+              id="btn-new-room"
+              onclick="openCreateRoom()"
+            >
+              + Buat Room
+            </button>
+          </div>
+        </div>
+
+        <div class="page-main">
+          <!-- ── TAB ROOM UJIAN ── -->
+          <div id="tab-content-rooms">
+            <div
+              class="card"
+              style="
+                background: linear-gradient(135deg, #0a3323, #0f4c35);
+                border: none;
+                margin-bottom: 1rem;
+                padding: 1rem 1.25rem;
+              "
+            >
+              <div style="display: flex; align-items: center; gap: 16px">
+                <div style="font-size: 36px">🏠</div>
+                <div>
+                  <div style="font-weight: 700; font-size: 15px; color: #fff">
+                    Room Ujian
+                  </div>
+                  <div
+                    style="
+                      font-size: 12px;
+                      color: rgba(255, 255, 255, 0.65);
+                      margin-top: 2px;
+                    "
+                  >
+                    Admin buat room, assign guru &amp; kelas. Klik room untuk
+                    lihat ujiannya.
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div id="rooms-grid" class="room-grid">
+              <div class="loading-spinner" style="margin: 2rem auto"></div>
+            </div>
+          </div>
+
+          <!-- ── TAB SEMUA UJIAN ── -->
+          <div id="tab-content-allujian" style="display: none">
+            <div
+              style="
+                display: grid;
+                grid-template-columns: repeat(4, 1fr);
+                gap: 0.75rem;
+                margin-bottom: 1rem;
+              "
+            >
+              <div class="stat-card">
+                <div class="stat-num" id="ust-total">—</div>
+                <div class="stat-label">Total Ujian</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-num" id="ust-live" style="color: #3b6d11">
+                  —
+                </div>
+                <div class="stat-label">🟢 Berlangsung</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-num" id="ust-open">—</div>
+                <div class="stat-label">Terbuka</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-num" id="ust-done">—</div>
+                <div class="stat-label">Selesai</div>
+              </div>
+            </div>
+            <div
+              style="
+                display: flex;
+                gap: 8px;
+                margin-bottom: 0.875rem;
+                flex-wrap: wrap;
+              "
+            >
+              <select
+                id="uj-status"
+                onchange="loadAllUjian()"
+                class="form-control"
+                style="width: auto"
+              >
+                <option value="">Semua Status</option>
+                <option value="ongoing">🟢 Berlangsung</option>
+                <option value="published">Terbuka</option>
+                <option value="finished">Selesai</option>
+                <option value="draft">Draft</option>
+              </select>
+              <select
+                id="uj-room"
+                onchange="loadAllUjian()"
+                class="form-control"
+                style="width: auto"
+              >
+                <option value="">Semua Room</option>
+              </select>
+              <input
+                id="uj-search"
+                type="text"
+                placeholder="🔍 Cari judul atau guru..."
+                oninput="loadAllUjian()"
+                style="
+                  flex: 1;
+                  max-width: 280px;
+                  padding: 8px 12px;
+                  border: 1px solid var(--border2);
+                  border-radius: 8px;
+                  font-size: 13px;
+                "
+              />
+              <div
+                style="
+                  margin-left: auto;
+                  align-self: center;
+                  font-size: 13px;
+                  color: var(--muted);
+                "
+                id="uj-count"
+              ></div>
+            </div>
+            <div class="card" style="padding: 0; overflow: hidden">
+              <div class="tbl-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Judul Ujian</th>
+                      <th>Guru</th>
+                      <th>Room</th>
+                      <th>Kelas</th>
+                      <th>Soal</th>
+                      <th>Status</th>
+                      <th>Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody id="allujian-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- end page-main -->
+      </div>
+      <!-- end main-wrap -->
+    </div>
+    <!-- end app-shell -->
+
+    <!-- Overlay & Detail Panel — di luar app-shell agar tidak terclip -->
+    <div class="detail-overlay" id="overlay" onclick="closeDetail()"></div>
+
+    <div class="detail-panel" id="detail-panel">
+      <div
+        style="
+          background: linear-gradient(135deg, #0a3323, #1a6b4a);
+          padding: 1.5rem;
+          flex-shrink: 0;
+        "
+      >
+        <div
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+          "
+        >
+          <div>
+            <div
+              style="font-weight: 700; font-size: 20px; color: #fff"
+              id="dp-name"
+            >
+              Room
+            </div>
+            <div
+              style="
+                font-size: 13px;
+                color: rgba(255, 255, 255, 0.6);
+                margin-top: 4px;
+              "
+              id="dp-desc"
+            ></div>
+          </div>
+          <button
+            onclick="closeDetail()"
+            style="
+              background: rgba(255, 255, 255, 0.15);
+              border: none;
+              color: #fff;
+              width: 32px;
+              height: 32px;
+              border-radius: 50%;
+              cursor: pointer;
+              font-size: 16px;
+            "
+          >
+            ✕
+          </button>
+        </div>
+        <div style="display: flex; gap: 12px; margin-top: 1rem">
+          <div
+            style="
+              background: rgba(255, 255, 255, 0.1);
+              border-radius: 10px;
+              padding: 0.5rem 1rem;
+              text-align: center;
+            "
+          >
+            <div
+              style="font-size: 22px; font-weight: 700; color: #fff"
+              id="dp-teacher-count"
+            >
+              0
+            </div>
+            <div style="font-size: 11px; color: rgba(255, 255, 255, 0.5)">
+              Guru
+            </div>
+          </div>
+          <div
+            style="
+              background: rgba(255, 255, 255, 0.1);
+              border-radius: 10px;
+              padding: 0.5rem 1rem;
+              text-align: center;
+            "
+          >
+            <div
+              style="font-size: 22px; font-weight: 700; color: #fff"
+              id="dp-class-count"
+            >
+              0
+            </div>
+            <div style="font-size: 11px; color: rgba(255, 255, 255, 0.5)">
+              Kelas
+            </div>
+          </div>
+          <div
+            style="
+              background: rgba(255, 255, 255, 0.1);
+              border-radius: 10px;
+              padding: 0.5rem 1rem;
+              text-align: center;
+            "
+          >
+            <div
+              style="font-size: 22px; font-weight: 700; color: #fff"
+              id="dp-exam-count"
+            >
+              0
+            </div>
+            <div style="font-size: 11px; color: rgba(255, 255, 255, 0.5)">
+              Ujian
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="padding: 1.25rem; flex: 1; overflow-y: auto">
+        <div
+          style="
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--muted);
+            letter-spacing: 0.4px;
+            margin-bottom: 0.625rem;
+          "
+        >
+          GURU ANGGOTA
+        </div>
+        <div id="dp-teachers" style="margin-bottom: 0.75rem"></div>
+        <div style="display: flex; gap: 8px; margin-bottom: 1.25rem">
+          <select
+            id="dp-add-teacher"
+            class="form-control"
+            style="flex: 1; font-size: 13px"
+          >
+            <option value="">+ Pilih guru...</option>
+          </select>
+          <button class="btn btn-primary btn-sm" onclick="addTeacher()">
+            Tambah
+          </button>
+        </div>
+
+        <div
+          style="
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--muted);
+            letter-spacing: 0.4px;
+            margin-bottom: 0.625rem;
+          "
+        >
+          KELAS DALAM ROOM
+        </div>
+        <div id="dp-classes" style="margin-bottom: 0.75rem"></div>
+        <div style="display: flex; gap: 8px; margin-bottom: 1.25rem">
+          <select
+            id="dp-add-class"
+            class="form-control"
+            style="flex: 1; font-size: 13px"
+          >
+            <option value="">+ Pilih kelas...</option>
+          </select>
+          <button class="btn btn-primary btn-sm" onclick="addRoomClass()">
+            Tambah
+          </button>
+        </div>
+
+        <div
+          style="
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 0.625rem;
+          "
+        >
+          <div
+            style="
+              font-size: 11px;
+              font-weight: 700;
+              color: var(--muted);
+              letter-spacing: 0.4px;
+            "
+          >
+            UJIAN DI ROOM INI
+          </div>
+        </div>
+        <div id="dp-exams-filter" style="margin-bottom: 8px"></div>
+        <div id="dp-exams"></div>
+
+        <div
+          style="
+            margin-top: 1.5rem;
+            padding-top: 1rem;
+            border-top: 0.5px solid var(--border);
+            display: flex;
+            gap: 8px;
+          "
+        >
+          <button
+            class="btn btn-secondary"
+            style="flex: 1"
+            onclick="editRoom()"
+          >
+            ✏️ Edit Room
+          </button>
+          <button class="btn btn-danger" onclick="deleteRoom()">
+            🗑 Hapus
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Room -->
+    <div
+      id="modal-room"
+      style="
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 300;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+        backdrop-filter: blur(4px);
+      "
+    >
+      <div
+        style="
+          background: #fff;
+          border-radius: 18px;
+          padding: 2rem;
+          max-width: 500px;
+          width: 100%;
+        "
+      >
+        <div
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.25rem;
+          "
+        >
+          <div
+            style="font-weight: 700; font-size: 18px; color: var(--green)"
+            id="modal-room-title"
+          >
+            Buat Room Ujian
+          </div>
+          <button
+            onclick="closeModal()"
+            style="
+              background: none;
+              border: none;
+              font-size: 22px;
+              cursor: pointer;
+            "
+          >
+            ✕
+          </button>
+        </div>
+        <input type="hidden" id="mr-id" />
+        <div class="form-group">
+          <label>Nama Room <span style="color: var(--red2)">*</span></label>
+          <input
+            class="form-control"
+            id="mr-name"
+            placeholder="Contoh: Ujian Kelas X Semester 1"
+          />
+        </div>
+        <div class="form-group">
+          <label>Deskripsi</label>
+          <textarea
+            class="form-control"
+            id="mr-desc"
+            rows="2"
+            placeholder="Deskripsi singkat..."
+          ></textarea>
+        </div>
+        <div style="display: flex; gap: 10px; margin-top: 1rem">
+          <button
+            class="btn btn-secondary"
+            style="flex: 1"
+            onclick="closeModal()"
+          >
+            Batal
+          </button>
+          <button class="btn btn-primary" style="flex: 1" onclick="saveRoom()">
+            💾 Simpan
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script src="../config.js"></script>
+    <script src="../components/api.js"></script>
+    <script src="../components/auth.js"></script>
+    <script src="../components/common.js"></script>
+    <script>
+      if (!Auth.requireRole(["admin"])) throw new Error();
+      UI.initSidebar();
+
+      let currentRoomId = null,
+        currentRoom = null,
+        allTeachers = [],
+        allKelas = [];
+
+      // ── Init ──────────────────────────────────────────────────────
+      (async function init() {
+        try {
+          [allTeachers, allKelas] = await Promise.all([
+            API.get("/api/admin/users").then((u) =>
+              u.filter((x) => x.role === "guru"),
+            ),
+            API.get("/api/classes"),
+          ]);
+          await loadRooms();
+          if (location.hash === "#allujian") switchTab("allujian");
+        } catch (e) {
+          console.error("init error:", e);
+          UI.toast("Gagal inisialisasi", "error");
+        }
+      })();
+
+      // ── Tab switching ────────────────────────────────────────────
+      function switchTab(tab) {
+        const isRooms = tab === "rooms";
+        document.getElementById("tab-content-rooms").style.display = isRooms
+          ? ""
+          : "none";
+        document.getElementById("tab-content-allujian").style.display = isRooms
+          ? "none"
+          : "";
+        document.getElementById("tab-rooms").style.cssText =
+          `padding:.75rem 1.25rem;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;color:${isRooms ? "var(--green)" : "var(--muted)"};border-bottom:2px solid ${isRooms ? "var(--green)" : "transparent"}`;
+        document.getElementById("tab-allujian").style.cssText =
+          `padding:.75rem 1.25rem;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;color:${!isRooms ? "var(--green)" : "var(--muted)"};border-bottom:2px solid ${!isRooms ? "var(--green)" : "transparent"}`;
+        document.getElementById("btn-new-room").style.display = isRooms
+          ? ""
+          : "none";
+        if (!isRooms) loadAllUjian();
+      }
+
+      // ── Room List ────────────────────────────────────────────────
+      async function loadRooms() {
+        const grid = document.getElementById("rooms-grid");
+        grid.innerHTML =
+          '<div class="loading-spinner" style="margin:2rem auto"></div>';
+        try {
+          const rooms = await API.get("/api/admin/rooms");
+          if (!rooms.length) {
+            grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:3rem;color:var(--muted)">
+        <div style="font-size:48px;margin-bottom:.75rem">🏠</div>
+        <div style="font-size:16px;font-weight:600">Belum ada room</div>
+        <div style="font-size:13px;margin-top:.5rem">Klik "+ Buat Room" untuk mulai</div>
+      </div>`;
+            return;
+          }
+          grid.innerHTML = rooms
+            .map(
+              (r) => `
+      <div class="room-card" onclick="openDetail('${r.id}')">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between">
+          <div style="font-weight:700;font-size:16px">${r.name}</div>
+          <span style="background:${r.is_active ? "#eaf3de" : "var(--light)"};color:${r.is_active ? "#3b6d11" : "var(--muted)"};padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;flex-shrink:0">${r.is_active ? "Aktif" : "Nonaktif"}</span>
+        </div>
+        ${r.description ? `<div style="font-size:12px;color:var(--muted)">${r.description}</div>` : ""}
+        <div style="display:flex;gap:10px;margin-top:4px">
+          <span style="font-size:12px;color:var(--muted)">👨‍🏫 ${r.teacher_count || 0} guru</span>
+          <span style="font-size:12px;color:var(--muted)">🏫 ${r.class_count || 0} kelas</span>
+          <span style="font-size:12px;color:var(--muted)">📋 ${r.exam_count || 0} ujian</span>
+        </div>
+        <div style="font-size:11px;color:var(--muted)">${UI.fmtDT(r.created_at) || ""}</div>
+      </div>`,
+            )
+            .join("");
+        } catch (e) {
+          console.error(e);
+          UI.toast("Gagal memuat rooms", "error");
+        }
+      }
+
+      // ── Room Detail ──────────────────────────────────────────────
+      async function openDetail(roomId) {
+        currentRoomId = roomId;
+        document.getElementById("overlay").classList.add("show");
+        document.getElementById("detail-panel").classList.add("open");
+        document.getElementById("dp-exams").innerHTML =
+          '<div class="loading-spinner" style="margin:1rem auto"></div>';
+
+        try {
+          const room = await API.get("/api/admin/rooms/" + roomId);
+          currentRoom = room;
+
+          document.getElementById("dp-name").textContent = room.name;
+          document.getElementById("dp-desc").textContent =
+            room.description || "";
+          document.getElementById("dp-teacher-count").textContent =
+            room.teachers.length;
+          document.getElementById("dp-class-count").textContent =
+            room.classes.length;
+          document.getElementById("dp-exam-count").textContent =
+            room.exams.length;
+
+          // Guru
+          const existTeacherIds = room.teachers.map((t) => t.id);
+          document.getElementById("dp-teachers").innerHTML = room.teachers
+            .length
+            ? room.teachers
+                .map(
+                  (t) => `
+          <div style="display:flex;align-items:center;gap:8px;padding:.5rem 0;border-bottom:.5px solid var(--border)">
+            <div style="width:30px;height:30px;border-radius:50%;background:var(--green);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:12px">${(t.name || "?")[0]}</div>
+            <div style="flex:1"><div style="font-size:13px;font-weight:500">${t.name}</div><div style="font-size:11px;color:var(--muted)">${t.email || ""}</div></div>
+            <button onclick="removeTeacher('${t.id}')" style="background:none;border:none;color:var(--red2);cursor:pointer;font-size:18px;padding:0">×</button>
+          </div>`,
+                )
+                .join("")
+            : '<div style="font-size:13px;color:var(--muted)">Belum ada guru</div>';
+
+          // Kelas
+          const existClassIds = room.classes.map((c) => c.id);
+          document.getElementById("dp-classes").innerHTML = room.classes.length
+            ? `<div style="display:flex;flex-wrap:wrap;gap:6px">${room.classes
+                .map(
+                  (c) => `
+          <span class="class-chip">${c.name}
+            <button onclick="removeRoomClass('${c.id}')" style="background:none;border:none;color:var(--red2);cursor:pointer;font-size:13px;padding:0;line-height:1">×</button>
+          </span>`,
+                )
+                .join("")}</div>`
+            : '<div style="font-size:13px;color:var(--muted)">Belum ada kelas</div>';
+
+          // Dropdown guru & kelas
+          document.getElementById("dp-add-teacher").innerHTML =
+            '<option value="">+ Pilih guru...</option>' +
+            allTeachers
+              .filter((t) => !existTeacherIds.includes(t.id))
+              .map((t) => `<option value="${t.id}">${t.name}</option>`)
+              .join("");
+          document.getElementById("dp-add-class").innerHTML =
+            '<option value="">+ Pilih kelas...</option>' +
+            allKelas
+              .filter((c) => !existClassIds.includes(c.id))
+              .map((c) => `<option value="${c.id}">${c.name}</option>`)
+              .join("");
+
+          // Ujian
+          renderRoomExams(room.exams);
+        } catch (e) {
+          console.error(e);
+          UI.toast("Gagal memuat detail room", "error");
+        }
+      }
+
+      function renderRoomExams(exams) {
+        const SB = {
+          draft:
+            '<span style="background:var(--light);color:var(--muted);padding:1px 7px;border-radius:20px;font-size:10px;font-weight:600">Draft</span>',
+          published:
+            '<span style="background:#e6f1fb;color:#185fa5;padding:1px 7px;border-radius:20px;font-size:10px;font-weight:600">Terbuka</span>',
+          ongoing:
+            '<span style="background:#eaf3de;color:#3b6d11;padding:1px 7px;border-radius:20px;font-size:10px;font-weight:600">🟢 Live</span>',
+          finished:
+            '<span style="background:#faeeda;color:#854f0b;padding:1px 7px;border-radius:20px;font-size:10px;font-weight:600">Selesai</span>',
+        };
+
+        window._roomExams = exams;
+
+        // Filter buttons
+        const statuses = [...new Set(exams.map((e) => e.status))];
+        document.getElementById("dp-exams-filter").innerHTML =
+          exams.length > 1
+            ? `<div style="display:flex;gap:5px;flex-wrap:wrap">
+        <button onclick="filterExams('all')" id="ef-all" class="btn btn-primary btn-sm" style="font-size:11px;padding:3px 9px">Semua (${exams.length})</button>
+        ${["ongoing", "published", "finished", "draft"]
+          .filter((s) => statuses.includes(s))
+          .map(
+            (s) => `
+          <button onclick="filterExams('${s}')" id="ef-${s}" class="btn btn-secondary btn-sm" style="font-size:11px;padding:3px 9px">
+            ${{ ongoing: "🟢 Live", published: "Terbuka", finished: "Selesai", draft: "Draft" }[s]} (${exams.filter((e) => e.status === s).length})
+          </button>`,
+          )
+          .join("")}
+      </div>`
+            : "";
+
+        document.getElementById("dp-exams").innerHTML = renderExamCards(
+          exams,
+          SB,
+        );
+        window._examSB = SB;
+      }
+
+      function renderExamCards(exams, SB) {
+        if (!exams.length)
+          return '<div style="font-size:13px;color:var(--muted);padding:.5rem 0">Belum ada ujian di room ini</div>';
+        return exams
+          .map(
+            (e) => `
+    <div style="padding:.75rem;margin-bottom:8px;background:#fff;border:.5px solid var(--border);border-radius:12px">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px">
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:600">${e.title || ""}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">${e.teacher_name || "—"} · ${e.subject_name || "—"}</div>
+          <div style="font-size:11px;color:var(--muted)">${e.duration_minutes || 90} menit · ${e.question_count || 0} soal${e.class_names ? ` · ${e.class_names}` : ""}</div>
+        </div>
+        ${SB[e.status] || e.status}
+      </div>
+      <div style="display:flex;gap:5px;flex-wrap:wrap">
+        <button class="btn btn-secondary btn-sm" onclick="viewSoal('${e.id}')" style="font-size:11px;padding:3px 8px">👁 Soal</button>
+        <button class="btn btn-secondary btn-sm" onclick="viewNilai('${e.id}')" style="font-size:11px;padding:3px 8px">📊 Nilai</button>
+        <button class="btn btn-secondary btn-sm" onclick="viewMonitor('${e.id}')" style="font-size:11px;padding:3px 8px">🖥 Monitor</button>
+        ${e.status === "draft" ? `<button class="btn btn-primary btn-sm" onclick="publishExam('${e.id}')" style="font-size:11px;padding:3px 8px">✅ Publish</button>` : ""}
+        ${["published", "ongoing"].includes(e.status) ? `<button class="btn btn-secondary btn-sm" onclick="forceFinishExam('${e.id}')" style="font-size:11px;padding:3px 8px;border-color:#e57373;color:#c62828">⏹ Stop</button>` : ""}
+        <button class="btn btn-danger btn-sm" onclick="deleteExam('${e.id}')" style="font-size:11px;padding:3px 8px">🗑</button>
+      </div>
+    </div>`,
+          )
+          .join("");
+      }
+
+      function filterExams(status) {
+        document.querySelectorAll('[id^="ef-"]').forEach((b) => {
+          b.className = "btn btn-secondary btn-sm";
+          b.style.cssText = "font-size:11px;padding:3px 9px";
+        });
+        const btn = document.getElementById("ef-" + status);
+        if (btn) {
+          btn.className = "btn btn-primary btn-sm";
+          btn.style.cssText = "font-size:11px;padding:3px 9px";
+        }
+        const filtered =
+          status === "all"
+            ? window._roomExams
+            : window._roomExams.filter((e) => e.status === status);
+        document.getElementById("dp-exams").innerHTML = renderExamCards(
+          filtered,
+          window._examSB,
+        );
+      }
+
+      function closeDetail() {
+        document.getElementById("overlay").classList.remove("show");
+        document.getElementById("detail-panel").classList.remove("open");
+        currentRoomId = null;
+        currentRoom = null;
+      }
+
+      // ── Room CRUD ────────────────────────────────────────────────
+      function openCreateRoom() {
+        document.getElementById("mr-id").value = "";
+        document.getElementById("mr-name").value = "";
+        document.getElementById("mr-desc").value = "";
+        document.getElementById("modal-room-title").textContent =
+          "Buat Room Ujian";
+        document.getElementById("modal-room").style.display = "flex";
+      }
+      function editRoom() {
+        if (!currentRoom) return;
+        document.getElementById("mr-id").value = currentRoom.id;
+        document.getElementById("mr-name").value = currentRoom.name;
+        document.getElementById("mr-desc").value =
+          currentRoom.description || "";
+        document.getElementById("modal-room-title").textContent = "Edit Room";
+        document.getElementById("modal-room").style.display = "flex";
+      }
+      function closeModal() {
+        document.getElementById("modal-room").style.display = "none";
+      }
+
+      async function saveRoom() {
+        const id = document.getElementById("mr-id").value;
+        const name = document.getElementById("mr-name").value.trim();
+        const desc = document.getElementById("mr-desc").value.trim();
+        if (!name) {
+          UI.toast("Nama room wajib", "warn");
+          return;
+        }
+        if (id) {
+          await API.patch("/api/admin/rooms/" + id, {
+            name,
+            description: desc,
+          });
+          UI.toast("✅ Room diperbarui", "success");
+          closeModal();
+          openDetail(id);
+          loadRooms();
+        } else {
+          const r = await API.post("/api/admin/rooms", {
+            name,
+            description: desc,
+          });
+          UI.toast("✅ Room dibuat", "success");
+          closeModal();
+          loadRooms();
+          if (r.id) openDetail(r.id);
+        }
+      }
+
+      async function deleteRoom() {
+        if (!currentRoom) return;
+        UI.confirm(
+          "Hapus Room",
+          "Hapus room <strong>" + currentRoom.name + "</strong>?",
+          async () => {
+            await API.del("/api/admin/rooms/" + currentRoomId);
+            UI.toast("Room dihapus", "success");
+            closeDetail();
+            loadRooms();
+          },
+        );
+      }
+
+      // ── Teacher & Class management ───────────────────────────────
+      async function addTeacher() {
+        const id = document.getElementById("dp-add-teacher").value;
+        if (!id) {
+          UI.toast("Pilih guru dulu", "warn");
+          return;
+        }
+        await API.post("/api/admin/rooms/" + currentRoomId + "/teachers", {
+          teacher_id: id,
+        });
+        UI.toast("✅ Guru ditambahkan", "success");
+        openDetail(currentRoomId);
+      }
+      async function removeTeacher(tid) {
+        await API.del("/api/admin/rooms/" + currentRoomId + "/teachers/" + tid);
+        UI.toast("Guru dihapus", "success");
+        openDetail(currentRoomId);
+      }
+      async function addRoomClass() {
+        const id = document.getElementById("dp-add-class").value;
+        if (!id) {
+          UI.toast("Pilih kelas dulu", "warn");
+          return;
+        }
+        await API.post("/api/admin/rooms/" + currentRoomId + "/classes", {
+          class_id: id,
+        });
+        UI.toast("✅ Kelas ditambahkan", "success");
+        openDetail(currentRoomId);
+      }
+      async function removeRoomClass(cid) {
+        await API.del("/api/admin/rooms/" + currentRoomId + "/classes/" + cid);
+        UI.toast("Kelas dihapus", "success");
+        openDetail(currentRoomId);
+      }
+
+      // ── Exam actions ─────────────────────────────────────────────
+      function viewSoal(id) {
+        window.open("soal.html?id=" + id, "_blank");
+      }
+      function viewNilai(id) {
+        window.open("nilai.html?id=" + id, "_blank");
+      }
+      function viewMonitor(id) {
+        window.open("pengawas.html?id=" + id, "_blank");
+      }
+
+      async function publishExam(id) {
+        UI.confirm(
+          "Publish Ujian",
+          "Siswa bisa mulai mengerjakan.",
+          async () => {
+            await API.patch("/api/exams/" + id, { status: "published" });
+            UI.toast("✅ Dipublish", "success");
+            openDetail(currentRoomId);
+          },
+        );
+      }
+      async function forceFinishExam(id) {
+        UI.confirm(
+          "Paksa Selesai",
+          "Semua siswa aktif akan di-submit.",
+          async () => {
+            const r = await API.post(
+              "/api/admin/exams/" + id + "/force-finish",
+            );
+            UI.toast("✅ " + (r.submitted || 0) + " sesi di-submit", "success");
+            openDetail(currentRoomId);
+          },
+        );
+      }
+      async function deleteExam(id) {
+        UI.confirm(
+          "Hapus Ujian",
+          "Hapus ujian beserta semua data?",
+          async () => {
+            await API.del("/api/admin/exams/" + id);
+            UI.toast("Ujian dihapus", "success");
+            openDetail(currentRoomId);
+          },
+        );
+      }
+
+      // ── Semua Ujian tab ──────────────────────────────────────────
+      const STATUS_BADGE = {
+        draft:
+          '<span style="background:var(--light);color:var(--muted);padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600">Draft</span>',
+        published:
+          '<span style="background:#e6f1fb;color:#185fa5;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600">Terbuka</span>',
+        ongoing:
+          '<span style="background:#eaf3de;color:#3b6d11;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600">🟢 Live</span>',
+        finished:
+          '<span style="background:#faeeda;color:#854f0b;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600">Selesai</span>',
+      };
+      let _examCache = [];
+
+      async function loadAllUjian() {
+        const status = document.getElementById("uj-status").value;
+        const roomF = document.getElementById("uj-room").value;
+        const q = document.getElementById("uj-search").value.toLowerCase();
+        const tbody = document.getElementById("allujian-tbody");
+        tbody.innerHTML =
+          '<tr><td colspan="7" style="text-align:center;padding:2rem"><div class="loading-spinner" style="margin:auto"></div></td></tr>';
+        try {
+          if (!_examCache.length) {
+            _examCache = await API.get("/api/admin/exams");
+            document.getElementById("ust-total").textContent =
+              _examCache.length;
+            document.getElementById("ust-live").textContent = _examCache.filter(
+              (e) => e.status === "ongoing",
+            ).length;
+            document.getElementById("ust-open").textContent = _examCache.filter(
+              (e) => e.status === "published",
+            ).length;
+            document.getElementById("ust-done").textContent = _examCache.filter(
+              (e) => e.status === "finished",
+            ).length;
+            const rooms = [
+              ...new Map(
+                _examCache
+                  .filter((e) => e.room_name)
+                  .map((e) => [e.room_id, e]),
+              ).values(),
+            ];
+            document.getElementById("uj-room").innerHTML =
+              '<option value="">Semua Room</option>' +
+              rooms
+                .map(
+                  (e) => `<option value="${e.room_id}">${e.room_name}</option>`,
+                )
+                .join("");
+          }
+          let exams = _examCache;
+          if (status) exams = exams.filter((e) => e.status === status);
+          if (roomF) exams = exams.filter((e) => e.room_id === roomF);
+          if (q)
+            exams = exams.filter(
+              (e) =>
+                (e.title || "").toLowerCase().includes(q) ||
+                (e.teacher_name || "").toLowerCase().includes(q),
+            );
+          document.getElementById("uj-count").textContent =
+            exams.length + " ujian";
+          if (!exams.length) {
+            tbody.innerHTML =
+              '<tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--muted)">Belum ada ujian</td></tr>';
+            return;
+          }
+          tbody.innerHTML = exams
+            .map(
+              (e) => `<tr>
+      <td><div style="font-weight:500;font-size:13px">${e.title || ""}</div><div style="font-size:11px;color:var(--muted)">${e.start_at ? UI.fmtDT(e.start_at) : ""}</div></td>
+      <td style="font-size:13px">${e.teacher_name || "—"}</td>
+      <td style="font-size:12px;color:var(--muted)">${e.room_name || "—"}</td>
+      <td style="font-size:12px;color:var(--muted)">${e.class_names || "—"}</td>
+      <td style="text-align:center"><span style="background:var(--green4);color:var(--green);padding:2px 8px;border-radius:6px;font-size:12px;font-weight:700">${e.question_count || 0}</span></td>
+      <td>${STATUS_BADGE[e.status] || e.status}</td>
+      <td><div class="action-btns">
+        <button class="btn btn-secondary btn-sm" onclick="viewSoal('${e.id}')">👁 Soal</button>
+        <button class="btn btn-secondary btn-sm" onclick="viewNilai('${e.id}')">📊 Nilai</button>
+        ${["published", "ongoing"].includes(e.status) ? `<button class="btn btn-secondary btn-sm" onclick="viewMonitor('${e.id}')">🖥 Monitor</button>` : ""}
+        ${e.status === "draft" ? `<button class="btn btn-primary btn-sm" onclick="pubUjian('${e.id}')">✅ Publish</button>` : ""}
+        ${["published", "ongoing"].includes(e.status) ? `<button class="btn btn-secondary btn-sm" style="border-color:#e57373;color:#c62828" onclick="stopUjian('${e.id}','${(e.title || "").replace(/'/g, "\\'")}')">⏹ Stop</button>` : ""}
+        <button class="btn btn-danger btn-sm" onclick="hapusUjian('${e.id}','${(e.title || "").replace(/'/g, "\\'")}')">🗑</button>
+      </div></td>
+    </tr>`,
+            )
+            .join("");
+        } catch (err) {
+          console.error(err);
+          UI.toast("Gagal memuat ujian", "error");
+        }
+      }
+
+      function _resetCache() {
+        _examCache = [];
+      }
+      async function pubUjian(id) {
+        await API.patch("/api/exams/" + id, { status: "published" });
+        _resetCache();
+        UI.toast("✅ Dipublish", "success");
+        loadAllUjian();
+      }
+      async function stopUjian(id, title) {
+        UI.confirm(
+          "Paksa Selesai",
+          "Stop <strong>" + title + "</strong>?",
+          async () => {
+            const r = await API.post(
+              "/api/admin/exams/" + id + "/force-finish",
+            );
+            _resetCache();
+            UI.toast("✅ " + (r.submitted || 0) + " sesi di-submit", "success");
+            loadAllUjian();
+          },
+        );
+      }
+      async function hapusUjian(id, title) {
+        UI.confirm(
+          "Hapus Ujian",
+          "Hapus <strong>" + title + "</strong>?",
+          async () => {
+            await API.del("/api/admin/exams/" + id);
+            _resetCache();
+            UI.toast("Dihapus", "success");
+            loadAllUjian();
+          },
+        );
+      }
+    </script>
+  </body>
+</html>
