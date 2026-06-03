@@ -7,15 +7,17 @@
 
 /* ── Reset ── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { overflow-x: hidden; }
 body {
   font-family: "Plus Jakarta Sans", sans-serif;
   background: #f4f3ef;
   color: #1e1e1c;
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
 }
 button { font-family: inherit; cursor: pointer; border: none; outline: none; }
-input, select, textarea { font-family: inherit; }
+input, select, textarea { font-family: inherit; max-width: 100%; }
 a { text-decoration: none; color: inherit; }
 img { max-width: 100%; }
 
@@ -649,30 +651,42 @@ tbody tr:hover td { background: #f8f7f3; }
   .sidebar {
     transform: translateX(-100%);
     box-shadow: none;
+    width: 220px;
   }
   .sidebar.open {
     transform: translateX(0);
-    box-shadow: 8px 0 32px rgba(0,0,0,.25);
+    box-shadow: 8px 0 32px rgba(0,0,0,.3);
   }
 
   /* Hamburger button tampil */
   .hamburger { display: flex; }
 
-  /* Main wrap tanpa margin */
-  .main-wrap { margin-left: 0; }
+  /* Main wrap tanpa margin, tidak overflow */
+  .main-wrap {
+    margin-left: 0;
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
 
   /* Topbar lebih compact */
-  .topbar {
-    padding: .625rem 1rem;
+  .topbar { padding: .625rem .875rem; gap: 8px; }
+  .topbar-title { font-size: 14px; }
+  .topbar-right {
+    gap: 4px;
+    flex-wrap: nowrap;
   }
-  .topbar-title { font-size: 15px; }
-  .topbar-right { gap: 5px; }
-  .topbar-right .btn { padding: 5px 10px; font-size: 11px; }
+  .topbar-right .btn {
+    padding: 5px 8px;
+    font-size: 11px;
+    white-space: nowrap;
+  }
 
   /* Page main padding kecil + beri ruang bottom nav */
   .page-main {
-    padding: 1rem;
-    padding-bottom: 76px;
+    padding: .75rem;
+    padding-bottom: 72px;
+    max-width: 100%;
+    overflow-x: hidden;
   }
 
   /* Bottom nav tampil */
@@ -684,22 +698,32 @@ tbody tr:hover td { background: #f8f7f3; }
 
   /* Stat card lebih kecil */
   .stat-num { font-size: 1.5rem; }
-  .stat-card { padding: .875rem 1rem; }
+  .stat-card { padding: .75rem .875rem; }
+  .stat-card::after { width: 40px; height: 40px; }
 
   /* Cards padding kecil */
-  .card { padding: 1rem; border-radius: 12px; }
+  .card { padding: .875rem; border-radius: 12px; margin-bottom: .75rem; }
+  .card-header { flex-direction: column; align-items: flex-start; }
 
-  /* Toast ke bawah (di atas bottom nav) */
-  .toast-container { bottom: 72px; right: .75rem; left: .75rem; align-items: stretch; }
-  .toast { max-width: 100%; }
+  /* Toast di atas bottom nav */
+  .toast-container { bottom: 68px; right: .75rem; left: .75rem; align-items: stretch; }
+  .toast { max-width: 100%; font-size: 12px; }
 
-  /* Action buttons wrap */
-  .action-btns { gap: 4px; }
+  /* Action buttons */
+  .action-btns { gap: 3px; flex-wrap: wrap; }
+  .action-btns .btn-sm { padding: 4px 7px; font-size: 11px; }
 
-  /* Tabel bisa scroll horizontal */
-  .tbl-wrap { border-radius: 10px; }
+  /* Tabel scroll horizontal dalam kontainernya */
+  .tbl-wrap {
+    border-radius: 10px;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+  table { min-width: 0; }
+  thead th { white-space: nowrap; font-size: 11px; padding: 8px 10px; }
+  tbody td  { font-size: 12px; padding: 8px 10px; }
 
-  /* Sembunyikan kolom tidak penting di tabel */
+  /* Sembunyikan kolom tidak penting */
   .hide-mobile { display: none !important; }
 
   /* Modal full bottom sheet di mobile */
@@ -714,6 +738,16 @@ tbody tr:hover td { background: #f8f7f3; }
     animation: slideUpSheet .3s cubic-bezier(.4,0,.2,1);
   }
   @keyframes slideUpSheet { from { transform: translateY(100%); } }
+
+  /* Inline grids dari HTML */
+  [style*="grid-template-columns: 1fr 1fr"],
+  [style*="grid-template-columns:1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
+  [style*="grid-template-columns: repeat(2"],
+  [style*="grid-template-columns:repeat(2"] {
+    grid-template-columns: 1fr 1fr !important;
+  }
 }
 
 /* ══════════════════════════════════════════════════
