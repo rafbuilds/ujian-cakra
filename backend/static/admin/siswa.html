@@ -5,6 +5,25 @@
     <meta name="viewport" content="width=device-width,initial-scale=1.0" />
     <title>Data Siswa — Admin</title>
     <link rel="stylesheet" href="../style.css" />
+    <style>
+      .filter-bar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:.875rem; }
+      .filter-bar select, .filter-bar input { font-size:13px; }
+
+      .badge { display:inline-flex; align-items:center; gap:4px; padding:3px 10px;
+        border-radius:20px; font-size:11px; font-weight:600; white-space:nowrap; }
+      .badge-green  { background:#eaf3de; color:#3b6d11; }
+      .badge-gray   { background:#f3f4f6; color:#6b7280; }
+      .badge-amber  { background:#fff3cd; color:#856404; }
+      .badge-red    { background:#fde8e8; color:#b91c1c; }
+      .badge-blue   { background:#e6f1fb; color:#185fa5; }
+
+      .action-cell { display:flex; gap:5px; flex-wrap:nowrap; align-items:center; }
+
+      tr:hover { background:#f9fafb; }
+
+      .stat-row { display:grid; grid-template-columns:repeat(4,1fr); gap:.75rem; margin-bottom:1rem; }
+      @media(max-width:700px){ .stat-row{ grid-template-columns:repeat(2,1fr); } }
+    </style>
   </head>
   <body>
     <div class="app-shell">
@@ -15,58 +34,33 @@
         </div>
         <div class="sb-nav">
           <div class="sb-section">MENU</div>
-          <a href="dashboard.html" class="sb-item" id="nav-dashboard"
-            ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path
-                d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"
-                stroke-linecap="round"
-              />
-              <polyline
-                points="9 22 9 12 15 12 15 22"
-                stroke-linecap="round"
-              /></svg
-            >Dashboard</a
-          >
-          <a href="siswa.html" class="sb-item active"
-            ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path
-                d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"
-                stroke-linecap="round"
-              />
-              <circle cx="9" cy="7" r="4" /></svg
-            >Data Siswa</a
-          >
-          <a href="rooms.html" class="sb-item"
-            ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path
-                d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"
-                stroke-linecap="round"
-              />
-              <path
-                d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"
-                stroke-linecap="round"
-              /></svg
-            >Room Ujian</a
-          >
-          <a href="settings.html" class="sb-item"
-            ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <circle cx="12" cy="12" r="3" />
-              <path
-                d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"
-                stroke-linecap="round"
-              /></svg
-            >Pengaturan</a
-          >
+          <a href="dashboard.html" class="sb-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" stroke-linecap="round"/>
+              <polyline points="9 22 9 12 15 12 15 22" stroke-linecap="round"/>
+            </svg>Dashboard
+          </a>
+          <a href="siswa.html" class="sb-item active">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke-linecap="round"/>
+              <circle cx="9" cy="7" r="4"/>
+            </svg>Data Siswa
+          </a>
+          <a href="rooms.html" class="sb-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke-linecap="round"/>
+              <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke-linecap="round"/>
+            </svg>Room Ujian
+          </a>
+          <a href="settings.html" class="sb-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" stroke-linecap="round"/>
+            </svg>Pengaturan
+          </a>
         </div>
         <div class="sb-user">
-          <div
-            style="
-              display: flex;
-              align-items: center;
-              gap: 8px;
-              margin-bottom: 8px;
-            "
-          >
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
             <div class="sb-avatar" id="sb-avatar">A</div>
             <div>
               <div class="sb-user-name" id="sb-user-name">Admin</div>
@@ -76,162 +70,90 @@
           <button class="sb-logout" onclick="Auth.logout()">⏻ Keluar</button>
         </div>
       </nav>
+
       <div class="main-wrap">
         <div class="topbar">
           <div class="topbar-title">Data Siswa</div>
           <div class="topbar-right" style="gap:6px">
-            <!-- Export dropdown -->
-            <div style="position:relative;display:inline-block" id="export-wrap">
-              <button class="btn btn-secondary btn-sm" onclick="toggleExportMenu()">⬇ Export ▾</button>
-              <div id="export-menu" style="display:none;position:absolute;right:0;top:110%;background:#fff;border:.5px solid var(--border);border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:100;min-width:180px;padding:4px 0">
-                <div onclick="exportSiswa('')"         style="padding:8px 14px;font-size:13px;cursor:pointer">📋 Semua Siswa</div>
-                <div onclick="exportSiswa('?grade=10')" style="padding:8px 14px;font-size:13px;cursor:pointer">🎓 Kelas 10 saja</div>
-                <div onclick="exportSiswa('?grade=11')" style="padding:8px 14px;font-size:13px;cursor:pointer">🎓 Kelas 11 saja</div>
-                <div onclick="exportSiswa('?grade=12')" style="padding:8px 14px;font-size:13px;cursor:pointer">🎓 Kelas 12 saja</div>
-                <div id="export-kelas-item" onclick="exportByKelas()" style="padding:8px 14px;font-size:13px;cursor:pointer;display:none">📂 Kelas dipilih</div>
-              </div>
-            </div>
-            <button class="btn btn-secondary btn-sm" onclick="downloadTemplate()">📄 Template</button>
-            <button class="btn btn-primary btn-sm" onclick="document.getElementById('imp').click()">⬆ Import</button>
+            <button class="btn btn-secondary btn-sm" onclick="downloadTemplate()" title="Download template import">📄 Template</button>
+            <button class="btn btn-secondary btn-sm" onclick="document.getElementById('imp').click()" title="Import dari Excel atau Word">⬆ Import</button>
+            <button class="btn btn-primary btn-sm" onclick="exportSiswa()" title="Export sesuai filter aktif">⬇ Export</button>
             <input type="file" id="imp" accept=".xlsx,.xls,.docx" style="display:none" onchange="importSiswa(this)" />
           </div>
         </div>
+
         <div class="page-main">
-          <!-- Filter -->
-          <div
-            style="
-              display: flex;
-              gap: 8px;
-              margin-bottom: 0.875rem;
-              flex-wrap: wrap;
-            "
-          >
-            <select
-              id="fg"
-              onchange="load()"
-              class="form-control"
-              style="width: auto"
-            >
+
+          <!-- Stat cards -->
+          <div class="stat-row" id="stat-row">
+            <div class="stat-card"><div class="stat-num" id="st-total">—</div><div class="stat-label">Total Siswa</div></div>
+            <div class="stat-card"><div class="stat-num" id="st-device" style="color:var(--green)">—</div><div class="stat-label">Device Terdaftar</div></div>
+            <div class="stat-card"><div class="stat-num" id="st-login" style="color:#3b82f6">—</div><div class="stat-label">Pernah Login</div></div>
+            <div class="stat-card"><div class="stat-num" id="st-inactive" style="color:#ef4444">—</div><div class="stat-label">Nonaktif</div></div>
+          </div>
+
+          <!-- Filter bar -->
+          <div class="filter-bar">
+            <select id="fg" onchange="onFilterChange()" class="form-control" style="width:auto">
               <option value="">Semua Tingkat</option>
               <option value="10">Kelas 10</option>
               <option value="11">Kelas 11</option>
               <option value="12">Kelas 12</option>
             </select>
-            <select
-              id="fc"
-              onchange="load()"
-              class="form-control"
-              style="width: auto"
-            >
+            <select id="fc" onchange="onFilterChange()" class="form-control" style="width:auto">
               <option value="">Semua Kelas</option>
             </select>
-            <input
-              id="fs"
-              type="text"
-              placeholder="🔍 Cari nama..."
-              oninput="load()"
-              style="
-                flex: 1;
-                max-width: 280px;
-                padding: 8px 12px;
-                border: 1px solid var(--border2);
-                border-radius: 8px;
-                font-size: 13px;
-              "
-            />
-            <div
-              style="
-                margin-left: auto;
-                font-size: 13px;
-                color: var(--muted);
-                align-self: center;
-              "
-              id="info"
-            ></div>
+            <select id="fd" onchange="onFilterChange()" class="form-control" style="width:auto">
+              <option value="">Semua Device</option>
+              <option value="yes">✓ Ada Device</option>
+              <option value="no">✗ Belum Ada</option>
+            </select>
+            <input id="fs" type="text" placeholder="🔍 Cari nama atau NISN..."
+              oninput="onFilterChange()"
+              style="flex:1;max-width:260px;padding:8px 12px;border:1px solid var(--border2);border-radius:8px;font-size:13px" />
+            <div id="filter-info" style="margin-left:auto;font-size:13px;color:var(--muted);align-self:center"></div>
           </div>
 
-          <div class="card" style="padding: 0; overflow: hidden">
+          <!-- Table -->
+          <div class="card" style="padding:0;overflow:hidden">
             <div class="tbl-wrap">
               <table>
                 <thead>
                   <tr>
-                    <th>#</th>
+                    <th style="width:36px">#</th>
                     <th>Nama Siswa</th>
                     <th>NISN</th>
                     <th>Kelas</th>
-                    <th>Device</th>
-                    <th>Kode HP</th>
-                    <th>Status</th>
-                    <th>Aksi</th>
+                    <th style="text-align:center">Device</th>
+                    <th>Login Terakhir</th>
+                    <th style="text-align:center">Status</th>
+                    <th style="text-align:center">Aksi</th>
                   </tr>
                 </thead>
                 <tbody id="tbody"></tbody>
               </table>
             </div>
           </div>
+
         </div>
       </div>
     </div>
 
     <!-- Modal Edit -->
-    <div
-      id="modal-edit"
-      style="
-        display: none;
-        position: fixed;
-        inset: 0;
-        background: rgba(0, 0, 0, 0.5);
-        z-index: 200;
-        align-items: center;
-        justify-content: center;
-        padding: 1rem;
-        backdrop-filter: blur(4px);
-      "
-    >
-      <div
-        style="
-          background: #fff;
-          border-radius: 18px;
-          padding: 2rem;
-          max-width: 440px;
-          width: 100%;
-        "
-      >
-        <div
-          style="
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1.25rem;
-          "
-        >
-          <div style="font-weight: 700; font-size: 18px; color: var(--green)">
-            Edit Data Siswa
-          </div>
-          <button
-            onclick="closeEdit()"
-            style="
-              background: none;
-              border: none;
-              font-size: 22px;
-              cursor: pointer;
-            "
-          >
-            ✕
-          </button>
+    <div id="modal-edit" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:center;justify-content:center;padding:1rem;backdrop-filter:blur(4px)">
+      <div style="background:#fff;border-radius:18px;padding:2rem;max-width:440px;width:100%">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem">
+          <div style="font-weight:700;font-size:18px;color:var(--green)">✏️ Edit Data Siswa</div>
+          <button onclick="closeEdit()" style="background:none;border:none;font-size:22px;cursor:pointer">✕</button>
         </div>
         <input type="hidden" id="edit-id" />
         <div class="form-group">
-          <label>Nama Lengkap</label
-          ><input class="form-control" id="edit-name" />
+          <label>Nama Lengkap</label>
+          <input class="form-control" id="edit-name" placeholder="Nama lengkap siswa" />
         </div>
         <div class="form-group">
-          <label>NISN</label
-          ><input
-            class="form-control"
-            id="edit-nisn"
-            placeholder="Nomor Induk Siswa"
-          />
+          <label>NISN</label>
+          <input class="form-control" id="edit-nisn" placeholder="Nomor Induk Siswa Nasional" />
         </div>
         <div class="form-group">
           <label>Kelas</label>
@@ -239,17 +161,16 @@
             <option value="">— Pilih kelas —</option>
           </select>
         </div>
-        <div style="display: flex; gap: 10px; margin-top: 1rem">
-          <button
-            class="btn btn-secondary"
-            style="flex: 1"
-            onclick="closeEdit()"
-          >
-            Batal
-          </button>
-          <button class="btn btn-primary" style="flex: 1" onclick="saveSiswa()">
-            💾 Simpan
-          </button>
+        <div class="form-group">
+          <label>Status Akun</label>
+          <select class="form-control" id="edit-active">
+            <option value="true">Aktif</option>
+            <option value="false">Nonaktif</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:1.25rem">
+          <button class="btn btn-secondary" style="flex:1" onclick="closeEdit()">Batal</button>
+          <button class="btn btn-primary" style="flex:1" onclick="saveSiswa()">💾 Simpan</button>
         </div>
       </div>
     </div>
@@ -259,137 +180,152 @@
     <script src="../components/auth.js"></script>
     <script src="../components/common.js"></script>
     <script>
-      if (!Auth.requireRole(["admin"])) throw new Error();
+      if (!Auth.requireRole(['admin'])) throw new Error();
       UI.initSidebar();
-      let allKelas = [];
+
+      let allKelas = [], _data = [];
 
       async function init() {
-        allKelas = await API.get("/api/classes");
-        const sel = document.getElementById("fc");
-        sel.innerHTML =
-          '<option value="">Semua Kelas</option>' +
-          allKelas
-            .map((k) => `<option value="${k.id}">${k.name}</option>`)
-            .join("");
-        document.getElementById("edit-class").innerHTML =
-          '<option value="">— Pilih kelas —</option>' +
-          allKelas
-            .map((k) => `<option value="${k.id}">${k.name}</option>`)
-            .join("");
+        allKelas = await API.get('/api/classes');
+        const selF = document.getElementById('fc');
+        const selE = document.getElementById('edit-class');
+        const opts = allKelas.map(k => `<option value="${k.id}">${k.name}</option>`).join('');
+        selF.innerHTML = '<option value="">Semua Kelas</option>' + opts;
+        selE.innerHTML = '<option value="">— Pilih kelas —</option>' + opts;
         load();
       }
+
+      function onFilterChange() { load(); }
 
       async function load() {
-        const grade = document.getElementById("fg").value;
-        const cls = document.getElementById("fc").value;
-        const search = document.getElementById("fs").value;
-        const tbody = document.getElementById("tbody");
-        tbody.innerHTML =
-          '<tr><td colspan="8" style="text-align:center;padding:2rem"><div class="loading-spinner" style="margin:auto"></div></td></tr>';
+        const grade  = document.getElementById('fg').value;
+        const cls    = document.getElementById('fc').value;
+        const search = document.getElementById('fs').value;
+        const tbody  = document.getElementById('tbody');
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:2rem"><div class="loading-spinner" style="margin:auto"></div></td></tr>';
         try {
-          const p = new URLSearchParams({
-            grade,
-            class_id: cls,
-            search,
-            per_page: 100,
-          });
-          const r = await API.get("/api/admin/siswa?" + p);
-          const data = r.data || r || [];
-          document.getElementById("info").textContent = data.length + " siswa";
-          if (!data.length) {
-            tbody.innerHTML =
-              '<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--muted)">Tidak ada siswa</td></tr>';
+          const p = new URLSearchParams({ grade, class_id: cls, search, per_page: 200 });
+          const r = await API.get('/api/admin/siswa?' + p);
+          _data = r.data || r || [];
+
+          // Device filter (client-side)
+          const devF = document.getElementById('fd').value;
+          let filtered = _data;
+          if (devF === 'yes') filtered = _data.filter(s => s.device_id);
+          if (devF === 'no')  filtered = _data.filter(s => !s.device_id);
+
+          // Update stat cards
+          document.getElementById('st-total').textContent    = filtered.length;
+          document.getElementById('st-device').textContent   = filtered.filter(s => s.device_id).length;
+          document.getElementById('st-login').textContent    = filtered.filter(s => s.last_login).length;
+          document.getElementById('st-inactive').textContent = filtered.filter(s => !s.is_active).length;
+
+          // Label filter
+          const parts = [];
+          if (grade) parts.push('Kelas ' + grade);
+          const kelasObj = allKelas.find(k => k.id === cls);
+          if (kelasObj) parts.push(kelasObj.name);
+          if (search) parts.push('"' + search + '"');
+          document.getElementById('filter-info').textContent = filtered.length + ' siswa' + (parts.length ? ' · ' + parts.join(', ') : '');
+
+          if (!filtered.length) {
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--muted)">Tidak ada siswa ditemukan</td></tr>';
             return;
           }
-          tbody.innerHTML = data
-            .map(
-              (s, i) => `<tr>
-      <td>${i + 1}</td>
-      <td><div style="font-weight:500">${s.name || ""}</div><div style="font-size:11px;color:var(--muted)">${s.email || ""}</div></td>
-      <td style="font-size:12px">${s.nisn || "—"}</td>
-      <td>${s.class_name || "—"}</td>
-      <td>${s.device_id
-        ? '<span style="background:#eaf3de;color:#3b6d11;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600">✓ Terdaftar</span>'
-        : '<span style="background:var(--light);color:var(--muted);padding:2px 8px;border-radius:20px;font-size:11px">Belum</span>'
-      }</td>
-      <td><span style="background:${s.last_login ? "#eaf3de" : "var(--light)"};color:${s.last_login ? "#3b6d11" : "var(--muted)"};padding:2px 8px;border-radius:20px;font-size:11px">${s.last_login ? UI.fmtDate(s.last_login) : "Belum"}</span></td>
-      <td>
-        <div class="action-btns">
-          <button class="btn btn-secondary btn-sm" onclick='openEdit(${JSON.stringify(s)})'>✏️ Edit</button>
-          <button class="btn btn-secondary btn-sm" onclick="resetDev('${s.id}','${(s.name || "").replace(/'/g, "\\'")}')" ${!s.device_id ? 'style="opacity:.45" title="Belum ada device"' : ""}>📱 Reset HP</button>
-          <button class="btn btn-danger btn-sm" onclick="delSiswa('${s.id}','${(s.name || "").replace(/'/g, "\\'")}')">🗑 Hapus</button>
-        </div>
-      </td>
-    </tr>`,
-            )
-            .join("");
-        } catch {
-          tbody.innerHTML =
-            '<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--red2)">Gagal memuat</td></tr>';
+
+          tbody.innerHTML = filtered.map((s, i) => {
+            const deviceBadge = s.device_id
+              ? `<span class="badge badge-green">✓ Terdaftar</span>`
+              : `<span class="badge badge-gray">Belum</span>`;
+            const activeBadge = s.is_active
+              ? `<span class="badge badge-blue" style="cursor:pointer" onclick="toggleAktif('${s.id}',false)" title="Klik untuk nonaktifkan">Aktif</span>`
+              : `<span class="badge badge-red" style="cursor:pointer" onclick="toggleAktif('${s.id}',true)" title="Klik untuk aktifkan">Nonaktif</span>`;
+            const resetBtn = s.device_id
+              ? `<button class="btn btn-secondary btn-sm" onclick="resetDev('${s.id}','${esc(s.name)}')" title="Reset perangkat HP">📱 Reset HP</button>`
+              : `<button class="btn btn-secondary btn-sm" style="opacity:.4;cursor:not-allowed" disabled title="Belum ada device terdaftar">📱 Reset HP</button>`;
+            return `<tr>
+              <td style="color:var(--muted)">${i + 1}</td>
+              <td>
+                <div style="font-weight:500;font-size:13px">${s.name || ''}</div>
+                <div style="font-size:11px;color:var(--muted)">${s.email || ''}</div>
+              </td>
+              <td style="font-size:12px;color:var(--muted)">${s.nisn || '—'}</td>
+              <td><span class="badge badge-gray">${s.class_name || '—'}</span></td>
+              <td style="text-align:center">${deviceBadge}</td>
+              <td style="font-size:12px;color:var(--muted)">${s.last_login ? UI.fmtDate(s.last_login) : '—'}</td>
+              <td style="text-align:center">${activeBadge}</td>
+              <td>
+                <div class="action-cell">
+                  <button class="btn btn-secondary btn-sm" onclick='openEdit(${JSON.stringify(s)})'>✏️ Edit</button>
+                  ${resetBtn}
+                  <button class="btn btn-danger btn-sm" onclick="delSiswa('${s.id}','${esc(s.name)}')">🗑</button>
+                </div>
+              </td>
+            </tr>`;
+          }).join('');
+        } catch(e) {
+          tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--red2)">Gagal memuat data</td></tr>';
         }
       }
 
+      function esc(s) { return (s || '').replace(/'/g, "\\'"); }
+
+      // ── Edit ────────────────────────────────────────────────────
       function openEdit(s) {
-        document.getElementById("edit-id").value = s.id;
-        document.getElementById("edit-name").value = s.name || "";
-        document.getElementById("edit-nisn").value = s.nisn || "";
-        document.getElementById("edit-class").value = s.class_id || "";
-        document.getElementById("modal-edit").style.display = "flex";
+        document.getElementById('edit-id').value     = s.id;
+        document.getElementById('edit-name').value   = s.name   || '';
+        document.getElementById('edit-nisn').value   = s.nisn   || '';
+        document.getElementById('edit-class').value  = s.class_id || '';
+        document.getElementById('edit-active').value = s.is_active ? 'true' : 'false';
+        document.getElementById('modal-edit').style.display = 'flex';
       }
-      function closeEdit() {
-        document.getElementById("modal-edit").style.display = "none";
-      }
+      function closeEdit() { document.getElementById('modal-edit').style.display = 'none'; }
 
       async function saveSiswa() {
-        const id = document.getElementById("edit-id").value;
-        const name = document.getElementById("edit-name").value.trim();
-        if (!name) {
-          UI.toast("Nama tidak boleh kosong", "warn");
-          return;
-        }
-        await API.patch("/api/admin/siswa/" + id, {
+        const id = document.getElementById('edit-id').value;
+        const name = document.getElementById('edit-name').value.trim();
+        if (!name) { UI.toast('Nama tidak boleh kosong', 'warn'); return; }
+        await API.patch('/api/admin/siswa/' + id, {
           name,
-          nisn: document.getElementById("edit-nisn").value.trim(),
-          class_id: document.getElementById("edit-class").value || null,
+          nisn:      document.getElementById('edit-nisn').value.trim() || null,
+          class_id:  document.getElementById('edit-class').value || null,
+          is_active: document.getElementById('edit-active').value === 'true',
         });
-        UI.toast("✅ Data diperbarui", "success");
-        closeEdit();
+        UI.toast('✅ Data diperbarui', 'success');
+        closeEdit(); load();
+      }
+
+      // ── Toggle aktif/nonaktif ────────────────────────────────────
+      async function toggleAktif(id, aktif) {
+        await API.patch('/api/admin/siswa/' + id, { is_active: aktif });
+        UI.toast(aktif ? '✅ Akun diaktifkan' : 'Akun dinonaktifkan', 'success');
         load();
       }
 
-      async function resetDev(id, name, deviceId) {
-        const kode = deviceId
-          ? '<br><small style="font-family:monospace;color:var(--muted)">Kode: ' +
-            deviceId +
-            "</small>"
-          : "";
-        UI.confirm(
-          "Reset Device HP",
-          "Reset HP <strong>" +
-            name +
-            "</strong>?" +
-            kode +
-            "<br><br>Siswa harus login ulang dari HP baru.",
+      // ── Reset Device ────────────────────────────────────────────
+      async function resetDev(id, name) {
+        UI.confirm('Reset Device HP',
+          'Reset HP <strong>' + name + '</strong>?<br><small style="color:var(--muted)">Siswa harus login ulang dari HP baru.</small>',
           async () => {
-            await API.post("/api/admin/siswa/" + id + "/reset-device");
-            UI.toast("✅ Device " + name + " direset", "success");
+            await API.post('/api/admin/siswa/' + id + '/reset-device');
+            UI.toast('✅ Device ' + name + ' direset', 'success');
             load();
-          },
-        );
+          });
       }
+
+      // ── Hapus ───────────────────────────────────────────────────
       async function delSiswa(id, name) {
-        UI.confirm(
-          "Hapus Siswa",
-          "Hapus <strong>" + name + "</strong>?",
+        UI.confirm('Hapus Siswa', 'Hapus <strong>' + name + '</strong>? Data ujiannya tetap tersimpan.',
           async () => {
-            await API.del("/api/admin/siswa/" + id);
-            UI.toast("Siswa dihapus", "success");
+            await API.del('/api/admin/siswa/' + id);
+            UI.toast('Siswa dihapus', 'success');
             load();
-          },
-        );
+          });
       }
+
+      // ── Template & Import ───────────────────────────────────────
       async function downloadTemplate() {
-        await API.download("/api/admin/siswa/template", "template_siswa.xlsx");
+        await API.download('/api/admin/siswa/template', 'template_siswa.xlsx');
       }
 
       async function importSiswa(input) {
@@ -407,7 +343,7 @@
           const r = await API.upload('/api/admin/siswa/import', fd);
           UI.toast('✅ Berhasil import ' + (r.imported || 0) + ' siswa', 'success');
           load();
-        } catch (e) {
+        } catch(e) {
           UI.toast(e.error || 'Gagal import', 'error');
         } finally {
           UI.loading(false);
@@ -415,36 +351,22 @@
         }
       }
 
-      // ── Export ──────────────────────────────────────────────────
-      function toggleExportMenu() {
-        const m = document.getElementById('export-menu');
-        m.style.display = m.style.display === 'none' ? 'block' : 'none';
-        if (m.style.display === 'block') {
-          // Tampilkan opsi kelas jika kelas tertentu dipilih di filter
-          const cls = document.getElementById('fc').value;
-          document.getElementById('export-kelas-item').style.display = cls ? 'block' : 'none';
-        }
-      }
-      document.addEventListener('click', e => {
-        if (!document.getElementById('export-wrap').contains(e.target))
-          document.getElementById('export-menu').style.display = 'none';
-      });
+      // ── Export — mengikuti filter aktif ─────────────────────────
+      async function exportSiswa() {
+        const grade  = document.getElementById('fg').value;
+        const cls    = document.getElementById('fc').value;
+        const params = new URLSearchParams();
+        if (grade) params.set('grade', grade);
+        if (cls)   params.set('class_id', cls);
+        const q = params.toString() ? '?' + params.toString() : '';
 
-      async function exportSiswa(query) {
-        document.getElementById('export-menu').style.display = 'none';
+        const kelasObj = allKelas.find(k => k.id === cls);
+        const label = cls ? kelasObj?.name : grade ? 'Kelas_' + grade : 'Semua';
         UI.loading(true, 'Menyiapkan export...');
         try {
-          await API.download('/api/admin/siswa/export' + (query || ''), 'data_siswa.xlsx');
+          await API.download('/api/admin/siswa/export' + q, 'data_siswa_' + label + '.xlsx');
         } catch(e) { UI.toast('Gagal export', 'error'); }
         finally { UI.loading(false); }
-      }
-      async function exportByKelas() {
-        const cls = document.getElementById('fc').value;
-        const grade = document.getElementById('fg').value;
-        let q = '';
-        if (cls)   q = '?class_id=' + cls;
-        else if (grade) q = '?grade=' + grade;
-        await exportSiswa(q);
       }
 
       init();
