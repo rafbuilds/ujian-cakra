@@ -1157,11 +1157,14 @@
             // Daftarkan device otomatis saat login
             try {
               const fp = _deviceFingerprint();
-              await apiFetch("/api/student/register-device", "POST", {
-                device_id: fp,
-                device_info: navigator.userAgent.substring(0, 250),
+              await apiFetch("/api/student/register-device", {
+                method: "POST",
+                body: JSON.stringify({
+                  device_id: fp,
+                  device_info: navigator.userAgent.substring(0, 250),
+                }),
               });
-            } catch (_) { /* silent — mungkin device berbeda, biarkan server tolak */ }
+            } catch (_) { /* silent — device berbeda, server tolak */ }
 
             await loadExams();
             page = "list";
