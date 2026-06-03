@@ -353,6 +353,7 @@ def get_room_detail(room_id):
         JOIN room_classes rc ON rc.class_id=c.id
         WHERE rc.room_id=%s ORDER BY c.grade, LENGTH(c.id), c.id
     """, (room_id,))
+    # Tampilkan semua ujian dari guru anggota room (bukan hanya yang punya room_id)
     exams = query("""
         SELECT e.*, u.name as teacher_name, s.name as subject_name,
                (SELECT COUNT(*) FROM questions q WHERE q.exam_id=e.id) as question_count,
@@ -362,7 +363,10 @@ def get_room_detail(room_id):
         FROM exams e
         JOIN users u ON u.id=e.teacher_id
         LEFT JOIN subjects s ON s.id=e.subject_id
-        WHERE e.room_id=%s ORDER BY e.created_at DESC
+        WHERE e.teacher_id IN (
+            SELECT teacher_id FROM room_teachers WHERE room_id=%s
+        )
+        ORDER BY u.name, e.created_at DESC
     """, (room_id,))
     return jsonify({
         **dict(room),

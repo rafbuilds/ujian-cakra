@@ -916,7 +916,6 @@
               ${SB[e.status] || e.status}
             </div>
             <div style="display:flex;gap:4px;flex-wrap:wrap">
-              <button class="btn btn-secondary btn-sm" onclick="viewSoal('${e.id}')"    style="font-size:11px;padding:3px 8px">👁 Soal</button>
               <button class="btn btn-secondary btn-sm" onclick="viewNilai('${e.id}')"   style="font-size:11px;padding:3px 8px">📊 Nilai</button>
               <button class="btn btn-secondary btn-sm" onclick="viewMonitor('${e.id}')" style="font-size:11px;padding:3px 8px">🖥 Monitor</button>
               ${e.status === 'draft' ? `<button class="btn btn-primary btn-sm" onclick="publishExam('${e.id}')" style="font-size:11px;padding:3px 8px">✅ Publish</button>` : ''}
@@ -1310,7 +1309,6 @@
       <td style="text-align:center"><span style="background:var(--green4);color:var(--green);padding:2px 8px;border-radius:6px;font-size:12px;font-weight:700">${e.question_count || 0}</span></td>
       <td>${STATUS_BADGE[e.status] || e.status}</td>
       <td><div class="action-btns">
-        <button class="btn btn-secondary btn-sm" onclick="viewSoal('${e.id}')">👁 Soal</button>
         <button class="btn btn-secondary btn-sm" onclick="viewNilai('${e.id}')">📊 Nilai</button>
         ${["published", "ongoing"].includes(e.status) ? `<button class="btn btn-secondary btn-sm" onclick="viewMonitor('${e.id}')">🖥 Monitor</button>` : ""}
         ${e.status === "draft" ? `<button class="btn btn-primary btn-sm" onclick="pubUjian('${e.id}')">✅ Publish</button>` : ""}
