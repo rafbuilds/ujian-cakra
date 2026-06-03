@@ -10,11 +10,18 @@ admin_bp = Blueprint('admin', __name__)
 @admin_bp.route('/api/admin/users', methods=['GET'])
 @require_admin
 def get_users():
-    rows = query("""
-        SELECT id, email, name, role, avatar_url, last_login, device_id, created_at,
-               (password_hash IS NOT NULL AND password_hash != '') AS has_password
-        FROM users ORDER BY role, name
-    """)
+    try:
+        rows = query("""
+            SELECT id, email, name, role, avatar_url, last_login, device_id, created_at,
+                   (password_hash IS NOT NULL AND password_hash != '') AS has_password
+            FROM users ORDER BY role, name
+        """)
+    except Exception:
+        # Fallback jika kolom password_hash belum ada (migration belum dijalankan)
+        rows = query("""
+            SELECT id, email, name, role, avatar_url, last_login, device_id, created_at
+            FROM users ORDER BY role, name
+        """)
     return jsonify([dict(r) for r in rows])
 
 @admin_bp.route('/api/admin/users/<user_id>', methods=['PATCH'])
