@@ -6,10 +6,21 @@
     <title>Pengaturan — Admin</title>
     <link rel="stylesheet" href="../style.css" />
     <style>
-      .settings-tabs { display:flex; gap:0; border-bottom:1px solid var(--border); margin-bottom:1.25rem; }
-      .stab { padding:.625rem 1.25rem; font-size:13px; font-weight:600; border:none;
+      .settings-tabs {
+        display:flex; gap:0;
+        border-bottom:1px solid var(--border);
+        margin-bottom:1.25rem;
+        overflow-x:auto;
+        -webkit-overflow-scrolling:touch;
+        scrollbar-width:none;
+      }
+      .settings-tabs::-webkit-scrollbar { display:none; }
+      .stab {
+        padding:.625rem 1rem; font-size:13px; font-weight:600; border:none;
         background:none; cursor:pointer; color:var(--muted);
-        border-bottom:2px solid transparent; transition:all .15s; }
+        border-bottom:2px solid transparent; transition:all .15s;
+        white-space:nowrap; flex-shrink:0;
+      }
       .stab.active { color:var(--green); border-bottom-color:var(--green); }
       .stab-content { display:none; }
       .stab-content.active { display:block; }
@@ -38,11 +49,42 @@
       .stat-mini-label { font-size:11px; color:var(--muted); margin-top:2px; }
 
       .user-row { display:flex; align-items:center; gap:10px; padding:.625rem 0;
-        border-bottom:.5px solid var(--border); }
+        border-bottom:.5px solid var(--border); flex-wrap:wrap; }
       .user-row:last-child { border-bottom:none; }
       .avatar { width:36px; height:36px; border-radius:50%; display:flex;
         align-items:center; justify-content:center; color:#fff; font-weight:700;
         font-size:14px; flex-shrink:0; }
+
+      @media(max-width:768px) {
+        /* Stat cards 3 kolom tetap tapi lebih kecil */
+        .stat-mini { gap:.5rem; }
+        .stat-mini-card { padding:.625rem .75rem; min-width:80px; }
+        .stat-mini-num { font-size:20px; }
+
+        /* Form tambah user: 1 kolom */
+        .ctrl-card > div[style*="grid-template-columns:1fr 1fr"] {
+          grid-template-columns:1fr !important;
+        }
+
+        /* User row: info + badge kiri, tombol kanan full-width */
+        .user-row { gap:8px; }
+        .user-row > div:last-child { margin-left:auto; }
+
+        /* Ctrl row wrap */
+        .ctrl-row { flex-wrap:wrap; gap:8px; }
+        .ctrl-row > button { flex-shrink:0; }
+
+        /* Tabel pengaturan */
+        thead th { font-size:10px; padding:8px; }
+        tbody td  { font-size:11px; padding:8px; }
+      }
+
+      @media(max-width:480px) {
+        .stat-mini { grid-template-columns:repeat(3,1fr); display:grid; }
+        .stat-mini-card { min-width:0; }
+        .stab { font-size:11px; padding:.5rem .75rem; }
+        .form-grid-new-user { grid-template-columns:1fr !important; }
+      }
     </style>
   </head>
   <body>
@@ -115,7 +157,7 @@
             <!-- Form tambah guru/admin -->
             <div class="ctrl-card" style="margin-bottom:.75rem">
               <div style="font-weight:600;font-size:14px;margin-bottom:1rem">➕ Tambah Guru / Admin Baru</div>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:.625rem">
+              <div class="form-grid-new-user" style="display:grid;grid-template-columns:1fr 1fr;gap:.625rem">
                 <div class="form-group" style="margin:0">
                   <label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">Nama Lengkap *</label>
                   <input id="new-name" class="form-control" placeholder="Nama lengkap" />
