@@ -533,6 +533,44 @@
       </div>
     </div>
 
+    <!-- Modal Nilai -->
+    <div id="modal-nilai" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:400;align-items:center;justify-content:center;padding:1rem">
+      <div style="background:#fff;border-radius:16px;width:700px;max-width:97vw;max-height:90vh;display:flex;flex-direction:column;overflow:hidden">
+        <div style="background:linear-gradient(135deg,#0a3323,#1a6b4a);padding:1.25rem 1.5rem;display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+          <div>
+            <div id="mn-title" style="font-weight:700;font-size:16px;color:#fff"></div>
+            <div id="mn-subtitle" style="font-size:12px;color:rgba(255,255,255,.6);margin-top:2px"></div>
+          </div>
+          <button onclick="closeNilai()" style="background:rgba(255,255,255,.15);border:none;color:#fff;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:16px">✕</button>
+        </div>
+        <div style="display:flex;gap:.75rem;padding:.875rem 1.25rem;background:var(--light);border-bottom:.5px solid var(--border);flex-shrink:0">
+          <div style="text-align:center;flex:1"><div id="mn-total" style="font-size:1.4rem;font-weight:800">—</div><div style="font-size:11px;color:var(--muted)">Peserta</div></div>
+          <div style="text-align:center;flex:1"><div id="mn-avg"   style="font-size:1.4rem;font-weight:800;color:var(--green)">—</div><div style="font-size:11px;color:var(--muted)">Rata-rata</div></div>
+          <div style="text-align:center;flex:1"><div id="mn-pass"  style="font-size:1.4rem;font-weight:800;color:#3b82f6">—</div><div style="font-size:11px;color:var(--muted)">Lulus</div></div>
+          <div style="text-align:center;flex:1"><div id="mn-high"  style="font-size:1.4rem;font-weight:800;color:#f59e0b">—</div><div style="font-size:11px;color:var(--muted)">Tertinggi</div></div>
+          <div style="text-align:center;flex:1"><div id="mn-low"   style="font-size:1.4rem;font-weight:800;color:#ef4444">—</div><div style="font-size:11px;color:var(--muted)">Terendah</div></div>
+        </div>
+        <div style="overflow-y:auto;flex:1">
+          <table style="width:100%;border-collapse:collapse;font-size:13px">
+            <thead>
+              <tr style="background:var(--light);position:sticky;top:0">
+                <th style="padding:.5rem .875rem;text-align:left;font-size:11px;font-weight:700;color:var(--muted)">#</th>
+                <th style="padding:.5rem .875rem;text-align:left;font-size:11px;font-weight:700;color:var(--muted)">Nama</th>
+                <th style="padding:.5rem .875rem;text-align:left;font-size:11px;font-weight:700;color:var(--muted)">Kelas</th>
+                <th style="padding:.5rem .875rem;text-align:center;font-size:11px;font-weight:700;color:var(--muted)">Nilai</th>
+                <th style="padding:.5rem .875rem;text-align:center;font-size:11px;font-weight:700;color:var(--muted)">Benar</th>
+                <th style="padding:.5rem .875rem;text-align:center;font-size:11px;font-weight:700;color:var(--muted)">Salah</th>
+                <th style="padding:.5rem .875rem;text-align:center;font-size:11px;font-weight:700;color:var(--muted)">Kosong</th>
+                <th style="padding:.5rem .875rem;text-align:left;font-size:11px;font-weight:700;color:var(--muted)">Waktu Submit</th>
+              </tr>
+            </thead>
+            <tbody id="mn-tbody"></tbody>
+          </table>
+          <div id="mn-loading" style="text-align:center;padding:2rem"><div class="loading-spinner" style="margin:auto"></div></div>
+        </div>
+      </div>
+    </div>
+
     <!-- Modal Room -->
     <div
       id="modal-room"
@@ -983,13 +1021,75 @@
 
       // ── Exam actions ─────────────────────────────────────────────
       function viewSoal(id) {
-        window.open("admin_soal.html?id=" + id, "_blank");
-      }
-      function viewNilai(id) {
-        window.open("../guru/nilai.html?id=" + id, "_blank");
+        window.open('admin_soal.html?id=' + id, '_blank');
       }
       function viewMonitor(id) {
-        window.open("pengawas.html?id=" + id, "_blank");
+        window.open('pengawas.html?id=' + id, '_blank');
+      }
+
+      async function viewNilai(examId) {
+        // Tampilkan modal nilai tanpa pindah ke halaman guru
+        const modal = document.getElementById('modal-nilai');
+        modal.style.display = 'flex';
+        document.getElementById('mn-loading').style.display = 'block';
+        document.getElementById('mn-tbody').innerHTML = '';
+        document.getElementById('mn-title').textContent = 'Memuat...';
+        document.getElementById('mn-subtitle').textContent = '';
+        ['mn-total','mn-avg','mn-pass','mn-high','mn-low'].forEach(id => document.getElementById(id).textContent = '—');
+
+        try {
+          const data = await API.get('/api/exams/' + examId + '/results');
+          document.getElementById('mn-loading').style.display = 'none';
+
+          // Header info
+          document.getElementById('mn-title').textContent = data.exam?.title || 'Hasil Ujian';
+          document.getElementById('mn-subtitle').textContent =
+            (data.exam?.teacher_name || '') + ' · ' + (data.exam?.subject_name || '') +
+            ' · ' + (data.stats?.total || 0) + ' peserta';
+
+          // Stats
+          const s = data.stats || {};
+          const passing = 75;
+          const students = data.students || [];
+          const scores   = students.map(r => parseFloat(r.score || 0));
+          const passed   = scores.filter(v => v >= passing).length;
+          document.getElementById('mn-total').textContent = students.length;
+          document.getElementById('mn-avg').textContent   = scores.length ? (scores.reduce((a,b)=>a+b,0)/scores.length).toFixed(1) : '—';
+          document.getElementById('mn-pass').textContent  = passed + ' / ' + students.length;
+          document.getElementById('mn-high').textContent  = scores.length ? Math.max(...scores).toFixed(1) : '—';
+          document.getElementById('mn-low').textContent   = scores.length ? Math.min(...scores).toFixed(1) : '—';
+
+          // Tabel
+          if (!students.length) {
+            document.getElementById('mn-tbody').innerHTML =
+              '<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--muted)">Belum ada hasil</td></tr>';
+            return;
+          }
+          const sorted = [...students].sort((a,b) => (b.score||0)-(a.score||0));
+          document.getElementById('mn-tbody').innerHTML = sorted.map((r, i) => {
+            const score = parseFloat(r.score || 0);
+            const color = score >= 90 ? '#3b6d11' : score >= 75 ? '#185fa5' : score >= 60 ? '#856404' : '#b91c1c';
+            return `<tr style="border-bottom:.5px solid var(--border)">
+              <td style="padding:.5rem .875rem;color:var(--muted)">${i+1}</td>
+              <td style="padding:.5rem .875rem;font-weight:500">${r.name || '—'}</td>
+              <td style="padding:.5rem .875rem;color:var(--muted);font-size:12px">${r.class_name || '—'}</td>
+              <td style="padding:.5rem .875rem;text-align:center">
+                <span style="background:${color}22;color:${color};font-weight:700;padding:2px 10px;border-radius:20px">${score.toFixed(1)}</span>
+              </td>
+              <td style="padding:.5rem .875rem;text-align:center;color:#3b6d11;font-weight:600">${r.correct_count ?? '—'}</td>
+              <td style="padding:.5rem .875rem;text-align:center;color:#b91c1c">${r.wrong_count ?? '—'}</td>
+              <td style="padding:.5rem .875rem;text-align:center;color:var(--muted)">${r.empty_count ?? '—'}</td>
+              <td style="padding:.5rem .875rem;font-size:11px;color:var(--muted)">${r.submitted_at ? new Date(r.submitted_at).toLocaleString('id-ID') : 'Belum submit'}</td>
+            </tr>`;
+          }).join('');
+        } catch(e) {
+          document.getElementById('mn-loading').style.display = 'none';
+          document.getElementById('mn-tbody').innerHTML =
+            '<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--muted)">Gagal memuat hasil</td></tr>';
+        }
+      }
+      function closeNilai() {
+        document.getElementById('modal-nilai').style.display = 'none';
       }
 
       async function publishExam(id) {
