@@ -151,7 +151,6 @@
             <div class="stat-card green">
               <div class="stat-num" id="st-guru">—</div>
               <div class="stat-label">👨‍🏫 Guru Aktif</div>
-              <div class="stat-sub" id="st-guru-pending"></div>
             </div>
             <div class="stat-card blue">
               <div class="stat-num" id="st-siswa">—</div>
@@ -220,10 +219,6 @@
             <div class="card">
               <div class="section-title">👨‍🏫 Guru &amp; Admin</div>
               <div id="users-list"><div class="loading-spinner"></div></div>
-              <div id="pending-section" style="display:none;margin-top:1rem;padding-top:.75rem;border-top:.5px solid var(--border)">
-                <div style="font-size:12px;font-weight:700;color:var(--amber);margin-bottom:.5rem">⏳ MENUNGGU APPROVAL</div>
-                <div id="pending-list"></div>
-              </div>
             </div>
             <div class="card">
               <div class="section-title">🏫 Ringkasan Kelas</div>
@@ -506,7 +501,6 @@
           const users   = await API.get('/api/admin/users');
           const gurus   = users.filter(u => u.role === 'guru');
           const admins  = users.filter(u => u.role === 'admin');
-          const pending = users.filter(u => u.role === 'guru_pending');
           const allStaff = [...admins, ...gurus];
           document.getElementById('users-list').innerHTML = allStaff.slice(0, 6).map(u => `
             <div style="display:flex;align-items:center;gap:10px;padding:.4rem 0;border-bottom:.5px solid var(--border)">
@@ -518,18 +512,6 @@
               <span class="badge ${u.role==='admin'?'badge-blue':'badge-green'}">${u.role==='admin'?'Admin':'Guru'}</span>
             </div>`).join('') || '<div style="color:var(--muted);font-size:13px">Belum ada guru</div>';
 
-          if (pending.length) {
-            document.getElementById('pending-section').style.display = 'block';
-            document.getElementById('pending-list').innerHTML = pending.map(u => `
-              <div class="pending-row">
-                <div style="flex:1;font-size:12px;font-weight:500">${u.name}</div>
-                <div style="font-size:10px;color:var(--muted);flex:1;overflow:hidden;text-overflow:ellipsis">${u.email||''}</div>
-                <button class="btn btn-primary btn-sm" onclick="approveGuru('${u.id}')">✓ Setujui</button>
-                <button class="btn btn-danger btn-sm"  onclick="rejectGuru('${u.id}')">✗</button>
-              </div>`).join('');
-          } else {
-            document.getElementById('pending-section').style.display = 'none';
-          }
         } catch(e) {}
       }
 
@@ -656,19 +638,6 @@
         });
       }
 
-      // ── Guru Approval ──────────────────────────────────────────
-      async function approveGuru(id) {
-        await API.patch('/api/admin/users/' + id, {role: 'guru'});
-        UI.toast('✅ Guru disetujui','success');
-        loadUsers(); loadAnalytics();
-      }
-      async function rejectGuru(id) {
-        UI.confirm('Tolak Guru','Hapus pendaftaran guru ini?', async () => {
-          await API.del('/api/admin/users/' + id);
-          UI.toast('Guru ditolak','success');
-          loadUsers(); loadAnalytics();
-        });
-      }
 
       // ── Init ───────────────────────────────────────────────────
       loadAll();
