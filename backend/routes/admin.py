@@ -40,9 +40,14 @@ def set_user_password(user_id):
     pw = (request.json or {}).get('password', '').strip()
     if not pw or len(pw) < 6:
         return jsonify({'error': 'Password minimal 6 karakter'}), 400
-    query("UPDATE users SET password_hash=%s WHERE id=%s",
-          (generate_password_hash(pw), user_id), fetch='none')
-    return jsonify({'ok': True})
+    try:
+        query("UPDATE users SET password_hash=%s WHERE id=%s",
+              (generate_password_hash(pw), user_id), fetch='none')
+        return jsonify({'ok': True})
+    except Exception as e:
+        if 'password_hash' in str(e):
+            return jsonify({'error': 'Kolom password_hash belum ada. Jalankan dulu di Supabase SQL Editor:\nALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT;'}), 500
+        return jsonify({'error': str(e)}), 500
 
 @admin_bp.route('/api/admin/users', methods=['POST'])
 @require_admin
