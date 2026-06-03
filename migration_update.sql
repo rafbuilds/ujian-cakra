@@ -15,9 +15,12 @@ ALTER TABLE users ADD CONSTRAINT users_role_check
     CHECK (role IN ('admin','guru','guru_pending','siswa'));
 
 -- ── 2. Kolom tambahan di users ───────────────────────────────
-ALTER TABLE users ADD COLUMN IF NOT EXISTS device_id   TEXT;
-ALTER TABLE users ADD COLUMN IF NOT EXISTS device_info TEXT;
-ALTER TABLE users ADD COLUMN IF NOT EXISTS nisn        TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS device_id     TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS device_info   TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS nisn          TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT;
+-- google_id boleh NULL untuk user login manual
+ALTER TABLE users ALTER COLUMN google_id DROP NOT NULL;
 
 -- ── 3. Kolom tambahan di exams ───────────────────────────────
 ALTER TABLE exams ADD COLUMN IF NOT EXISTS score_per_correct DECIMAL;

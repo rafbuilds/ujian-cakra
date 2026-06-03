@@ -26,6 +26,41 @@ def update_user(user_id):
         query(f"UPDATE users SET {f}=%s WHERE id=%s", (data[f], user_id), fetch='none')
     return jsonify({'ok': True})
 
+@admin_bp.route('/api/admin/users/<user_id>/set-password', methods=['POST'])
+@require_admin
+def set_user_password(user_id):
+    from werkzeug.security import generate_password_hash
+    pw = (request.json or {}).get('password', '').strip()
+    if not pw or len(pw) < 6:
+        return jsonify({'error': 'Password minimal 6 karakter'}), 400
+    query("UPDATE users SET password_hash=%s WHERE id=%s",
+          (generate_password_hash(pw), user_id), fetch='none')
+    return jsonify({'ok': True})
+
+@admin_bp.route('/api/admin/users', methods=['POST'])
+@require_admin
+def create_user():
+    from werkzeug.security import generate_password_hash
+    data  = request.json or {}
+    name  = data.get('name', '').strip()
+    email = data.get('email', '').strip().lower()
+    role  = data.get('role', 'guru')
+    pw    = data.get('password', '').strip()
+    if not name or not email:
+        return jsonify({'error': 'Nama dan email wajib'}), 400
+    if not pw or len(pw) < 6:
+        return jsonify({'error': 'Password minimal 6 karakter'}), 400
+    existing = query("SELECT id FROM users WHERE LOWER(email)=%s", (email,), fetch='one')
+    if existing:
+        return jsonify({'error': 'Email sudah terdaftar'}), 409
+    dummy_gid = f"manual_{uuid.uuid4().hex[:12]}"
+    uid = str(uuid.uuid4())
+    query("""INSERT INTO users (id, google_id, email, name, role, password_hash, is_active)
+             VALUES (%s,%s,%s,%s,%s,%s,true)""",
+          (uid, dummy_gid, email, name, role, generate_password_hash(pw)), fetch='none')
+    user = query("SELECT id,email,name,role FROM users WHERE id=%s", (uid,), fetch='one')
+    return jsonify(dict(user)), 201
+
 @admin_bp.route('/api/admin/users/<user_id>', methods=['DELETE'])
 @require_admin
 def delete_user(user_id):

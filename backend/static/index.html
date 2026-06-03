@@ -6,251 +6,77 @@
     <title>Ujian Online — SMAN 1 Batangan</title>
     <link rel="stylesheet" href="style.css" />
     <style>
-      .landing {
-        min-height: 100vh;
-        display: flex;
-        overflow: hidden;
-      }
+      .landing { min-height:100vh; display:flex; overflow:hidden; }
       .landing-left {
-        flex: 1;
-        background: linear-gradient(
-          145deg,
-          #0a3323 0%,
-          #0f4c35 40%,
-          #1a6b4a 100%
-        );
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-        padding: 3rem;
-        position: relative;
-        overflow: hidden;
+        flex:1; background:linear-gradient(145deg,#0a3323 0%,#0f4c35 40%,#1a6b4a 100%);
+        display:flex; flex-direction:column; justify-content:space-between;
+        padding:3rem; position:relative; overflow:hidden;
       }
       .landing-left::before {
-        content: "";
-        position: absolute;
-        top: -100px;
-        right: -100px;
-        width: 450px;
-        height: 450px;
-        background: rgba(29, 158, 117, 0.1);
-        border-radius: 50%;
+        content:""; position:absolute; top:-100px; right:-100px;
+        width:450px; height:450px; background:rgba(29,158,117,.1); border-radius:50%;
       }
       .landing-left::after {
-        content: "";
-        position: absolute;
-        bottom: -80px;
-        left: -80px;
-        width: 300px;
-        height: 300px;
-        background: rgba(212, 175, 55, 0.07);
-        border-radius: 50%;
+        content:""; position:absolute; bottom:-80px; left:-80px;
+        width:300px; height:300px; background:rgba(212,175,55,.07); border-radius:50%;
       }
-      .brand {
-        position: relative;
-        z-index: 1;
-      }
-      .brand-logo {
-        font-size: 48px;
-        margin-bottom: 1rem;
-      }
-      .brand-name {
-        font-family: "Playfair Display", serif;
-        font-size: 30px;
-        color: #fff;
-        line-height: 1.3;
-      }
-      .brand-sub {
-        font-size: 14px;
-        color: rgba(255, 255, 255, 0.55);
-        margin-top: 6px;
-      }
-      .features {
-        position: relative;
-        z-index: 1;
-      }
-      .feat {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        padding: 0.75rem 0;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-      }
-      .feat:last-child {
-        border-bottom: none;
-      }
-      .feat-icon {
-        width: 38px;
-        height: 38px;
-        background: rgba(255, 255, 255, 0.1);
-        border-radius: 10px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 17px;
-        flex-shrink: 0;
-      }
-      .feat-text {
-        font-size: 13px;
-        color: rgba(255, 255, 255, 0.75);
-        line-height: 1.5;
-      }
-      .landing-right {
-        width: 480px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 2rem;
-        flex-shrink: 0;
-      }
-      .login-card {
-        width: 100%;
-        max-width: 380px;
-      }
-      .login-card-top {
-        text-align: center;
-        margin-bottom: 2rem;
-      }
-      .login-greeting {
-        font-family: "Playfair Display", serif;
-        font-size: 26px;
-        color: var(--green);
-        margin-bottom: 0.5rem;
-      }
-      .login-sub {
-        font-size: 14px;
-        color: var(--muted);
-        line-height: 1.6;
-      }
-      .role-tabs {
-        display: flex;
-        gap: 0;
-        background: var(--light);
-        border-radius: 12px;
-        padding: 4px;
-        margin-bottom: 1.5rem;
-      }
-      .role-tab {
-        flex: 1;
-        padding: 9px;
-        text-align: center;
-        font-size: 13px;
-        font-weight: 600;
-        cursor: pointer;
-        border-radius: 9px;
-        transition: all 0.2s;
-        color: var(--muted);
-        background: none;
-        border: none;
-      }
-      .role-tab.active {
-        background: var(--white);
-        color: var(--green);
-        box-shadow: var(--shadow);
-      }
-      .google-btn {
-        width: 100%;
-        padding: 13px;
-        background: var(--white);
-        border: 1.5px solid var(--border);
-        border-radius: 12px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 12px;
-        font-size: 14px;
-        font-weight: 600;
-        color: var(--text);
-        cursor: pointer;
-        transition: all 0.2s;
-        box-shadow: var(--shadow);
-        font-family: inherit;
-      }
-      .google-btn:hover {
-        border-color: var(--green3);
-        box-shadow: 0 4px 16px rgba(15, 76, 53, 0.12);
-        transform: translateY(-1px);
-      }
-      .login-divider {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        margin: 1rem 0;
-        color: var(--muted);
-        font-size: 12px;
-      }
-      .login-divider::before,
-      .login-divider::after {
-        content: "";
-        flex: 1;
-        height: 0.5px;
-        background: var(--border);
-      }
-      .login-domain {
-        background: var(--green4);
-        border: 1px solid rgba(29, 158, 117, 0.3);
-        border-radius: 10px;
-        padding: 0.75rem 1rem;
-        font-size: 13px;
-        color: #0f6e56;
-        text-align: center;
-        font-weight: 500;
-      }
-      .err-box {
-        background: #fcebeb;
-        color: var(--red2);
-        border: 1px solid #f7c1c1;
-        border-radius: 10px;
-        padding: 10px 14px;
-        font-size: 13px;
-        margin-bottom: 1rem;
-        text-align: center;
-      }
+      .brand { position:relative; z-index:1; }
+      .brand-logo { font-size:48px; margin-bottom:1rem; }
+      .brand-name { font-size:30px; color:#fff; line-height:1.3; font-weight:700; }
+      .brand-sub  { font-size:14px; color:rgba(255,255,255,.55); margin-top:6px; }
+      .feat { display:flex; align-items:center; gap:12px; padding:.75rem 0;
+        border-bottom:1px solid rgba(255,255,255,.08); position:relative; z-index:1; }
+      .feat:last-child { border-bottom:none; }
+      .feat-icon { width:38px; height:38px; background:rgba(255,255,255,.1); border-radius:10px;
+        display:flex; align-items:center; justify-content:center; font-size:17px; flex-shrink:0; }
+      .feat-text { font-size:13px; color:rgba(255,255,255,.75); line-height:1.5; }
 
-      /* Dev mode */
-      .dev-section {
-        margin-top: 1.25rem;
-      }
-      .dev-title {
-        font-size: 11px;
-        font-weight: 600;
-        color: var(--muted);
-        text-align: center;
-        margin-bottom: 0.5rem;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-      }
-      .dev-btn {
-        width: 100%;
-        padding: 8px 12px;
-        background: var(--light);
-        border: 0.5px solid var(--border);
-        border-radius: 8px;
-        font-size: 12px;
-        cursor: pointer;
-        text-align: left;
-        margin-bottom: 5px;
-        font-family: inherit;
-        color: var(--text);
-        transition: background 0.15s;
-      }
-      .dev-btn:hover {
-        background: var(--border);
-      }
+      .landing-right { width:460px; display:flex; align-items:center; justify-content:center;
+        padding:2rem; flex-shrink:0; }
+      .login-card { width:100%; max-width:380px; }
+      .login-title { font-size:26px; font-weight:800; color:var(--green); margin-bottom:4px; }
+      .login-sub   { font-size:13px; color:var(--muted); margin-bottom:1.75rem; }
 
-      @media (max-width: 768px) {
-        .landing {
-          flex-direction: column;
-        }
-        .landing-left {
-          display: none;
-        }
-        .landing-right {
-          width: 100%;
-          padding: 2rem 1.5rem;
-          align-items: flex-start;
-          padding-top: 4rem;
-        }
+      .role-tabs { display:flex; background:var(--light); border-radius:12px;
+        padding:4px; margin-bottom:1.5rem; gap:0; }
+      .role-tab  { flex:1; padding:9px; text-align:center; font-size:13px; font-weight:600;
+        cursor:pointer; border-radius:9px; transition:all .2s; color:var(--muted);
+        background:none; border:none; }
+      .role-tab.active { background:#fff; color:var(--green); box-shadow:var(--shadow); }
+
+      .form-group  { margin-bottom:1rem; }
+      .form-label  { display:block; font-size:12px; font-weight:600; color:var(--muted);
+        margin-bottom:5px; text-transform:uppercase; letter-spacing:.4px; }
+      .form-input  { width:100%; padding:11px 14px; border:1.5px solid var(--border);
+        border-radius:10px; font-size:14px; font-family:inherit; outline:none;
+        transition:border-color .2s; box-sizing:border-box; }
+      .form-input:focus { border-color:var(--green); }
+      .pw-wrap    { position:relative; }
+      .pw-toggle  { position:absolute; right:12px; top:50%; transform:translateY(-50%);
+        background:none; border:none; cursor:pointer; font-size:16px; color:var(--muted); }
+
+      .btn-login  { width:100%; padding:13px; background:var(--green); color:#fff;
+        border:none; border-radius:12px; font-size:15px; font-weight:700;
+        cursor:pointer; font-family:inherit; transition:all .2s; margin-top:.5rem; }
+      .btn-login:hover { background:#0d5e3f; transform:translateY(-1px); }
+      .btn-login:disabled { opacity:.6; cursor:not-allowed; transform:none; }
+
+      .err-box { background:#fcebeb; color:var(--red2); border:1px solid #f7c1c1;
+        border-radius:10px; padding:10px 14px; font-size:13px; margin-bottom:1rem;
+        text-align:center; display:none; }
+
+      .dev-section { margin-top:1.25rem; padding-top:1rem; border-top:.5px solid var(--border); }
+      .dev-title { font-size:11px; font-weight:600; color:var(--amber); text-align:center;
+        margin-bottom:.5rem; text-transform:uppercase; letter-spacing:.5px; }
+      .dev-btn { width:100%; padding:8px 12px; background:var(--light); border:.5px solid var(--border);
+        border-radius:8px; font-size:12px; cursor:pointer; text-align:left; margin-bottom:5px;
+        font-family:inherit; color:var(--text); transition:background .15s; }
+      .dev-btn:hover { background:var(--border); }
+
+      @media(max-width:768px){
+        .landing { flex-direction:column; }
+        .landing-left { display:none; }
+        .landing-right { width:100%; padding:2.5rem 1.5rem; }
       }
     </style>
   </head>
@@ -260,148 +86,57 @@
       <div class="landing-left">
         <div class="brand">
           <div class="brand-logo">📋</div>
-          <div class="brand-name">Ujian Online<br />SMAN 1 Batangan</div>
-          <div class="brand-sub">
-            Platform ujian digital yang aman, cepat, dan mudah
-          </div>
+          <div class="brand-name">Ujian Online<br/>SMAN 1 Batangan</div>
+          <div class="brand-sub">Platform ujian digital yang aman, cepat, dan mudah</div>
         </div>
-        <div class="features">
-          <div class="feat">
-            <div class="feat-icon">🔒</div>
-            <div class="feat-text">
-              Keamanan berlapis — satu perangkat per sesi, deteksi pindah tab
-            </div>
-          </div>
-          <div class="feat">
-            <div class="feat-icon">⚡</div>
-            <div class="feat-text">
-              Jawaban tersimpan otomatis — aman dari gangguan koneksi
-            </div>
-          </div>
-          <div class="feat">
-            <div class="feat-icon">📊</div>
-            <div class="feat-text">
-              Nilai langsung setelah submit — guru bisa monitor real-time
-            </div>
-          </div>
-          <div class="feat">
-            <div class="feat-icon">📄</div>
-            <div class="feat-text">
-              Import soal dari Word, Excel, atau CSV — tanpa ribet
-            </div>
-          </div>
+        <div>
+          <div class="feat"><div class="feat-icon">🔒</div><div class="feat-text">Keamanan berlapis — satu perangkat per sesi, deteksi pindah tab</div></div>
+          <div class="feat"><div class="feat-icon">⚡</div><div class="feat-text">Jawaban tersimpan otomatis — aman dari gangguan koneksi</div></div>
+          <div class="feat"><div class="feat-icon">📊</div><div class="feat-text">Nilai langsung setelah submit — guru bisa monitor real-time</div></div>
+          <div class="feat"><div class="feat-icon">📄</div><div class="feat-text">Import soal dari Word, Excel, atau CSV — tanpa ribet</div></div>
         </div>
       </div>
 
       <!-- Kanan: login -->
       <div class="landing-right">
         <div class="login-card">
-          <div class="login-card-top">
-            <div class="login-greeting">Selamat Datang 👋</div>
-            <div class="login-sub">Masuk menggunakan akun Google sekolahmu</div>
-          </div>
+          <div class="login-title">Selamat Datang 👋</div>
+          <div class="login-sub">Masuk dengan akun yang diberikan sekolah</div>
 
           <!-- Tab role -->
           <div class="role-tabs">
-            <button
-              class="role-tab active"
-              id="tab-siswa"
-              onclick="setRole('siswa')"
-            >
-              🎒 Siswa
-            </button>
-            <button class="role-tab" id="tab-guru" onclick="setRole('guru')">
-              👨‍🏫 Guru
-            </button>
-            <button class="role-tab" id="tab-admin" onclick="setRole('admin')">
-              ⚙️ Admin
-            </button>
+            <button class="role-tab active" id="tab-siswa" onclick="setRole('siswa')">🎒 Siswa</button>
+            <button class="role-tab" id="tab-guru"  onclick="setRole('guru')">👨‍🏫 Guru</button>
+            <button class="role-tab" id="tab-admin" onclick="setRole('admin')">⚙️ Admin</button>
           </div>
 
-          <div id="err-msg" class="err-box" style="display: none"></div>
+          <div id="err-msg" class="err-box"></div>
 
-          <!-- Invite Banner (muncul kalau ada ?invite= di URL) -->
-          <div
-            id="invite-banner"
-            style="
-              display: none;
-              background: #e6f1fb;
-              border: 1px solid #90caf9;
-              border-radius: 12px;
-              padding: 12px 16px;
-              margin-bottom: 1rem;
-              font-size: 13px;
-              color: #185fa5;
-            "
-          >
-            🎉 <strong id="invite-name">Selamat datang!</strong><br />
-            Kamu diundang sebagai <strong>Guru</strong> di SMAN 1 Batangan.<br />
-            <span
-              id="invite-email"
-              style="font-size: 11px; opacity: 0.8"
-            ></span>
-          </div>
+          <!-- Form login -->
+          <form onsubmit="doLogin(event)">
+            <div class="form-group">
+              <label class="form-label">Email</label>
+              <input type="email" id="inp-email" class="form-input"
+                placeholder="email@sman1batangan.sch.id" autocomplete="username" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Password</label>
+              <div class="pw-wrap">
+                <input type="password" id="inp-pw" class="form-input"
+                  placeholder="Masukkan password" autocomplete="current-password" required />
+                <button type="button" class="pw-toggle" onclick="togglePw()" id="pw-eye">👁</button>
+              </div>
+            </div>
+            <button type="submit" class="btn-login" id="btn-login">Masuk</button>
+          </form>
 
-          <!-- Deskripsi role -->
-          <div
-            id="role-desc"
-            class="alert alert-info"
-            style="margin-bottom: 1rem; font-size: 13px"
-          >
-            🎒 <strong>Siswa</strong> — masuk untuk mengikuti ujian yang sudah
-            dijadwalkan
-          </div>
-
-          <!-- Tombol Google -->
-          <button class="google-btn" onclick="loginGoogle()">
-            <svg viewBox="0 0 24 24" width="20" height="20">
-              <path
-                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                fill="#4285F4"
-              />
-              <path
-                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                fill="#34A853"
-              />
-              <path
-                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"
-                fill="#FBBC05"
-              />
-              <path
-                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                fill="#EA4335"
-              />
-            </svg>
-            Masuk dengan Akun Sekolah
-          </button>
-
-          <div class="login-divider">atau</div>
-          <div class="login-domain">🏫 Gunakan akun @sman1batangan.sch.id</div>
-
-          <!-- DEV MODE login dummy -->
-          <div class="dev-section" id="dev-section" style="display: block">
-            <div class="dev-title">⚠️ Dev Mode — Login Dummy</div>
-            <button
-              class="dev-btn"
-              onclick="devLogin('sembarang.mugoladoh@gmail.com')"
-            >
-              ⚙️ Admin — Rafael
-            </button>
-            <button class="dev-btn" onclick="devLogin('secrap7@gmail.com')">
-              👨‍🏫 Guru — sec rap
-            </button>
-            <button
-              class="dev-btn"
-              onclick="devLogin('siswa1@sman1batangan.sch.id')"
-            >
-              🎒 Siswa — Adi Saputra
-            </button>
-            <button
-              class="dev-btn"
-              onclick="devLogin('siswa2@sman1batangan.sch.id')"
-            >
-              🎒 Siswa — Bella Rahmawati
-            </button>
+          <!-- DEV MODE -->
+          <div class="dev-section" id="dev-section" style="display:none">
+            <div class="dev-title">⚠️ Dev Mode — Login Cepat</div>
+            <button class="dev-btn" onclick="devLogin('sembarang.mugoladoh@gmail.com')">⚙️ Admin — Rafael</button>
+            <button class="dev-btn" onclick="devLogin('secrap7@gmail.com')">👨‍🏫 Guru — sec rap</button>
+            <button class="dev-btn" onclick="devLogin('siswa1@sman1batangan.sch.id')">🎒 Siswa — Adi Saputra</button>
+            <button class="dev-btn" onclick="devLogin('siswa2@sman1batangan.sch.id')">🎒 Siswa — Bella Rahmawati</button>
           </div>
         </div>
       </div>
@@ -410,144 +145,80 @@
     <script src="config.js"></script>
     <script src="components/api.js"></script>
     <script src="components/auth.js"></script>
-    <script src="components/common.js"></script>
     <script>
-      let currentRole = "siswa";
-
-      const roleDescs = {
-        siswa:
-          "🎒 <strong>Siswa</strong> — masuk untuk mengikuti ujian yang sudah dijadwalkan",
-        guru: "👨‍🏫 <strong>Guru</strong> — kelola ujian, soal, dan pantau siswa secara real-time",
-        admin:
-          "⚙️ <strong>Admin</strong> — akses penuh untuk mengelola seluruh sistem",
+      const ROLE_REDIRECT = {
+        admin:       '/admin/dashboard.html',
+        guru:        '/guru/dashboard.html',
+        guru_pending:'/guru/pending.html',
+        siswa:       '/siswa/siswa-ujian.html',
       };
 
       function setRole(role) {
-        currentRole = role;
-        ["siswa", "guru", "admin"].forEach((r) => {
-          document
-            .getElementById(`tab-${r}`)
-            .classList.toggle("active", r === role);
-        });
-        document.getElementById("role-desc").innerHTML = roleDescs[role];
+        ['siswa','guru','admin'].forEach(r =>
+          document.getElementById('tab-' + r).classList.toggle('active', r === role));
       }
 
-      // Simpan invite token dari URL
-      const _inviteParams = new URLSearchParams(location.search);
-      const _inviteToken = _inviteParams.get("invite");
-      const _inviteRole = _inviteParams.get("role");
+      function showErr(msg) {
+        const el = document.getElementById('err-msg');
+        el.textContent = msg; el.style.display = 'block';
+      }
+      function hideErr() { document.getElementById('err-msg').style.display = 'none'; }
 
-      async function loginGoogle() {
+      function togglePw() {
+        const inp = document.getElementById('inp-pw');
+        const eye = document.getElementById('pw-eye');
+        if (inp.type === 'password') { inp.type = 'text'; eye.textContent = '🙈'; }
+        else { inp.type = 'password'; eye.textContent = '👁'; }
+      }
+
+      async function doLogin(e) {
+        e.preventDefault();
+        hideErr();
+        const email = document.getElementById('inp-email').value.trim();
+        const pw    = document.getElementById('inp-pw').value;
+        const btn   = document.getElementById('btn-login');
+        btn.disabled = true; btn.textContent = 'Memproses...';
         try {
-          // Kalau ada invite token, pakai role=guru dan sertakan token
-          const role = _inviteToken ? "guru" : currentRole;
-          const extraParam = _inviteToken
-            ? `&invite_token=${_inviteToken}`
-            : "";
-          const r = await API.get(
-            `/api/auth/google/url?role=${role}${extraParam}`,
-          );
-          window.location.href = r.url;
-        } catch (e) {
-          const el = document.getElementById("err-msg");
-          el.textContent =
-            e.error || "Gagal terhubung ke server. Pastikan backend berjalan.";
-          el.style.display = "block";
+          const d = await API.post('/api/auth/login', { email, password: pw });
+          localStorage.setItem('ujian_token', d.token);
+          localStorage.setItem('ujian_user', JSON.stringify({ role: d.role, name: d.name, id: d.id }));
+          window.location.href = ROLE_REDIRECT[d.role] || '/index.html';
+        } catch(err) {
+          showErr(err.error || err.message || 'Login gagal. Periksa email dan password.');
+          btn.disabled = false; btn.textContent = 'Masuk';
         }
       }
 
       async function devLogin(email) {
+        hideErr();
         try {
-          UI.loading(true, "Login...");
-          const d = await API.post("/api/dev/login-as", { email });
-          localStorage.setItem("ujian_token", d.token);
-          // Redirect berdasarkan role
-          if (d.role === "admin")
-            window.location.href = "/admin/dashboard.html";
-          else if (d.role === "guru")
-            window.location.href = "/guru/dashboard.html";
-          else window.location.href = "/siswa/ujian.html";
-        } catch (e) {
-          UI.loading(false);
-          const el = document.getElementById("err-msg");
-          el.textContent = e.error || "Gagal login";
-          el.style.display = "block";
+          const d = await API.post('/api/dev/login-as', { email });
+          localStorage.setItem('ujian_token', d.token);
+          localStorage.setItem('ujian_user', JSON.stringify({ role: d.role, name: d.name }));
+          window.location.href = ROLE_REDIRECT[d.role] || '/index.html';
+        } catch(err) {
+          showErr(err.error || 'Dev login gagal');
         }
       }
 
       // Init
       (async () => {
-        // Cek apakah sudah login
+        // Sudah login → redirect
         const token = Auth.getToken();
         if (token) {
-          UI.loading(true);
-          const user = await Auth.fetchAndStoreUser();
-          if (user) {
-            Auth.redirectByRole(user.role);
-            return;
-          }
-          UI.loading(false);
+          try {
+            const user = await API.get('/api/auth/me');
+            if (user && user.role) { window.location.href = ROLE_REDIRECT[user.role] || '/index.html'; return; }
+          } catch(_) { localStorage.removeItem('ujian_token'); }
         }
-
-        // Ambil token dari URL (redirect OAuth)
-        Auth.initFromUrl();
-
-        // Cek error dari URL
-        const params = new URLSearchParams(window.location.search);
-        if (params.get("error")) {
-          const el = document.getElementById("err-msg");
-          el.textContent = decodeURIComponent(params.get("error"));
-          el.style.display = "block";
-        }
-
         // Cek dev mode
         try {
-          const health = await fetch(CONFIG.API_BASE + "/").then((r) =>
-            r.json(),
-          );
-          if (health.dev_mode) {
-            document.getElementById("dev-section").style.display = "block";
-          }
-        } catch {}
-
-        // ── Guru Invite Handler ─────────────────────────────────
-        if (_inviteToken && _inviteRole === "guru") {
-          // Sembunyikan tab role (guru harus pakai invite link)
-          document.querySelector(".role-tabs").style.display = "none";
-
-          // Verifikasi token ke backend
-          try {
-            const res = await fetch(
-              CONFIG.API_BASE + "/api/auth/verify-invite?token=" + _inviteToken,
-            );
-            const data = await res.json();
-            const banner = document.getElementById("invite-banner");
-            banner.style.display = "block";
-            if (data.valid) {
-              document.getElementById("invite-name").textContent =
-                data.name_hint
-                  ? "Selamat datang, " + data.name_hint + "!"
-                  : "Selamat datang!";
-              document.getElementById("invite-email").textContent =
-                "Masuk dengan email: " + (data.email || "");
-            } else {
-              // Token tidak valid
-              banner.style.background = "#fcebeb";
-              banner.style.borderColor = "#f7c1c1";
-              banner.style.color = "#a32d2d";
-              banner.innerHTML =
-                "❌ <strong>Link undangan tidak valid atau sudah kadaluarsa.</strong><br>" +
-                '<span style="font-size:12px">' +
-                (data.error || "Hubungi admin untuk link baru.") +
-                "</span>";
-            }
-          } catch {
-            // Backend tidak bisa dihubungi, tampilkan banner generik
-            document.getElementById("invite-banner").style.display = "block";
-            document.getElementById("invite-name").textContent =
-              "Kamu diundang sebagai Guru!";
-          }
-        }
+          const h = await API.get('/api/health');
+          if (h.dev_mode) document.getElementById('dev-section').style.display = 'block';
+        } catch(_) {}
+        // Error dari URL
+        const params = new URLSearchParams(location.search);
+        if (params.get('error')) showErr(decodeURIComponent(params.get('error')));
       })();
     </script>
   </body>

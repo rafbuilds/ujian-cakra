@@ -24,113 +24,43 @@ app.register_blueprint(exams_bp)
 
 # ── Auth Routes ────────────────────────────────────────────────
 from auth import require_auth, require_admin, create_token
-import requests as http_requests
+from werkzeug.security import generate_password_hash, check_password_hash
 
-GOOGLE_CLIENT_ID     = os.environ.get('GOOGLE_CLIENT_ID','')
-GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET','')
-FRONTEND_URL         = os.environ.get('FRONTEND_URL','http://localhost:8080')
-APP_URL              = os.environ.get('APP_URL','http://localhost:5000')
-DEV_MODE             = os.environ.get('DEV_MODE','false').lower()=='true'
-ALLOWED_DOMAIN       = os.environ.get('ALLOWED_DOMAIN','')
+FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:8080')
+DEV_MODE     = os.environ.get('DEV_MODE', 'false').lower() == 'true'
 
 @app.route('/api/health')
 def index():
-    return jsonify({'status': 'ok', 'service': 'Ujian Online SMABA'})
+    return jsonify({'status': 'ok', 'service': 'Ujian Online SMABA', 'dev_mode': DEV_MODE})
 
-@app.route('/api/auth/google/url')
-def google_url():
-    role = request.args.get('role','siswa')
-    redirect_uri = f"{APP_URL}/api/auth/google/callback"
-    invite_token = request.environ.get('invite_token', '') or request.args.get('invite_token', '')
-    state = f"{role}|{invite_token}" if invite_token else role
-    url = (f"https://accounts.google.com/o/oauth2/v2/auth"
-           f"?client_id={GOOGLE_CLIENT_ID}"
-           f"&redirect_uri={redirect_uri}"
-           f"&response_type=code"
-           f"&scope=openid email profile"
-           f"&state={state}")
-    return jsonify({'url': url})
-
-@app.route('/api/auth/google/callback')
-def google_callback():
+@app.route('/api/auth/login', methods=['POST'])
+def login():
     from db import query
-    import uuid
-    code  = request.args.get('code')
-    state_raw = request.args.get('state', 'siswa')
-    # State bisa berupa "role" atau "role|invite_token"
-    if '|' in state_raw:
-        role, invite_token_state = state_raw.split('|', 1)
-        # Simpan di request untuk dipakai di bawah
-        request.environ['invite_token'] = invite_token_state
-    else:
-        role = state_raw
-        request.environ['invite_token'] = ''
-    redirect_uri = f"{APP_URL}/api/auth/google/callback"
-    r = http_requests.post('https://oauth2.googleapis.com/token', data={
-        'code': code, 'client_id': GOOGLE_CLIENT_ID,
-        'client_secret': GOOGLE_CLIENT_SECRET,
-        'redirect_uri': redirect_uri, 'grant_type': 'authorization_code'
-    })
-    if not r.ok: return jsonify({'error': 'Token exchange gagal'}), 400
-    tokens = r.json()
-    user_r = http_requests.get('https://www.googleapis.com/oauth2/v3/userinfo',
-                                headers={'Authorization': f"Bearer {tokens['access_token']}"})
-    if not user_r.ok: return jsonify({'error': 'Gagal ambil info user'}), 400
-    info    = user_r.json()
-    google_id = info['sub']
-    email     = info.get('email','')
-    name      = info.get('name','')
-    avatar    = info.get('picture','')
+    body  = request.json or {}
+    email = (body.get('email') or '').strip().lower()
+    pw    = body.get('password') or ''
+    if not email or not pw:
+        return jsonify({'error': 'Email dan password wajib diisi'}), 400
 
-    user = query("SELECT * FROM users WHERE google_id=%s", (google_id,), fetch='one')
+    user = query("SELECT * FROM users WHERE LOWER(email)=%s AND is_active=true",
+                 (email,), fetch='one')
     if not user:
-        if ALLOWED_DOMAIN and not email.endswith('@'+ALLOWED_DOMAIN) and role == 'siswa':
-            return f"<script>window.location='{FRONTEND_URL}?error=domain'</script>"
-        if role == 'guru':
-            # Validasi invite token — guru harus punya undangan dari admin
-            invite_token = request.environ.get('invite_token', '') or request.args.get('invite_token', '')
-            invite = query("""
-                SELECT * FROM guru_invites
-                WHERE token=%s AND email=%s AND used_at IS NULL AND expires_at > NOW()
-            """, (invite_token, email.lower()), fetch='one')
+        return jsonify({'error': 'Email tidak ditemukan atau akun nonaktif'}), 401
 
-            if not invite:
-                from urllib.parse import quote
-                return f"<script>window.location='{FRONTEND_URL}?error=no_invite&email={quote(email)}'</script>"
+    ph = user.get('password_hash') or ''
+    if not ph:
+        return jsonify({'error': 'Password belum di-set. Hubungi admin sekolah.'}), 401
+    if not check_password_hash(ph, pw):
+        return jsonify({'error': 'Password salah'}), 401
 
-            # Invite valid — langsung jadi guru aktif
-            assigned_role = 'guru'
-            uid = str(uuid.uuid4())
-            query("""INSERT INTO users (id, google_id, email, name, avatar_url, role, is_active)
-                     VALUES (%s,%s,%s,%s,%s,%s,true)""",
-                  (uid, google_id, email, name or invite.get('name_hint',''), avatar, assigned_role), fetch='none')
-            # Mark invite as used
-            query("UPDATE guru_invites SET used_at=NOW(), used_by=%s WHERE id=%s",
-                  (uid, invite['id']), fetch='none')
-        else:
-            assigned_role = role
-            uid = str(uuid.uuid4())
-            query("""INSERT INTO users (id, google_id, email, name, avatar_url, role, is_active)
-                     VALUES (%s,%s,%s,%s,%s,%s,true)""",
-                  (uid, google_id, email, name, avatar, assigned_role), fetch='none')
-        user = query("SELECT * FROM users WHERE id=%s", (uid,), fetch='one')
-
-    query("UPDATE users SET last_login=NOW(), avatar_url=%s WHERE id=%s", (avatar, user['id']), fetch='none')
+    query("UPDATE users SET last_login=NOW() WHERE id=%s", (user['id'],), fetch='none')
     token = create_token(str(user['id']), user['role'])
-
-    # Redirect ke halaman yang sesuai role
-    role_actual = user['role']
-    if role_actual == 'guru_pending':
-        dest = f"{FRONTEND_URL}/guru/pending.html"
-    elif role_actual == 'guru':
-        dest = f"{FRONTEND_URL}/guru/dashboard.html"
-    elif role_actual == 'admin':
-        dest = f"{FRONTEND_URL}/admin/dashboard.html"
-    else:
-        dest = f"{FRONTEND_URL}/siswa/siswa-ujian.html"
-
-    import json as _json
-    return f"<script>localStorage.setItem('ujian_token',{_json.dumps(token)});localStorage.setItem('ujian_user',{_json.dumps({'role': role_actual})});window.location={_json.dumps(dest)}</script>"
+    return jsonify({
+        'token': token,
+        'role':  user['role'],
+        'name':  user['name'],
+        'id':    str(user['id']),
+    })
 
 @app.route('/api/auth/me')
 @require_auth
@@ -140,6 +70,23 @@ def auth_me():
                  (request.user_id,), fetch='one')
     if not user: return jsonify({'error': 'User tidak ditemukan'}), 404
     return jsonify(dict(user))
+
+@app.route('/api/auth/change-password', methods=['POST'])
+@require_auth
+def change_password():
+    from db import query
+    body   = request.json or {}
+    old_pw = body.get('old_password', '')
+    new_pw = body.get('new_password', '')
+    if not new_pw or len(new_pw) < 6:
+        return jsonify({'error': 'Password baru minimal 6 karakter'}), 400
+    user = query("SELECT password_hash FROM users WHERE id=%s", (request.user_id,), fetch='one')
+    if user and user.get('password_hash'):
+        if not check_password_hash(user['password_hash'], old_pw):
+            return jsonify({'error': 'Password lama salah'}), 401
+    query("UPDATE users SET password_hash=%s WHERE id=%s",
+          (generate_password_hash(new_pw), request.user_id), fetch='none')
+    return jsonify({'ok': True})
 
 # ── Dev Login ──────────────────────────────────────────────────
 @app.route('/api/dev/login-as', methods=['POST'])
