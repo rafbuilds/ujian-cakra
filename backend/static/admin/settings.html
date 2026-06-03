@@ -313,11 +313,12 @@
         try {
           const users = await API.get('/api/admin/users');
           _staffData = users.filter(u => u.role === 'guru' || u.role === 'admin');
-          const noPass = users.filter(u => (u.role==='guru'||u.role==='admin') && !u.has_password).length;
+          const staff  = users.filter(u => u.role==='guru' || u.role==='admin');
+          const noPass = staff.filter(u => !u.has_password).length;
 
-          document.getElementById('st-guru').textContent  = users.filter(u => u.role==='guru').length;
-          document.getElementById('st-admin').textContent = users.filter(u => u.role==='admin').length;
-          document.getElementById('st-nopass').textContent = '?';
+          document.getElementById('st-guru').textContent   = users.filter(u => u.role==='guru').length;
+          document.getElementById('st-admin').textContent  = users.filter(u => u.role==='admin').length;
+          document.getElementById('st-nopass').textContent = noPass;
 
           renderStaff(_staffData);
         } catch(e) { UI.toast('Gagal memuat', 'error'); }

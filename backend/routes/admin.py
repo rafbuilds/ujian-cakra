@@ -11,8 +11,8 @@ admin_bp = Blueprint('admin', __name__)
 @require_admin
 def get_users():
     rows = query("""
-        SELECT id, email, name, role, avatar_url, last_login, device_id,
-               created_at
+        SELECT id, email, name, role, avatar_url, last_login, device_id, created_at,
+               (password_hash IS NOT NULL AND password_hash != '') AS has_password
         FROM users ORDER BY role, name
     """)
     return jsonify([dict(r) for r in rows])
@@ -55,9 +55,17 @@ def create_user():
         return jsonify({'error': 'Email sudah terdaftar'}), 409
     dummy_gid = f"manual_{uuid.uuid4().hex[:12]}"
     uid = str(uuid.uuid4())
-    query("""INSERT INTO users (id, google_id, email, name, role, password_hash, is_active)
-             VALUES (%s,%s,%s,%s,%s,%s,true)""",
-          (uid, dummy_gid, email, name, role, generate_password_hash(pw)), fetch='none')
+    try:
+        query("""INSERT INTO users (id, google_id, email, name, role, password_hash, is_active)
+                 VALUES (%s,%s,%s,%s,%s,%s,true)""",
+              (uid, dummy_gid, email, name, role, generate_password_hash(pw)), fetch='none')
+    except Exception as e:
+        err = str(e)
+        if 'password_hash' in err:
+            return jsonify({'error': 'Kolom password_hash belum ada. Jalankan migration SQL di Supabase dulu.'}), 500
+        if 'google_id' in err and 'null' in err.lower():
+            return jsonify({'error': 'Kolom google_id masih NOT NULL. Jalankan: ALTER TABLE users ALTER COLUMN google_id DROP NOT NULL'}), 500
+        return jsonify({'error': 'Gagal: ' + err}), 500
     user = query("SELECT id,email,name,role FROM users WHERE id=%s", (uid,), fetch='one')
     return jsonify(dict(user)), 201
 
