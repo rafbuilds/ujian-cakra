@@ -163,39 +163,116 @@ const UI = (() => {
     if (el) el.classList.add("active");
   };
 
-  // Init user info di sidebar
+  // Init user info di sidebar + mobile responsive
   const initSidebar = () => {
     const user = Auth.getUser();
     if (!user) return;
-    const nameEl = document.getElementById("sb-user-name");
-    const roleEl = document.getElementById("sb-user-role");
+    const nameEl   = document.getElementById("sb-user-name");
+    const roleEl   = document.getElementById("sb-user-role");
     const avatarEl = document.getElementById("sb-avatar");
     if (nameEl) nameEl.textContent = user.name || "—";
-    if (roleEl)
-      roleEl.textContent =
-        {
-          admin: "Administrator",
-          guru: "Guru Pengampu",
-          guru_pending: "Menunggu Approval",
-          siswa: "Siswa",
-        }[user.role] || user.role;
+    if (roleEl) roleEl.textContent = {
+      admin: "Administrator", guru: "Guru Pengampu",
+      guru_pending: "Menunggu Approval", siswa: "Siswa",
+    }[user.role] || user.role;
     if (avatarEl) avatarEl.textContent = (user.name || "?")[0].toUpperCase();
 
-    // Kalau admin masuk halaman guru, tambahkan tombol balik ke admin panel
+    // Admin di halaman guru → tombol balik
     if (user.role === "admin" && window.location.pathname.includes("/guru/")) {
       const sbNav = document.querySelector(".sb-nav");
       if (sbNav && !document.getElementById("btn-back-admin")) {
-        const backBtn = document.createElement("a");
-        backBtn.id = "btn-back-admin";
-        backBtn.href = "/admin/dashboard.html";
-        backBtn.className = "sb-item";
-        backBtn.style.cssText =
-          "background:rgba(255,255,255,.1);margin:0 .75rem .5rem;border-radius:8px";
-        backBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="18" height="18"><path d="M19 12H5M12 5l-7 7 7 7" stroke-linecap="round" stroke-linejoin="round"/></svg> Admin Panel`;
-        sbNav.insertBefore(backBtn, sbNav.firstChild);
+        const b = document.createElement("a");
+        b.id = "btn-back-admin"; b.href = "/admin/dashboard.html"; b.className = "sb-item";
+        b.style.cssText = "background:rgba(255,255,255,.1);margin:0 .75rem .5rem;border-radius:8px";
+        b.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="18" height="18"><path d="M19 12H5M12 5l-7 7 7 7" stroke-linecap="round" stroke-linejoin="round"/></svg> Admin Panel`;
+        sbNav.insertBefore(b, sbNav.firstChild);
       }
     }
+
+    // ── MOBILE: Hamburger + Overlay + Bottom Nav ────────────────
+    _initMobileNav();
   };
+
+  const _initMobileNav = () => {
+    const sidebar = document.querySelector(".sidebar");
+    const topbar  = document.querySelector(".topbar");
+    if (!sidebar || !topbar) return;
+
+    // Overlay
+    let overlay = document.getElementById("_sb_overlay");
+    if (!overlay) {
+      overlay = document.createElement("div");
+      overlay.id = "_sb_overlay";
+      overlay.className = "sidebar-overlay";
+      document.body.appendChild(overlay);
+    }
+
+    // Hamburger button di topbar
+    if (!document.getElementById("_hamburger")) {
+      const btn = document.createElement("button");
+      btn.id = "_hamburger"; btn.className = "hamburger"; btn.setAttribute("aria-label","Menu");
+      btn.innerHTML = "<span></span><span></span><span></span>";
+      topbar.insertBefore(btn, topbar.firstChild);
+      btn.addEventListener("click", _toggleSidebar);
+    }
+
+    overlay.addEventListener("click", _closeSidebar);
+
+    // Close sidebar on nav item click (mobile)
+    sidebar.querySelectorAll(".sb-item,.sb-logout").forEach(el => {
+      el.addEventListener("click", () => { if (window.innerWidth <= 768) _closeSidebar(); });
+    });
+
+    // ── Bottom Navigation ─────────────────────────────────────
+    if (!document.getElementById("_bottom_nav")) {
+      const items = [];
+      sidebar.querySelectorAll(".sb-item").forEach(el => {
+        const label = el.textContent.trim();
+        const href  = el.getAttribute("href") || "#";
+        const svgEl = el.querySelector("svg");
+        const svg   = svgEl ? svgEl.outerHTML : "";
+        const active = el.classList.contains("active");
+        items.push({ label, href, svg, active });
+      });
+
+      const maxItems = Math.min(items.length, 5);
+      const visible  = items.slice(0, maxItems);
+
+      const nav = document.createElement("nav");
+      nav.id = "_bottom_nav"; nav.className = "bottom-nav";
+      nav.innerHTML = `<div class="bottom-nav-inner">
+        ${visible.map(it => `
+          <a class="bn-item${it.active ? " active" : ""}" href="${it.href}">
+            ${it.svg}
+            <span>${it.label.substring(0,9)}</span>
+          </a>`).join("")}
+      </div>`;
+      document.body.appendChild(nav);
+    }
+  };
+
+  const _toggleSidebar = () => {
+    const sidebar  = document.querySelector(".sidebar");
+    const overlay  = document.getElementById("_sb_overlay");
+    const ham      = document.getElementById("_hamburger");
+    const isOpen   = sidebar.classList.toggle("open");
+    if (overlay) overlay.classList.toggle("show", isOpen);
+    if (ham) ham.setAttribute("aria-expanded", isOpen);
+    document.body.style.overflow = isOpen ? "hidden" : "";
+  };
+
+  const _closeSidebar = () => {
+    const sidebar = document.querySelector(".sidebar");
+    const overlay = document.getElementById("_sb_overlay");
+    const ham     = document.getElementById("_hamburger");
+    if (sidebar) sidebar.classList.remove("open");
+    if (overlay) overlay.classList.remove("show");
+    if (ham) ham.setAttribute("aria-expanded", "false");
+    document.body.style.overflow = "";
+  };
+
+  // Close on ESC key
+  document.addEventListener("keydown", e => { if (e.key === "Escape") _closeSidebar(); });
 
   return {
     toast,
