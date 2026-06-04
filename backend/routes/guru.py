@@ -177,14 +177,18 @@ def guru_import_siswa():
 def siswa_history(student_id):
     rows = query("""
         SELECT
-            es.id, es.submitted_at, es.created_at,
+            es.id, es.submitted_at, es.started_at,
             e.title as exam_title, e.id as exam_id,
-            r.score, r.correct_count
+            e.duration_minutes,
+            s.name as subject_name,
+            r.score, r.correct_count, r.wrong_count, r.empty_count,
+            es.tab_violations
         FROM exam_sessions es
         JOIN exams e ON e.id=es.exam_id
+        LEFT JOIN subjects s ON s.id=e.subject_id
         LEFT JOIN results r ON r.session_id=es.id
         WHERE es.student_id=%s
-        ORDER BY es.created_at DESC
+        ORDER BY COALESCE(es.submitted_at, es.started_at) DESC
     """, (student_id,))
     return jsonify({'history': [dict(r) for r in rows]})
 

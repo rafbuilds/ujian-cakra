@@ -305,24 +305,32 @@
       async function lihatHistory(id, name) {
         try {
           const r = await API.get("/api/siswa/" + id + "/history");
-          const history = r.history || [];
+          const history = r.history || r || [];
           if (!history.length) {
             UI.toast(name + " belum punya riwayat ujian", "info");
             return;
           }
-          const rows = history
-            .map(
-              (h) => `
-      <div style="padding:.5rem 0;border-bottom:.5px solid var(--border)">
-        <div style="font-weight:500;font-size:13px">${h.exam_title || "—"}</div>
-        <div style="font-size:11px;color:var(--muted)">${h.submitted_at ? UI.fmtDT(h.submitted_at) : "—"}</div>
-        <div style="font-size:12px;color:var(--green);font-weight:600">Nilai: ${h.score ?? "—"}</div>
-      </div>`,
-            )
-            .join("");
+          const rows = history.map(h => {
+            const score = h.score != null ? parseFloat(h.score).toFixed(1) : '—';
+            const color = h.score >= 75 ? 'var(--green)' : h.score != null ? '#b91c1c' : 'var(--muted)';
+            const lulus = h.score != null ? (h.score >= 75 ? '✅ Lulus' : '❌ Tidak Lulus') : '';
+            return `
+              <div style="padding:.625rem .75rem;margin-bottom:6px;background:var(--light);border-radius:10px">
+                <div style="font-weight:600;font-size:13px;margin-bottom:3px">${h.exam_title || '—'}</div>
+                <div style="font-size:11px;color:var(--muted);margin-bottom:5px">
+                  ${h.subject_name ? h.subject_name + ' · ' : ''}${h.submitted_at ? UI.fmtDT(h.submitted_at) : 'Belum submit'}
+                </div>
+                <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+                  <span style="font-size:14px;font-weight:700;color:${color}">Nilai: ${score}</span>
+                  <span style="font-size:11px;color:${color}">${lulus}</span>
+                  ${h.correct_count != null ? `<span style="font-size:11px;color:var(--muted)">✓${h.correct_count} ✗${h.wrong_count||0} —${h.empty_count||0}</span>` : ''}
+                  ${h.tab_violations > 0 ? `<span style="font-size:10px;background:#fde8e8;color:#b91c1c;padding:1px 6px;border-radius:10px">${h.tab_violations}× pelanggaran</span>` : ''}
+                </div>
+              </div>`;
+          }).join('');
           UI.confirm("Riwayat Ujian — " + name, rows, () => {}, "info");
-        } catch {
-          UI.toast("Gagal memuat riwayat", "error");
+        } catch(e) {
+          UI.toast("Gagal memuat riwayat: " + (e.error || e.message || ''), "error");
         }
       }
 
