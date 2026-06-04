@@ -1089,10 +1089,11 @@
             return;
           }
 
+          // Monitor API returns: { session_id, name, class_name, status, answered, total, tab_violations, submitted_at }
           document.getElementById('mm-body').innerHTML = students.map(s => {
-            const pct = (s.total_questions > 0) ? Math.round(s.answered_count / s.total_questions * 100) : 0;
-            const done = !!s.submitted_at;
-            const vBadge = s.tab_violations > 0
+            const pct  = (s.total > 0) ? Math.round((s.answered||0) / s.total * 100) : 0;
+            const done = s.status === 'submitted' || !!s.submitted_at;
+            const vBadge = (s.tab_violations||0) > 0
               ? `<span style="background:#fde8e8;color:#b91c1c;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:700">${s.tab_violations}× pelanggaran</span>` : '';
             return `
               <div style="display:flex;align-items:center;gap:10px;padding:.5rem 0;border-bottom:.5px solid var(--border)">
@@ -1103,10 +1104,10 @@
                     <span style="font-size:10px;font-weight:600;padding:1px 6px;border-radius:10px;background:${done?'#e6f1fb':'#eaf3de'};color:${done?'#185fa5':'#3b6d11'}">${done?'Selesai':'Mengerjakan'}</span>
                     ${vBadge}
                   </div>
-                  <div style="font-size:11px;color:var(--muted)">${s.class_name||'—'} · IP: ${s.ip_address||'—'}</div>
+                  <div style="font-size:11px;color:var(--muted)">${s.class_name||'—'}</div>
                   ${!done ? `<div style="display:flex;align-items:center;gap:6px;margin-top:4px">
                     <div style="height:5px;background:#e5e7eb;border-radius:3px;flex:1"><div style="height:100%;width:${pct}%;background:var(--green);border-radius:3px"></div></div>
-                    <span style="font-size:10px;color:var(--muted)">${s.answered_count||0}/${s.total_questions||0} soal</span>
+                    <span style="font-size:10px;color:var(--muted)">${s.answered||0}/${s.total||0} soal</span>
                   </div>` : ''}
                 </div>
                 ${!done ? `<button class="btn btn-sm" style="font-size:10px;padding:2px 8px;background:var(--light)" onclick="allowExit('${s.session_id}')">Izinkan Keluar</button>` : ''}
@@ -1121,9 +1122,10 @@
 
       async function allowExit(sessionId) {
         try {
-          await API.patch('/api/exams/sessions/' + sessionId + '/allow-exit', {});
-          UI.toast('Izin keluar diberikan', 'success');
-        } catch(e) { UI.toast('Gagal', 'error'); }
+          await API.post('/api/sessions/' + sessionId + '/allow-exit', {});
+          UI.toast('✅ Izin keluar diberikan', 'success');
+          refreshMonitor();
+        } catch(e) { UI.toast('Gagal: ' + (e.error||e.message||''), 'error'); }
       }
 
       function closeMonitor() {
@@ -1147,21 +1149,22 @@
           const data = await API.get('/api/exams/' + examId + '/results');
           document.getElementById('mn-loading').style.display = 'none';
 
-          // Header info
-          document.getElementById('mn-title').textContent = data.exam?.title || 'Hasil Ujian';
+          // Header info — API returns: { results, summary, score_distribution, question_stats }
+          const sm = data.summary || {};
+          document.getElementById('mn-title').textContent = sm.title || 'Hasil Ujian';
           document.getElementById('mn-subtitle').textContent =
-            (data.exam?.teacher_name || '') + ' · ' + (data.exam?.subject_name || '') +
-            ' · ' + (data.stats?.total || 0) + ' peserta';
+            (sm.total_students || 0) + ' peserta · ' +
+            (sm.submitted || 0) + ' submit · rata-rata ' + (sm.avg_score || '—');
 
           // Stats
-          const s = data.stats || {};
-          const passing = 75;
-          const students = data.students || [];
-          const scores   = students.map(r => parseFloat(r.score || 0));
-          const passed   = scores.filter(v => v >= passing).length;
+          const passing  = 75;
+          const students = data.results || [];
+          const submitted = students.filter(r => r.submitted_at);
+          const scores   = submitted.map(r => parseFloat(r.score || 0));
+          const passed = scores.filter(v => v >= passing).length;
           document.getElementById('mn-total').textContent = students.length;
           document.getElementById('mn-avg').textContent   = scores.length ? (scores.reduce((a,b)=>a+b,0)/scores.length).toFixed(1) : '—';
-          document.getElementById('mn-pass').textContent  = passed + ' / ' + students.length;
+          document.getElementById('mn-pass').textContent  = passed + ' / ' + scores.length;
           document.getElementById('mn-high').textContent  = scores.length ? Math.max(...scores).toFixed(1) : '—';
           document.getElementById('mn-low').textContent   = scores.length ? Math.min(...scores).toFixed(1) : '—';
 
