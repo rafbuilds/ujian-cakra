@@ -483,6 +483,326 @@ def export_nilai(exam_id):
     return send_file(buf, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
                      as_attachment=True, download_name=f"nilai_{exam['title'] if exam else 'ujian'}.xlsx")
 
+# ── Export Detail — Jawaban Lengkap per Siswa ──────────────────
+@exams_bp.route('/api/exams/<exam_id>/export-detail', methods=['GET'])
+@require_guru
+def export_detail(exam_id):
+    import io, base64 as b64mod
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+    from openpyxl.drawing.image import Image as XLImage
+
+    # ── Warna tema ─────────────────────────────────────────
+    C_GREEN_DARK  = '0F4C35'
+    C_GREEN_MED   = '1D9E75'
+    C_GREEN_LIGHT = 'D6F0E6'
+    C_RED_LIGHT   = 'FFDADA'
+    C_YELLOW      = 'FFF3CD'
+    C_BLUE_LIGHT  = 'DBEAFE'
+    C_GRAY_HEAD   = 'F0EDE6'
+    C_WHITE       = 'FFFFFF'
+
+    thin  = Side(style='thin',  color='CCCCCC')
+    thick = Side(style='medium', color='888888')
+    def border(t=thin, l=thin, r=thin, b=thin):
+        return Border(top=t, left=l, right=r, bottom=b)
+    def fill(c): return PatternFill('solid', fgColor=c)
+    def font(bold=False, size=11, color='000000', italic=False):
+        return Font(bold=bold, size=size, color=color, italic=italic,
+                    name='Calibri')
+    def align(h='left', v='center', wrap=False):
+        return Alignment(horizontal=h, vertical=v, wrap_text=wrap)
+
+    # ── Ambil data ─────────────────────────────────────────
+    exam = query("SELECT e.*, u.name as teacher_name, s.name as subject_name "
+                 "FROM exams e LEFT JOIN users u ON u.id=e.teacher_id "
+                 "LEFT JOIN subjects s ON s.id=e.subject_id "
+                 "WHERE e.id=%s", (exam_id,), fetch='one')
+    if not exam:
+        return jsonify({'error': 'Ujian tidak ditemukan'}), 404
+    if request.user_role != 'admin' and str(exam['teacher_id']) != request.user_id:
+        return jsonify({'error': 'Akses ditolak'}), 403
+
+    sessions = query("""
+        SELECT es.id as session_id, es.submitted_at, es.tab_violations,
+               es.auto_submitted,
+               u.name, u.nisn, c.name as class_name, c.id as class_id,
+               r.score, r.correct_count, r.wrong_count, r.empty_count
+        FROM exam_sessions es
+        JOIN users u ON u.id = es.student_id
+        LEFT JOIN classes c ON c.id = u.class_id
+        LEFT JOIN results r ON r.session_id = es.id
+        WHERE es.exam_id = %s AND es.submitted_at IS NOT NULL
+        ORDER BY c.grade, c.name, u.name
+    """, (exam_id,))
+
+    questions = query("""
+        SELECT q.id, q.content, q.type, q.order_num, q.image_url, q.attachment_url
+        FROM questions q WHERE q.exam_id = %s ORDER BY q.order_num
+    """, (exam_id,))
+
+    # Bangun option map: {question_id: [options]}
+    opt_map = {}
+    for q in questions:
+        opts = query("SELECT id, label, content, is_correct FROM options "
+                     "WHERE question_id=%s ORDER BY label", (q['id'],))
+        opt_map[str(q['id'])] = [dict(o) for o in opts]
+
+    # Bangun essay map: {session_id: {question_id: essay}}
+    essay_map_all = {}
+    for sess in sessions:
+        sid = str(sess['session_id'])
+        try:
+            essays = query("SELECT question_id, essay_text, photo_b64 "
+                           "FROM essay_answers WHERE session_id=%s", (sid,))
+            essay_map_all[sid] = {str(e['question_id']): dict(e) for e in essays}
+        except Exception:
+            essay_map_all[sid] = {}
+
+    wb = Workbook()
+
+    # ══════════════════════════════════════════════════════
+    # SHEET 1: Rekap Nilai (semua siswa)
+    # ══════════════════════════════════════════════════════
+    ws_sum = wb.active
+    ws_sum.title = 'Rekap Nilai'
+
+    # Judul
+    ws_sum.merge_cells('A1:J1')
+    ws_sum['A1'] = f'REKAP NILAI UJIAN — {(exam.get("title") or "").upper()}'
+    ws_sum['A1'].font      = font(bold=True, size=13, color=C_WHITE)
+    ws_sum['A1'].fill      = fill(C_GREEN_DARK)
+    ws_sum['A1'].alignment = align('center')
+    ws_sum.row_dimensions[1].height = 22
+
+    ws_sum.merge_cells('A2:J2')
+    ws_sum['A2'] = f'Guru: {exam.get("teacher_name","")}  |  Mapel: {exam.get("subject_name","")}  |  Durasi: {exam.get("duration_minutes",90)} menit'
+    ws_sum['A2'].font      = font(size=10, color='555555', italic=True)
+    ws_sum['A2'].alignment = align('center')
+    ws_sum.row_dimensions[2].height = 16
+
+    # Header tabel rekap
+    h_cols = ['No','Nama Siswa','NISN','Kelas','Waktu Submit',
+              'Nilai','Benar','Salah','Kosong','Pelanggaran']
+    for j, h in enumerate(h_cols, 1):
+        c = ws_sum.cell(3, j, h)
+        c.font      = font(bold=True, size=10, color=C_WHITE)
+        c.fill      = fill(C_GREEN_MED)
+        c.alignment = align('center')
+        c.border    = border()
+    ws_sum.row_dimensions[3].height = 18
+
+    passing = 75  # default KKM
+    for i, s in enumerate(sessions, 1):
+        row = i + 3
+        score = float(s['score'] or 0)
+        lulus = score >= passing
+        vals = [i, s['name'], s['nisn'] or '—', s['class_name'] or '—',
+                str(s['submitted_at'])[:16] if s['submitted_at'] else '—',
+                score, s['correct_count'] or 0,
+                s['wrong_count'] or 0, s['empty_count'] or 0,
+                s['tab_violations'] or 0]
+        for j, v in enumerate(vals, 1):
+            c = ws_sum.cell(row, j, v)
+            c.alignment = align('center' if j != 2 else 'left')
+            c.border    = border()
+            if j == 6:  # kolom nilai
+                c.font = font(bold=True, color=C_GREEN_DARK if lulus else 'C00000')
+                c.fill = fill(C_GREEN_LIGHT if lulus else C_RED_LIGHT)
+
+    # Lebar kolom rekap
+    widths_sum = [5, 28, 14, 10, 18, 8, 7, 7, 7, 12]
+    for j, w in enumerate(widths_sum, 1):
+        ws_sum.column_dimensions[get_column_letter(j)].width = w
+
+    # ══════════════════════════════════════════════════════
+    # SHEET PER SISWA
+    # ══════════════════════════════════════════════════════
+    COLS = ['No', 'Pertanyaan', 'Tipe', 'Jawaban Siswa', 'Jawaban Benar',
+            'Status', 'Foto/Essay', 'Nilai Guru', 'Catatan Guru']
+
+    for sess in sessions:
+        sid   = str(sess['session_id'])
+        sname = (sess['name'] or 'siswa')[:28]
+        ws    = wb.create_sheet(title=sname)
+        score = float(sess['score'] or 0)
+        lulus = score >= passing
+
+        # ── Info siswa (baris 1-6) ───────────────────────
+        ws.merge_cells('A1:I1')
+        ws['A1'] = f'LEMBAR JAWABAN — {(exam.get("title") or "").upper()}'
+        ws['A1'].font      = font(bold=True, size=13, color=C_WHITE)
+        ws['A1'].fill      = fill(C_GREEN_DARK)
+        ws['A1'].alignment = align('center')
+        ws.row_dimensions[1].height = 24
+
+        info = [
+            ('Nama Siswa',   sess['name']  or '—',
+             'Nilai',        score),
+            ('NISN',         sess['nisn']  or '—',
+             'Benar',        sess['correct_count'] or 0),
+            ('Kelas',        sess['class_name'] or '—',
+             'Salah',        sess['wrong_count']  or 0),
+            ('Submit',       str(sess['submitted_at'])[:16] if sess['submitted_at'] else '—',
+             'Kosong',       sess['empty_count']  or 0),
+            ('Pelanggaran',  sess['tab_violations'] or 0,
+             'Lulus/Tidak',  'LULUS ✓' if lulus else 'TIDAK LULUS ✗'),
+        ]
+        for r_off, (lbl1, val1, lbl2, val2) in enumerate(info, 2):
+            ws.merge_cells(f'A{r_off}:B{r_off}')
+            ws.merge_cells(f'C{r_off}:D{r_off}')
+            ws.merge_cells(f'E{r_off}:F{r_off}')
+            ws.merge_cells(f'G{r_off}:I{r_off}')
+
+            cl = ws.cell(r_off, 1, lbl1)
+            cv = ws.cell(r_off, 3, val1)
+            cl2 = ws.cell(r_off, 5, lbl2)
+            cv2 = ws.cell(r_off, 7, val2)
+
+            for c in (cl, cl2):
+                c.font = font(bold=True, size=10, color='555555')
+                c.fill = fill(C_GRAY_HEAD)
+                c.alignment = align('right')
+                c.border = border()
+            for c in (cv, cv2):
+                c.font = font(size=10)
+                c.alignment = align('left')
+                c.border = border()
+            # Warna nilai
+            if lbl2 == 'Nilai':
+                cv2.font = font(bold=True, size=11,
+                                color=C_GREEN_DARK if lulus else 'C00000')
+            if lbl2 == 'Lulus/Tidak':
+                cv2.font = font(bold=True, size=10,
+                                color=C_GREEN_DARK if lulus else 'C00000')
+                cv2.fill = fill(C_GREEN_LIGHT if lulus else C_RED_LIGHT)
+
+        # ── Header tabel jawaban (baris 8) ───────────────
+        HDR_ROW = 8
+        ws.row_dimensions[HDR_ROW].height = 20
+        for j, h in enumerate(COLS, 1):
+            c = ws.cell(HDR_ROW, j, h)
+            c.font      = font(bold=True, size=10, color=C_WHITE)
+            c.fill      = fill(C_GREEN_DARK)
+            c.alignment = align('center', wrap=True)
+            c.border    = border(t=thick, l=thick, r=thick, b=thick)
+
+        # ── Ambil jawaban siswa untuk sesi ini ───────────
+        ans_rows = query("""
+            SELECT a.question_id, a.option_id, o.label, o.content, o.is_correct
+            FROM answers a
+            LEFT JOIN options o ON o.id = a.option_id
+            WHERE a.session_id = %s
+        """, (sid,))
+        ans_map = {str(r['question_id']): dict(r) for r in ans_rows}
+        essay_map = essay_map_all.get(sid, {})
+
+        # ── Tulis soal + jawaban ────────────────────────
+        data_row = HDR_ROW + 1
+        for q_num, q in enumerate(questions, 1):
+            qid   = str(q['id'])
+            qtype = q.get('type') or 'multiple_choice'
+            ans   = ans_map.get(qid)
+            essay = essay_map.get(qid, {})
+            opts  = opt_map.get(qid, [])
+            correct_opts = [o for o in opts if o.get('is_correct')]
+            correct_text = ' / '.join(f"({o['label']}) {o['content']}" for o in correct_opts)
+
+            # Status & warna
+            if qtype == 'camera_essay':
+                status, row_fill = '📷 Koreksi Manual', C_BLUE_LIGHT
+            elif ans and ans.get('is_correct'):
+                status, row_fill = '✓ Benar', C_GREEN_LIGHT
+            elif ans and ans.get('option_id'):
+                status, row_fill = '✗ Salah', C_RED_LIGHT
+            else:
+                status, row_fill = '— Kosong', C_YELLOW
+
+            # Teks jawaban siswa
+            if qtype == 'camera_essay':
+                student_ans = essay.get('essay_text') or '(lihat foto)'
+            elif ans and ans.get('label'):
+                student_ans = f"({ans['label']}) {ans.get('content','')}"
+            else:
+                student_ans = '—'
+
+            tipe_label = {
+                'multiple_choice': 'Pilihan Ganda',
+                'camera_essay':    'Esai Foto',
+                'essay':           'Uraian',
+                'multiple_answer': 'Pilihan Berganda',
+                'yes_no':          'Benar/Salah',
+            }.get(qtype, qtype)
+
+            vals = [q_num, q['content'] or '', tipe_label,
+                    student_ans, correct_text or '—', status,
+                    '', '', '']  # foto, nilai guru, catatan guru (kosong)
+
+            ws.row_dimensions[data_row].height = 60
+            for j, v in enumerate(vals, 1):
+                c = ws.cell(data_row, j, v)
+                c.fill      = fill(row_fill)
+                c.border    = border()
+                c.alignment = align('center' if j in (1, 3, 6, 8) else 'left',
+                                    wrap=True)
+                c.font      = font(size=10)
+                if j == 6:  # status
+                    c.font = font(bold=True, size=10,
+                                  color=(C_GREEN_DARK if '✓' in status
+                                         else ('C00000' if '✗' in status
+                                               else '856404')))
+                if j == 2:  # pertanyaan
+                    c.font = font(size=10)
+
+            # ── Sisipkan foto jika ada ─────────────────
+            photo_b64 = essay.get('photo_b64', '')
+            if photo_b64 and qtype == 'camera_essay':
+                try:
+                    from PIL import Image as PILImage
+                    raw = photo_b64.split(',')[-1] if ',' in photo_b64 else photo_b64
+                    img_bytes = b64mod.b64decode(raw)
+                    pil_img   = PILImage.open(io.BytesIO(img_bytes))
+                    pil_img.thumbnail((180, 140))
+                    img_buf = io.BytesIO()
+                    pil_img.save(img_buf, format='PNG')
+                    img_buf.seek(0)
+                    xl_img = XLImage(img_buf)
+                    xl_img.width  = 160
+                    xl_img.height = 120
+                    ws.add_image(xl_img, f'G{data_row}')
+                    ws.row_dimensions[data_row].height = 100
+                except Exception:
+                    ws.cell(data_row, 7, '⚠ Foto tidak dapat dimuat').font = font(italic=True, color='888888')
+
+            data_row += 1
+
+        # ── Kolom "Nilai Guru" dan "Catatan Guru" — bordered kosong ──
+        # (sudah terisi kosong, guru isi manual)
+        for r in range(HDR_ROW + 1, data_row):
+            for j in (8, 9):
+                c = ws.cell(r, j)
+                c.border = border(t=thin, l=thick, r=thick, b=thin)
+                c.fill   = fill('FFFDE7')  # kuning muda — tandai harus diisi
+
+        # ── Lebar kolom per-siswa ────────────────────────
+        widths_stu = [5, 50, 14, 36, 36, 14, 22, 12, 30]
+        for j, w in enumerate(widths_stu, 1):
+            ws.column_dimensions[get_column_letter(j)].width = w
+
+        # ── Freeze header ────────────────────────────────
+        ws.freeze_panes = f'A{HDR_ROW + 1}'
+
+    # ── Simpan & kirim ─────────────────────────────────────
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    title_safe = (exam.get('title') or 'ujian').replace('/', '-').replace(' ', '_')
+    return send_file(buf,
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                     as_attachment=True,
+                     download_name=f'detail_jawaban_{title_safe}.xlsx')
+
 # ── Template Soal ──────────────────────────────────────────────
 @exams_bp.route('/api/template-soal', methods=['GET'])
 @require_guru

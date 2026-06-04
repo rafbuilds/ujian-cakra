@@ -284,9 +284,12 @@
       <div class="main-wrap">
         <div class="topbar">
           <div class="topbar-title">Nilai & Rekap</div>
-          <div class="topbar-right" id="export-wrap" style="display: none">
-            <button class="btn btn-secondary btn-sm" onclick="exportExcel()">
-              ⬇ Export Excel
+          <div class="topbar-right" id="export-wrap" style="display:none;gap:6px">
+            <button class="btn btn-secondary btn-sm" onclick="exportExcel()" title="Rekap nilai ringkas semua siswa">
+              ⬇ Rekap Nilai
+            </button>
+            <button class="btn btn-primary btn-sm" onclick="exportDetail()" title="Export jawaban lengkap + foto per siswa">
+              📋 Detail Jawaban
             </button>
           </div>
         </div>
@@ -1063,6 +1066,20 @@
           );
         } catch {
           UI.toast("Gagal export", "error");
+        }
+      }
+
+      async function exportDetail() {
+        UI.loading(true, 'Menyiapkan export detail jawaban...\nProses ini mungkin butuh beberapa detik.');
+        try {
+          await API.download(
+            `/api/exams/${currentExamId}/export-detail`,
+            `detail_jawaban.xlsx`,
+          );
+        } catch(e) {
+          UI.toast(e.error || "Gagal export detail", "error");
+        } finally {
+          UI.loading(false);
         }
       }
 
