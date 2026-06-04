@@ -154,7 +154,7 @@
                     <th>Nama Siswa</th>
                     <th class="col-nisn">NISN</th>
                     <th>Kelas</th>
-                    <th style="text-align:center">Device</th>
+                    <th>📱 Perangkat HP</th>
                     <th class="col-login">Login Terakhir</th>
                     <th class="col-status" style="text-align:center">Status</th>
                     <th style="text-align:center">Aksi</th>
@@ -265,14 +265,19 @@
 
           tbody.innerHTML = filtered.map((s, i) => {
             const deviceBadge = s.device_id
-              ? `<span class="badge badge-green">✓ Terdaftar</span>`
-              : `<span class="badge badge-gray">Belum</span>`;
+              ? `<div style="max-width:180px">
+                   <div style="font-size:12px;font-weight:600;color:#1a6b35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${(s.device_info||'').replace(/"/g,'&quot;')}">
+                     📱 ${s.device_info || s.device_id}
+                   </div>
+                   <div style="font-size:10px;color:var(--muted);font-family:monospace">${(s.device_id||'').substring(0,12)}…</div>
+                 </div>`
+              : `<span style="font-size:12px;color:var(--muted)">— Belum login</span>`;
             const activeBadge = s.is_active
               ? `<span class="badge badge-blue" style="cursor:pointer" onclick="toggleAktif('${s.id}',false)" title="Klik untuk nonaktifkan">Aktif</span>`
               : `<span class="badge badge-red" style="cursor:pointer" onclick="toggleAktif('${s.id}',true)" title="Klik untuk aktifkan">Nonaktif</span>`;
             const resetBtn = s.device_id
-              ? `<button class="btn btn-secondary btn-sm" onclick="resetDev('${s.id}','${esc(s.name)}')" title="Reset perangkat HP">📱 Reset HP</button>`
-              : `<button class="btn btn-secondary btn-sm" style="opacity:.4;cursor:not-allowed" disabled title="Belum ada device terdaftar">📱 Reset HP</button>`;
+              ? `<button class="btn btn-secondary btn-sm" onclick="resetDev('${s.id}','${esc(s.name)}','${esc(s.device_info||s.device_id)}')" title="Reset: ${esc(s.device_info||'—')}">📱 Reset HP</button>`
+              : `<button class="btn btn-secondary btn-sm" style="opacity:.4;cursor:not-allowed" disabled title="Belum login">📱 Reset HP</button>`;
             return `<tr>
               <td style="color:var(--muted)">${i + 1}</td>
               <td>
@@ -281,7 +286,7 @@
               </td>
               <td class="col-nisn" style="font-size:12px;color:var(--muted)">${s.nisn || '—'}</td>
               <td><span class="badge badge-gray">${s.class_name || '—'}</span></td>
-              <td style="text-align:center">${deviceBadge}</td>
+              <td>${deviceBadge}</td>
               <td class="col-login" style="font-size:12px;color:var(--muted)">${s.last_login ? UI.fmtDate(s.last_login) : '—'}</td>
               <td class="col-status" style="text-align:center">${activeBadge}</td>
               <td>
@@ -333,12 +338,15 @@
       }
 
       // ── Reset Device ────────────────────────────────────────────
-      async function resetDev(id, name) {
-        UI.confirm('Reset Device HP',
-          'Reset HP <strong>' + name + '</strong>?<br><small style="color:var(--muted)">Siswa harus login ulang dari HP baru.</small>',
+      async function resetDev(id, name, deviceInfo) {
+        const infoHtml = deviceInfo
+          ? `<div style="margin:.5rem 0;padding:.5rem .75rem;background:var(--light);border-radius:8px;font-size:12px;font-family:monospace;color:var(--muted)">📱 ${deviceInfo}</div>`
+          : '';
+        UI.confirm('Reset Perangkat HP',
+          `Reset HP siswa <strong>${name}</strong>?${infoHtml}<small style="color:var(--muted)">Setelah direset, siswa bisa login dari HP lain. HP lama tidak bisa dipakai lagi.</small>`,
           async () => {
             await API.post('/api/admin/siswa/' + id + '/reset-device');
-            UI.toast('✅ Device ' + name + ' direset', 'success');
+            UI.toast('✅ Device ' + name + ' berhasil direset', 'success');
             load();
           });
       }
