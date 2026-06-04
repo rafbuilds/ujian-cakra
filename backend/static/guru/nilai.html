@@ -839,8 +839,12 @@
           .join("");
       }
 
+      let currentStudentSessionId = null; // untuk grade essay
+
       async function showDetail(studentId) {
         const stu = nilaiData.find((s) => (s.student_id || s.id) === studentId);
+        // Simpan session_id untuk grading essay
+        currentStudentSessionId = stu?.session_id || null;
         if (!stu) return;
         const score = stu.score != null ? parseFloat(stu.score) : null;
         const color =
@@ -947,37 +951,46 @@
             if (type === "camera_essay") {
               const hasEssay = q.essay_text || q.photo_b64;
               const teacherScore = q.teacher_score;
-              return `<div class="q-item">
-      <div class="q-status ${hasEssay ? "correct" : "empty"}" style="background:${hasEssay ? "#8b5cf6" : "#e5e7eb"};color:white">📷</div>
+              const scored = teacherScore != null && teacherScore !== '';
+              const uid = `essay_${i}_${q.id}`;
+              return `<div class="q-item" id="qitem_${uid}">
+      <div class="q-status" style="background:${scored ? 'var(--green)' : hasEssay ? '#8b5cf6' : '#e5e7eb'};color:white">
+        ${scored ? '✓' : '📷'}
+      </div>
       <div style="flex:1">
         <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:4px">SOAL ${i + 1} · KAMERA+URAIAN</div>
         <div style="font-size:13px;line-height:1.6;color:var(--text);margin-bottom:8px">${q.content}</div>
-        ${
-          q.photo_b64
-            ? `
+        ${q.photo_b64 ? `
           <div style="margin-bottom:8px">
             <div style="font-size:11px;color:var(--muted);margin-bottom:4px">📷 Foto jawaban:</div>
-            <img src="data:image/jpeg;base64,${q.photo_b64}" style="max-width:100%;max-height:200px;border-radius:8px;border:1px solid var(--border)"/>
-          </div>`
-            : ""
-        }
-        ${
-          q.essay_text
-            ? `
+            <img src="data:image/jpeg;base64,${q.photo_b64}"
+              style="max-width:100%;max-height:260px;border-radius:10px;border:.5px solid var(--border);cursor:zoom-in"
+              onclick="this.style.maxHeight=this.style.maxHeight==='260px'?'none':'260px'" />
+          </div>` : ''}
+        ${q.essay_text ? `
           <div style="background:#f8f9fa;border-radius:8px;padding:10px;border-left:3px solid #8b5cf6;margin-bottom:8px">
             <div style="font-size:11px;color:var(--muted);margin-bottom:4px">✏️ Uraian siswa:</div>
             <div style="font-size:13px;line-height:1.6">${q.essay_text}</div>
-          </div>`
-            : ""
-        }
-        ${!hasEssay ? '<span class="ans-pill empty">⬜ Belum dijawab</span>' : ""}
-        ${
-          teacherScore != null
-            ? `<span class="ans-pill correct">✅ Nilai guru: ${teacherScore}</span>`
-            : hasEssay
-              ? `<span style="font-size:11px;color:#8b5cf6;font-weight:600">⏳ Belum dinilai guru</span>`
-              : ""
-        }
+          </div>` : ''}
+        ${!hasEssay ? '<span class="ans-pill empty">⬜ Belum dijawab</span>' : ''}
+
+        ${hasEssay ? `
+        <div style="margin-top:10px;padding:10px;background:#f8f7f3;border-radius:10px;border:.5px solid var(--border)">
+          <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:8px">📝 NILAI GURU</div>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <input type="number" id="${uid}_score" min="0" max="100"
+              value="${teacherScore ?? ''}" placeholder="0–100"
+              style="width:80px;padding:6px 10px;border:1.5px solid ${scored ? 'var(--green)' : 'var(--border2)'};border-radius:8px;font-size:15px;font-weight:700;text-align:center;color:var(--green)" />
+            <input type="text" id="${uid}_note" placeholder="Catatan guru..."
+              value="${q.teacher_note ?? ''}"
+              style="flex:1;min-width:120px;padding:6px 10px;border:1px solid var(--border2);border-radius:8px;font-size:12px" />
+            <button class="btn btn-primary btn-sm"
+              onclick="saveEssayGrade('${q.id}','${uid}')">
+              💾 Simpan Nilai
+            </button>
+            ${scored ? `<span style="font-size:12px;color:var(--green);font-weight:600">✅ Nilai: ${teacherScore}</span>` : `<span style="font-size:11px;color:#8b5cf6">⏳ Belum dinilai</span>`}
+          </div>
+        </div>` : ''}
       </div>
     </div>`;
             }
@@ -1069,6 +1082,30 @@
         } catch {
           UI.toast("Gagal export", "error");
         }
+      }
+
+      async function saveEssayGrade(questionId, uid) {
+        if (!currentStudentSessionId) { UI.toast('Session tidak ditemukan', 'error'); return; }
+        const scoreEl = document.getElementById(`${uid}_score`);
+        const noteEl  = document.getElementById(`${uid}_note`);
+        const score   = scoreEl ? parseInt(scoreEl.value) : null;
+        const note    = noteEl  ? noteEl.value.trim() : '';
+        if (score == null || isNaN(score) || score < 0 || score > 100) {
+          UI.toast('Nilai harus 0–100', 'warn'); return;
+        }
+        try {
+          await API.patch(
+            `/api/exams/${currentExamId}/sessions/${currentStudentSessionId}/grade-essay`,
+            { question_id: questionId, score, note }
+          );
+          UI.toast(`✅ Nilai ${score} disimpan`, 'success');
+          // Update tampilan langsung tanpa reload full
+          if (scoreEl) scoreEl.style.borderColor = 'var(--green)';
+          // Refresh data nilai agar skor total diupdate
+          const [r] = await Promise.all([API.get(`/api/exams/${currentExamId}/results`)]);
+          nilaiData = r.results || [];
+          renderTable(nilaiData);
+        } catch(e) { UI.toast(e.error || 'Gagal simpan', 'error'); }
       }
 
       async function exportDetail() {

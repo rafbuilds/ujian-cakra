@@ -451,6 +451,62 @@ def publish_results(exam_id):
           (exam_id, request.user_id), fetch='none')
     return jsonify({'ok': True})
 
+# ── Grade Essay ────────────────────────────────────────────────
+@exams_bp.route('/api/exams/<exam_id>/sessions/<session_id>/grade-essay', methods=['PATCH'])
+@require_guru
+def grade_essay(exam_id, session_id):
+    """Guru beri nilai untuk jawaban esai/foto satu siswa."""
+    body  = request.json or {}
+    qid   = body.get('question_id')
+    score = body.get('score')         # angka 0-100
+    note  = body.get('note', '')
+    if not qid:
+        return jsonify({'error': 'question_id wajib'}), 400
+    try:
+        query("""INSERT INTO essay_answers (id, session_id, question_id, teacher_score, teacher_note)
+                 VALUES (gen_random_uuid(), %s, %s, %s, %s)
+                 ON CONFLICT (session_id, question_id)
+                 DO UPDATE SET teacher_score=%s, teacher_note=%s""",
+              (session_id, qid, score, note, score, note), fetch='none')
+        # Recalculate total score including essay scores
+        _recalc_with_essay(session_id)
+        return jsonify({'ok': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+def _recalc_with_essay(session_id):
+    """Hitung ulang nilai dengan memasukkan skor esai dari guru."""
+    try:
+        sess = query("SELECT exam_id FROM exam_sessions WHERE id=%s", (session_id,), fetch='one')
+        if not sess: return
+        exam_id = sess['exam_id']
+        total_q = query("SELECT COUNT(*) as n FROM questions WHERE exam_id=%s", (exam_id,), fetch='one')['n']
+        if not total_q: return
+        exam    = query("SELECT score_per_correct FROM exams WHERE id=%s", (exam_id,), fetch='one')
+        spc     = float(exam.get('score_per_correct') or (100.0 / total_q))
+
+        correct = query("""SELECT COUNT(*) as n FROM answers a
+                           JOIN options o ON o.id=a.option_id
+                           WHERE a.session_id=%s AND o.is_correct=true""", (session_id,), fetch='one')['n']
+        wrong   = query("""SELECT COUNT(*) as n FROM answers a
+                           JOIN options o ON o.id=a.option_id
+                           WHERE a.session_id=%s AND o.is_correct=false""", (session_id,), fetch='one')['n']
+        # Tambah skor esai dari guru
+        essay_total = query("""SELECT COALESCE(SUM(teacher_score), 0) as s
+                               FROM essay_answers WHERE session_id=%s
+                               AND teacher_score IS NOT NULL""", (session_id,), fetch='one')['s']
+        score = round(correct * spc + float(essay_total or 0), 2)
+        score = min(100.0, score)
+        empty = total_q - correct - wrong
+        query("""INSERT INTO results (id, session_id, score, correct_count, wrong_count, empty_count)
+                 VALUES (gen_random_uuid(), %s, %s, %s, %s, %s)
+                 ON CONFLICT (session_id) DO UPDATE
+                 SET score=%s, correct_count=%s, wrong_count=%s, empty_count=%s""",
+              (session_id, score, correct, wrong, empty,
+               score, correct, wrong, empty), fetch='none')
+    except Exception:
+        pass
+
 # ── Export Excel ───────────────────────────────────────────────
 @exams_bp.route('/api/exams/<exam_id>/export-nilai', methods=['GET'])
 @require_guru
