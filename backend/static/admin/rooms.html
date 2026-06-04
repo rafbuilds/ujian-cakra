@@ -698,7 +698,7 @@
         try {
           [allTeachers, allKelas] = await Promise.all([
             API.get("/api/admin/users").then((u) =>
-              u.filter((x) => x.role === "guru"),
+              u.filter((x) => x.role === "guru" || x.role === "admin"),
             ),
             API.get("/api/classes"),
           ]);

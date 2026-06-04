@@ -306,6 +306,54 @@
       </div>
     </div>
 
+    <!-- Modal Edit Pengguna -->
+    <div id="modal-edit-user" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:center;justify-content:center;padding:1rem;backdrop-filter:blur(4px)">
+      <div style="background:#fff;border-radius:18px;width:500px;max-width:97vw;max-height:90vh;display:flex;flex-direction:column;overflow:hidden">
+        <!-- Header -->
+        <div style="background:linear-gradient(135deg,var(--green),#1a6b4a);padding:1.25rem 1.5rem;display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+          <div id="em-title" style="font-weight:700;font-size:16px;color:#fff">Edit Pengguna</div>
+          <button onclick="closeEditModal()" style="background:rgba(255,255,255,.15);border:none;color:#fff;width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:16px">✕</button>
+        </div>
+        <!-- Body scrollable -->
+        <div style="padding:1.25rem 1.5rem;overflow-y:auto;flex:1">
+          <input type="hidden" id="em-id" />
+
+          <!-- Informasi Dasar -->
+          <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.5px;margin-bottom:.75rem">INFORMASI DASAR</div>
+          <div class="form-group">
+            <label>Nama Lengkap *</label>
+            <input class="form-control" id="em-name" placeholder="Nama lengkap" />
+          </div>
+          <div class="form-group">
+            <label>Email *</label>
+            <input class="form-control" id="em-email" type="email" placeholder="email@sekolah.sch.id" />
+          </div>
+          <div class="form-group" style="margin-bottom:1.25rem">
+            <label>Role *</label>
+            <select class="form-control" id="em-role">
+              <option value="guru">Guru</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+
+          <!-- Mata Pelajaran -->
+          <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.5px;margin-bottom:.75rem">MATA PELAJARAN YANG DIAMPU</div>
+          <div id="em-mapel-list" style="min-height:36px;margin-bottom:.75rem;display:flex;flex-wrap:wrap;gap:4px;align-items:center"></div>
+          <div style="display:flex;gap:8px">
+            <input id="em-mapel-input" class="form-control" placeholder="Nama mata pelajaran..." style="flex:1"
+              onkeydown="if(event.key==='Enter'){event.preventDefault();addMapel()}" />
+            <button class="btn btn-primary btn-sm" onclick="addMapel()">+ Tambah</button>
+          </div>
+          <div style="font-size:11px;color:var(--muted);margin-top:5px">Tekan Enter atau klik "Tambah". Klik × untuk hapus mapel.</div>
+        </div>
+        <!-- Footer -->
+        <div style="padding:1rem 1.5rem;border-top:.5px solid var(--border);display:flex;gap:8px;flex-shrink:0">
+          <button class="btn btn-secondary" style="flex:1" onclick="closeEditModal()">Batal</button>
+          <button class="btn btn-primary" style="flex:2" onclick="saveEditUser()">💾 Simpan Perubahan</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Modal Set Password -->
     <div id="modal-pw" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:center;justify-content:center;padding:1rem;backdrop-filter:blur(4px)">
       <div style="background:#fff;border-radius:18px;padding:2rem;max-width:400px;width:100%">
@@ -378,17 +426,101 @@
         }
         document.getElementById('staff-list').innerHTML = list.map(u => `
           <div class="user-row">
-            <div class="avatar" style="background:${u.role==='admin'?'#3b82f6':'var(--green)'}">${(u.name||'?')[0]}</div>
-            <div style="flex:1;min-width:0">
+            <div class="avatar" style="background:${u.role==='admin'?'#3b82f6':'var(--green)'};cursor:pointer" onclick="openEditModal('${u.id}')">${(u.name||'?')[0]}</div>
+            <div style="flex:1;min-width:0;cursor:pointer" onclick="openEditModal('${u.id}')">
               <div style="font-size:13px;font-weight:600">${u.name}</div>
               <div style="font-size:11px;color:var(--muted)">${u.email||''}</div>
             </div>
             <span style="background:${u.role==='admin'?'#e6f1fb':'#eaf3de'};color:${u.role==='admin'?'#185fa5':'#3b6d11'};padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600">${u.role==='admin'?'Admin':'Guru'}</span>
             <div style="display:flex;gap:5px;flex-shrink:0">
+              <button class="btn btn-secondary btn-sm" onclick="openEditModal('${u.id}')">✏️ Edit</button>
               <button class="btn btn-secondary btn-sm" onclick="openPwModal('${u.id}','${esc(u.name)}')">🔑 Password</button>
               <button class="btn btn-danger btn-sm" onclick="deleteUser('${u.id}','${esc(u.name)}')">🗑</button>
             </div>
           </div>`).join('');
+      }
+
+      // ── Edit Modal ──────────────────────────────────────────────
+      let _editUserId = null;
+      let _editSubjects = [];
+
+      async function openEditModal(userId) {
+        _editUserId = userId;
+        _editSubjects = [];
+        const u = _staffData.find(x => x.id === userId);
+        if (!u) return;
+
+        // Isi form dasar
+        document.getElementById('em-id').value    = userId;
+        document.getElementById('em-name').value  = u.name || '';
+        document.getElementById('em-email').value = u.email || '';
+        document.getElementById('em-role').value  = u.role || 'guru';
+        document.getElementById('em-title').textContent = 'Edit: ' + u.name;
+        document.getElementById('em-mapel-input').value = '';
+        document.getElementById('em-mapel-list').innerHTML = '<div class="loading-spinner" style="margin:.5rem auto;width:24px;height:24px;border-width:2px"></div>';
+
+        document.getElementById('modal-edit-user').style.display = 'flex';
+
+        // Muat mata pelajaran
+        try {
+          const subjects = await API.get('/api/admin/guru/' + userId + '/subjects');
+          _editSubjects = subjects;
+          renderMapelChips();
+        } catch(e) {
+          document.getElementById('em-mapel-list').innerHTML = '<span style="font-size:12px;color:var(--muted)">Gagal memuat</span>';
+        }
+      }
+
+      function closeEditModal() {
+        document.getElementById('modal-edit-user').style.display = 'none';
+        _editUserId = null;
+      }
+
+      function renderMapelChips() {
+        const el = document.getElementById('em-mapel-list');
+        if (!_editSubjects.length) {
+          el.innerHTML = '<span style="font-size:12px;color:var(--muted)">Belum ada mata pelajaran</span>';
+          return;
+        }
+        el.innerHTML = _editSubjects.map(s => `
+          <span style="display:inline-flex;align-items:center;gap:5px;background:var(--green4);color:var(--green);border:1px solid rgba(15,76,53,.2);padding:4px 10px;border-radius:20px;font-size:12px;font-weight:600;margin:3px">
+            ${s.name}
+            <button onclick="removeMapel('${s.id}')" style="background:none;border:none;color:var(--red2);cursor:pointer;font-size:14px;line-height:1;padding:0">×</button>
+          </span>`).join('');
+      }
+
+      async function addMapel() {
+        const inp  = document.getElementById('em-mapel-input');
+        const name = inp.value.trim();
+        if (!name) return;
+        try {
+          const s = await API.post('/api/admin/guru/' + _editUserId + '/subjects', { name });
+          _editSubjects.push(s);
+          renderMapelChips();
+          inp.value = '';
+          inp.focus();
+        } catch(e) { UI.toast(e.error || 'Gagal tambah mapel', 'error'); }
+      }
+
+      async function removeMapel(subjectId) {
+        try {
+          await API.del('/api/admin/guru/' + _editUserId + '/subjects/' + subjectId);
+          _editSubjects = _editSubjects.filter(s => s.id !== subjectId);
+          renderMapelChips();
+        } catch(e) { UI.toast(e.error || 'Gagal hapus mapel', 'error'); }
+      }
+
+      async function saveEditUser() {
+        const name  = document.getElementById('em-name').value.trim();
+        const email = document.getElementById('em-email').value.trim();
+        const role  = document.getElementById('em-role').value;
+        if (!name || !email) { UI.toast('Nama dan email wajib', 'warn'); return; }
+        try {
+          await API.patch('/api/admin/users/' + _editUserId, { name, email, role });
+          UI.toast('✅ Data berhasil disimpan', 'success');
+          closeEditModal();
+          loadStaff();
+        } catch(e) { UI.toast(e.error || 'Gagal simpan', 'error'); }
       }
 
       async function createUser() {
