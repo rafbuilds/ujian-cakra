@@ -177,15 +177,35 @@ const UI = (() => {
     }[user.role] || user.role;
     if (avatarEl) avatarEl.textContent = (user.name || "?")[0].toUpperCase();
 
-    // Admin di halaman guru → tombol balik
-    if (user.role === "admin" && window.location.pathname.includes("/guru/")) {
+    const isAdminPage = window.location.pathname.includes("/admin/");
+    const isGuruPage  = window.location.pathname.includes("/guru/");
+
+    if (user.role === "admin") {
       const sbNav = document.querySelector(".sb-nav");
-      if (sbNav && !document.getElementById("btn-back-admin")) {
-        const b = document.createElement("a");
-        b.id = "btn-back-admin"; b.href = "/admin/dashboard.html"; b.className = "sb-item";
-        b.style.cssText = "background:rgba(255,255,255,.1);margin:0 .75rem .5rem;border-radius:8px";
-        b.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="18" height="18"><path d="M19 12H5M12 5l-7 7 7 7" stroke-linecap="round" stroke-linejoin="round"/></svg> Admin Panel`;
-        sbNav.insertBefore(b, sbNav.firstChild);
+      if (sbNav) {
+        if (isAdminPage && !document.getElementById("btn-mode-guru")) {
+          // Di halaman admin → tampilkan tombol "Mode Guru"
+          const divider = document.createElement("div");
+          divider.style.cssText = "height:.5px;background:rgba(255,255,255,.12);margin:.5rem 1.25rem";
+          const b = document.createElement("a");
+          b.id = "btn-mode-guru"; b.href = "/guru/dashboard.html"; b.className = "sb-item";
+          b.style.cssText = "color:rgba(255,255,255,.75);gap:10px";
+          b.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="18" height="18" style="flex-shrink:0"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke-linecap="round"/><circle cx="9" cy="7" r="4"/><path d="M23 11l-4 4-2-2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Mode Guru</span>`;
+          sbNav.appendChild(divider);
+          sbNav.appendChild(b);
+        }
+        if (isGuruPage && !document.getElementById("btn-back-admin")) {
+          // Di halaman guru → tampilkan tombol "Kembali ke Admin"
+          const b = document.createElement("a");
+          b.id = "btn-back-admin"; b.href = "/admin/dashboard.html"; b.className = "sb-item";
+          b.style.cssText = "background:rgba(255,255,255,.12);margin:.5rem .875rem .25rem;border-radius:10px;font-weight:600;";
+          b.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="18" height="18" style="flex-shrink:0"><path d="M19 12H5M12 5l-7 7 7 7" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Admin Panel</span>`;
+          sbNav.insertBefore(b, sbNav.firstChild);
+
+          // Ubah label "Administrator" jadi "Admin / Guru" saat di mode guru
+          const roleEl = document.getElementById("sb-user-role");
+          if (roleEl) roleEl.textContent = "Admin · Mode Guru";
+        }
       }
     }
 
