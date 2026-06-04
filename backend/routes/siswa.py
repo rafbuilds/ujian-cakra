@@ -106,16 +106,25 @@ def start_exam(exam_id):
     saved_answers = {str(r['question_id']): str(r['option_id']) for r in saved if r['option_id']}
 
     now = datetime.now(timezone.utc)
-    elapsed = 0
-    if existing:
-        started = existing.get('started_at')
-        if started:
-            if hasattr(started, 'tzinfo') and started.tzinfo is None:
-                started = started.replace(tzinfo=timezone.utc)
-            elapsed = int((now - started).total_seconds())
 
-    duration_secs = int(exam.get('duration_minutes') or 90) * 60
-    remaining = max(0, duration_secs - elapsed)
+    # Prioritaskan expires_at jika ada (untuk sesi yang dibuka ulang oleh guru)
+    # expires_at di-set saat reopen → akurat untuk sesi reset/perpanjangan
+    expires_at_val = (existing or {}).get('expires_at') or expires_at
+    if expires_at_val:
+        if hasattr(expires_at_val, 'tzinfo') and expires_at_val.tzinfo is None:
+            expires_at_val = expires_at_val.replace(tzinfo=timezone.utc)
+        remaining = max(0, int((expires_at_val - now).total_seconds()))
+    else:
+        # Fallback: hitung dari started_at + durasi (sesi normal)
+        elapsed = 0
+        if existing:
+            started = existing.get('started_at')
+            if started:
+                if hasattr(started, 'tzinfo') and started.tzinfo is None:
+                    started = started.replace(tzinfo=timezone.utc)
+                elapsed = int((now - started).total_seconds())
+        duration_secs = int(exam.get('duration_minutes') or 90) * 60
+        remaining = max(0, duration_secs - elapsed)
 
     return jsonify({
         'session_id': session_id,
@@ -123,7 +132,7 @@ def start_exam(exam_id):
         'questions': result_questions,
         'saved_answers': saved_answers,
         'remaining_seconds': remaining,
-        'expires_at': expires_at.isoformat() if expires_at else None,
+        'expires_at': expires_at_val.isoformat() if expires_at_val else (expires_at.isoformat() if expires_at else None),
     })
 
 # ── Answer ─────────────────────────────────────────────────────
