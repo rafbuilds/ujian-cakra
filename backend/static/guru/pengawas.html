@@ -378,38 +378,49 @@
 
         <!-- Body -->
         <div style="padding:1.25rem 1.5rem">
-          <!-- Waktu tambahan -->
+          <!-- Waktu tambahan (hanya relevan untuk opsi lanjut+waktu dan mulai ulang) -->
           <div style="margin-bottom:1.25rem">
-            <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:6px">TAMBAHAN WAKTU (menit)</label>
+            <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:6px">TAMBAHAN WAKTU — untuk Lanjut/Mulai Ulang (menit)</label>
             <input type="number" id="reopen-extra" value="30" min="5" max="120"
-              class="form-control" style="text-align:center;font-size:20px;font-weight:700;color:var(--green);width:120px" />
+              class="form-control" style="text-align:center;font-size:20px;font-weight:700;color:var(--green);width:120px"
+              oninput="document.querySelectorAll('.extra-label').forEach(el=>el.textContent=this.value)" />
           </div>
 
-          <!-- 2 Pilihan -->
+          <!-- Pilihan Metode -->
           <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:10px">PILIH METODE PENGERJAAN ULANG</div>
 
-          <!-- Opsi 1: Lanjut -->
-          <div style="border:1.5px solid var(--border);border-radius:12px;padding:1rem;margin-bottom:.75rem;cursor:pointer;transition:border-color .15s"
-               onmouseover="this.style.borderColor='var(--green)'" onmouseout="this.style.borderColor='var(--border)'"
-               onclick="doReopen('lanjut')">
+          <!-- Opsi 1: Lanjutkan Countdown (timer asli, tanpa tambah waktu) -->
+          <div class="reopen-opt" onclick="doReopen('countdown')"
+               style="border:1.5px solid var(--border);border-radius:12px;padding:.875rem 1rem;margin-bottom:.625rem;cursor:pointer;transition:border-color .15s">
             <div style="display:flex;align-items:center;gap:10px">
-              <div style="width:36px;height:36px;border-radius:10px;background:#eaf3de;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">▶️</div>
+              <div style="width:36px;height:36px;border-radius:10px;background:#e6f1fb;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">⏱️</div>
               <div style="flex:1">
-                <div style="font-weight:700;font-size:14px;color:var(--green)">Lanjutkan dari Posisi Terakhir</div>
-                <div style="font-size:12px;color:var(--muted);margin-top:2px">Jawaban yang sudah diisi <strong>tetap ada</strong>. Siswa melanjutkan dari soal terakhir.</div>
+                <div style="font-weight:700;font-size:13px;color:#185fa5">Lanjutkan Countdown</div>
+                <div style="font-size:11px;color:var(--muted);margin-top:2px">Timer <strong>tetap dari hitungan awal</strong>. Jawaban tetap ada. Cocok untuk siswa yang sempat terputus.</div>
               </div>
             </div>
           </div>
 
-          <!-- Opsi 2: Mulai Ulang -->
-          <div style="border:1.5px solid var(--border);border-radius:12px;padding:1rem;cursor:pointer;transition:border-color .15s"
-               onmouseover="this.style.borderColor='var(--red2)'" onmouseout="this.style.borderColor='var(--border)'"
-               onclick="confirmReset()">
+          <!-- Opsi 2: Lanjut + Tambah Waktu -->
+          <div class="reopen-opt" onclick="doReopen('lanjut')"
+               style="border:1.5px solid var(--border);border-radius:12px;padding:.875rem 1rem;margin-bottom:.625rem;cursor:pointer;transition:border-color .15s">
+            <div style="display:flex;align-items:center;gap:10px">
+              <div style="width:36px;height:36px;border-radius:10px;background:#eaf3de;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">▶️</div>
+              <div style="flex:1">
+                <div style="font-weight:700;font-size:13px;color:var(--green)">Lanjutkan + Tambah Waktu</div>
+                <div style="font-size:11px;color:var(--muted);margin-top:2px">Jawaban tetap ada. Timer diganti <strong>+<span class="extra-label">30</span> menit</strong> dari sekarang.</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Opsi 3: Mulai Ulang -->
+          <div class="reopen-opt" onclick="confirmReset()"
+               style="border:1.5px solid var(--border);border-radius:12px;padding:.875rem 1rem;cursor:pointer;transition:border-color .15s">
             <div style="display:flex;align-items:center;gap:10px">
               <div style="width:36px;height:36px;border-radius:10px;background:#fcebeb;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">🔄</div>
               <div style="flex:1">
-                <div style="font-weight:700;font-size:14px;color:var(--red2)">Mulai dari Awal</div>
-                <div style="font-size:12px;color:var(--muted);margin-top:2px">Semua jawaban <strong>dihapus</strong>. Siswa mengerjakan ujian dari soal pertama.</div>
+                <div style="font-weight:700;font-size:13px;color:var(--red2)">Mulai dari Awal</div>
+                <div style="font-size:11px;color:var(--muted);margin-top:2px">Semua jawaban <strong>dihapus</strong>. Siswa mengerjakan dari soal pertama. Waktu baru +<span class="extra-label">30</span> menit.</div>
               </div>
             </div>
           </div>
@@ -712,15 +723,30 @@
       }
 
       async function doReopen(mode) {
-        // mode: 'lanjut' | 'ulang'
+        // mode: 'countdown' | 'lanjut' | 'ulang'
         const extra = parseInt(document.getElementById('reopen-extra').value) || 30;
-        const endpoint = mode === 'ulang'
-          ? `/api/guru/sessions/${_reopenSid}/reset-reopen`
-          : `/api/guru/sessions/${_reopenSid}/reopen`;
+        let endpoint, body, toastMsg;
+
+        if (mode === 'countdown') {
+          // Lanjutkan timer asli (keep_timer=true), jawaban tetap
+          endpoint = `/api/guru/sessions/${_reopenSid}/reopen`;
+          body     = { keep_timer: true };
+          toastMsg = `✅ ${_reopenName} dilanjutkan dengan countdown asli`;
+        } else if (mode === 'lanjut') {
+          // Lanjut + tambah waktu
+          endpoint = `/api/guru/sessions/${_reopenSid}/reopen`;
+          body     = { extra_minutes: extra, keep_timer: false };
+          toastMsg = `✅ ${_reopenName} dilanjutkan +${extra} menit`;
+        } else {
+          // Mulai dari awal
+          endpoint = `/api/guru/sessions/${_reopenSid}/reset-reopen`;
+          body     = { extra_minutes: extra };
+          toastMsg = `✅ Jawaban ${_reopenName} direset, ujian dibuka ulang +${extra} menit`;
+        }
+
         try {
-          await API.post(endpoint, { extra_minutes: extra });
-          const label = mode === 'ulang' ? 'direset & dibuka ulang' : 'dilanjutkan';
-          UI.toast(`✅ Ujian ${_reopenName} berhasil ${label} (+${extra} menit)`, 'success');
+          await API.post(endpoint, body);
+          UI.toast(toastMsg, 'success');
           closeReopenModal();
           loadMonitor();
         } catch(e) {

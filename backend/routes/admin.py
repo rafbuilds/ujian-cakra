@@ -749,103 +749,96 @@ def reset_all_devices():
 # SESSION REOPEN — Opsi 2: Guru/Admin buka ulang sesi siswa
 # ══════════════════════════════════════════════════════════════
 
+def _do_reopen(session_id, extra_min=None, keep_timer=False, reset_answers=False, reset_violations=False):
+    """Helper internal: buka ulang sesi. Dipakai oleh semua endpoint reopen."""
+    from datetime import datetime, timezone, timedelta
+
+    sess = query("""SELECT es.*, e.teacher_id, e.duration_minutes
+                    FROM exam_sessions es JOIN exams e ON e.id = es.exam_id
+                    WHERE es.id = %s""", (session_id,), fetch='one')
+    if not sess:
+        return None, 'Sesi tidak ditemukan'
+
+    if reset_answers:
+        query("DELETE FROM answers       WHERE session_id=%s", (session_id,), fetch='none')
+        query("DELETE FROM results       WHERE session_id=%s", (session_id,), fetch='none')
+        try:
+            query("DELETE FROM essay_answers WHERE session_id=%s", (session_id,), fetch='none')
+            query("DELETE FROM multi_answers  WHERE session_id=%s", (session_id,), fetch='none')
+        except Exception:
+            pass  # tabel mungkin belum ada
+
+    now = datetime.now(timezone.utc)
+
+    if keep_timer:
+        # Lanjutkan countdown asli — jangan ubah expires_at
+        new_expires = sess.get('expires_at')
+        # Jika expires_at sudah lewat, perpanjang dengan durasi ujian asli
+        if not new_expires or (hasattr(new_expires, 'tzinfo') and new_expires < now):
+            dur = int(sess.get('duration_minutes') or 90)
+            new_expires = now + timedelta(minutes=dur)
+        update_expires_sql = "expires_at = %s,"
+        update_expires_val = (new_expires,)
+    else:
+        dur = int(extra_min or 30)
+        new_expires = now + timedelta(minutes=dur)
+        update_expires_sql = "expires_at = %s,"
+        update_expires_val = (new_expires,)
+
+    viol_reset = ", tab_violations = 0" if reset_violations else ""
+
+    query(f"""UPDATE exam_sessions
+              SET submitted_at  = NULL,
+                  auto_submitted = FALSE,
+                  status         = 'ongoing',
+                  exit_allowed   = FALSE,
+                  {update_expires_sql}
+                  started_at     = COALESCE(started_at, %s)
+                  {viol_reset}
+              WHERE id = %s""",
+          (*update_expires_val, now, session_id), fetch='none')
+
+    return sess, None
+
 @admin_bp.route('/api/admin/sessions/<session_id>/reopen', methods=['POST'])
 @require_admin
 def reopen_session(session_id):
-    """Buka ulang sesi ujian yang sudah disubmit. Opsi 2: manual oleh admin."""
-    from datetime import datetime, timezone, timedelta
-    body         = request.json or {}
-    extra_min    = int(body.get('extra_minutes', 15))  # tambahan waktu default 15 mnt
-
-    sess = query("SELECT * FROM exam_sessions WHERE id=%s", (session_id,), fetch='one')
-    if not sess:
-        return jsonify({'error': 'Sesi tidak ditemukan'}), 404
-
-    # Hitung expires_at baru: sekarang + extra_minutes
-    new_expires = datetime.now(timezone.utc) + timedelta(minutes=extra_min)
-
-    query("""UPDATE exam_sessions
-             SET submitted_at  = NULL,
-                 auto_submitted = FALSE,
-                 status         = 'ongoing',
-                 expires_at     = %s,
-                 reopen_count   = COALESCE(reopen_count, 0) + 1
-             WHERE id = %s""",
-          (new_expires, session_id), fetch='none')
-
+    body      = request.json or {}
+    extra_min = int(body.get('extra_minutes', 15))
+    keep      = bool(body.get('keep_timer', False))
+    sess, err = _do_reopen(session_id, extra_min=extra_min, keep_timer=keep)
+    if err: return jsonify({'error': err}), 404
     log_activity(request.user_id, 'SESSION_REOPEN',
-                 f"Buka ulang sesi {session_id[:8]} (+{extra_min} menit)", request.remote_addr)
+                 f"Buka ulang sesi {session_id[:8]}", request.remote_addr)
+    return jsonify({'ok': True})
 
-    return jsonify({'ok': True, 'extra_minutes': extra_min,
-                    'new_expires': new_expires.isoformat()})
+@admin_bp.route('/api/guru/sessions/<session_id>/reopen', methods=['POST'])
+@require_guru
+def guru_reopen_session(session_id):
+    """Lanjutkan atau perpanjang sesi — tanpa reset jawaban."""
+    body      = request.json or {}
+    extra_min = int(body.get('extra_minutes', 30))
+    keep      = bool(body.get('keep_timer', False))
+    sess, err = _do_reopen(session_id, extra_min=extra_min, keep_timer=keep)
+    if err: return jsonify({'error': err}), 404
+    if request.user_role != 'admin' and str(sess['teacher_id']) != request.user_id:
+        return jsonify({'error': 'Akses ditolak'}), 403
+    return jsonify({'ok': True})
 
 @admin_bp.route('/api/guru/sessions/<session_id>/reset-reopen', methods=['POST'])
 @require_guru
 def guru_reset_reopen(session_id):
     """Reset semua jawaban + buka ulang sesi (mulai dari awal)."""
-    from datetime import datetime, timezone, timedelta
     body      = request.json or {}
     extra_min = int(body.get('extra_minutes', 90))
-
-    sess = query("""SELECT es.*, e.teacher_id FROM exam_sessions es
-                    JOIN exams e ON e.id = es.exam_id
-                    WHERE es.id = %s""", (session_id,), fetch='one')
-    if not sess:
-        return jsonify({'error': 'Sesi tidak ditemukan'}), 404
+    sess, err = _do_reopen(session_id, extra_min=extra_min,
+                           reset_answers=True, reset_violations=True)
+    if err: return jsonify({'error': err}), 404
     if request.user_role != 'admin' and str(sess['teacher_id']) != request.user_id:
         return jsonify({'error': 'Akses ditolak'}), 403
-
-    # Hapus semua jawaban
-    query("DELETE FROM answers WHERE session_id=%s",       (session_id,), fetch='none')
-    query("DELETE FROM essay_answers WHERE session_id=%s", (session_id,), fetch='none')
-    query("DELETE FROM multi_answers WHERE session_id=%s", (session_id,), fetch='none')
-    query("DELETE FROM results WHERE session_id=%s",       (session_id,), fetch='none')
-
-    new_expires = datetime.now(timezone.utc) + timedelta(minutes=extra_min)
-    query("""UPDATE exam_sessions
-             SET submitted_at   = NULL,
-                 auto_submitted = FALSE,
-                 status         = 'ongoing',
-                 tab_violations = 0,
-                 expires_at     = %s,
-                 reopen_count   = COALESCE(reopen_count, 0) + 1
-             WHERE id = %s""",
-          (new_expires, session_id), fetch='none')
-
     log_activity(request.user_id, 'SESSION_RESET',
-                 f"Reset jawaban sesi {session_id[:8]} (+{extra_min} menit)", request.remote_addr)
-    return jsonify({'ok': True, 'extra_minutes': extra_min, 'new_expires': new_expires.isoformat()})
-
-@admin_bp.route('/api/guru/sessions/<session_id>/reopen', methods=['POST'])
-@require_guru
-def guru_reopen_session(session_id):
-    """Buka ulang sesi oleh guru (hanya ujian milik guru tersebut)."""
-    from datetime import datetime, timezone, timedelta
-    body      = request.json or {}
-    extra_min = int(body.get('extra_minutes', 15))
-
-    sess = query("""SELECT es.*, e.teacher_id FROM exam_sessions es
-                    JOIN exams e ON e.id = es.exam_id
-                    WHERE es.id = %s""", (session_id,), fetch='one')
-    if not sess:
-        return jsonify({'error': 'Sesi tidak ditemukan'}), 404
-
-    if request.user_role != 'admin' and str(sess['teacher_id']) != request.user_id:
-        return jsonify({'error': 'Hanya guru pemilik ujian yang bisa buka ulang'}), 403
-
-    new_expires = datetime.now(timezone.utc) + timedelta(minutes=extra_min)
-
-    query("""UPDATE exam_sessions
-             SET submitted_at  = NULL,
-                 auto_submitted = FALSE,
-                 status         = 'ongoing',
-                 expires_at     = %s,
-                 reopen_count   = COALESCE(reopen_count, 0) + 1
-             WHERE id = %s""",
-          (new_expires, session_id), fetch='none')
-
-    return jsonify({'ok': True, 'extra_minutes': extra_min,
-                    'new_expires': new_expires.isoformat()})
+                 f"Reset jawaban sesi {session_id[:8]}", request.remote_addr)
+    return jsonify({'ok': True})
 
 # ── Cleanup finished exams ───────────────────────────────────
 @admin_bp.route('/api/admin/exams/cleanup', methods=['DELETE'])
