@@ -586,6 +586,7 @@
 
       let nilaiData = [],
         currentExamId = null,
+        currentExamTitle = '',
         monitorData = null;
       const COLORS = [
         "#0f4c35",
@@ -623,6 +624,10 @@
           return;
         }
         currentExamId = examId;
+        // Simpan judul ujian dari option yang terpilih
+        const sel = document.getElementById('exam-select');
+        const selText = sel ? sel.options[sel.selectedIndex]?.text || '' : '';
+        currentExamTitle = selText.split(' — ')[0].trim();
         UI.loading(true, "Memuat...");
         try {
           const [r, mon] = await Promise.all([
@@ -1069,9 +1074,10 @@
       async function exportDetail() {
         UI.loading(true, 'Menyiapkan export detail jawaban...\nProses ini mungkin butuh beberapa detik.');
         try {
+          const safeName = currentExamTitle.replace(/[\/\\:*?"<>|]/g, '-') || 'ujian';
           await API.download(
             `/api/exams/${currentExamId}/export-detail`,
-            `detail_jawaban.xlsx`,
+            `Nilai_Jawaban_${safeName}.xlsx`,
           );
         } catch(e) {
           UI.toast(e.error || "Gagal export detail", "error");
