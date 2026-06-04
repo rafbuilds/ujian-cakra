@@ -93,17 +93,18 @@
         background: #b4b2a9;
       }
       .prog-bar {
-        height: 5px;
+        height: 6px;
         background: var(--border);
         border-radius: 99px;
         overflow: hidden;
-        margin-top: 3px;
-        width: 80px;
+        margin-top: 4px;
+        width: 100px;
       }
       .prog-fill {
         height: 100%;
         border-radius: 99px;
         background: var(--green3);
+        transition: width .8s cubic-bezier(.4,0,.2,1);
       }
       .violation-badge {
         background: #fcebeb;
@@ -572,9 +573,8 @@
         // Hitung summary dari students kalau backend tidak return summary
         const summary = d.summary || {
           submitted: students.filter((s) => s.status === "submitted").length,
-          online: students.filter((s) => s.status === "online").length,
-          offline: students.filter((s) => s.status === "offline" || !s.status)
-            .length,
+          online: students.filter((s) => s.status === "ongoing" || s.status === "online").length,
+          offline: students.filter((s) => s.status === "offline" || !s.status || s.status === "not_started").length,
         };
         document.getElementById("mon-stat").innerHTML = `
     <div class="mon-card"><div class="mon-num mon-submitted">${summary.submitted}</div><div class="mon-label">✅ Submit</div></div>
@@ -649,18 +649,22 @@
             <td style="padding:9px 12px">${i + 1}</td>
             <td style="padding:9px 12px">
               <div style="display:flex;align-items:center;gap:8px">
-                <div class="stu-avatar ${s.status}">${(s.name || "?")[0]}</div>
+                <div class="stu-avatar ${s.status === 'ongoing' ? 'online' : s.status}">${(s.name || "?")[0]}</div>
                 <div style="font-weight:500">${s.name}</div>
               </div>
             </td>
-            <td style="padding:9px 12px;font-size:12px;color:var(--muted)">${s.class_name}</td>
+            <td style="padding:9px 12px;font-size:12px;color:var(--muted)">${s.class_name || '—'}</td>
             <td style="padding:9px 12px">
-              <span class="status-dot dot-${s.status}"></span>
-              ${{ submitted: "Submit", online: "Online", offline: "Belum" }[s.status]}
+              <span class="status-dot dot-${s.status === 'ongoing' ? 'online' : (s.status || 'offline')}"></span>
+              ${{ submitted: 'Submit ✅', ongoing: '🟡 Online', online: '🟡 Online', offline: '⭕ Belum' }[s.status] || '—'}
             </td>
             <td style="padding:9px 12px">
-              <div>${s.answered || 0}/${s.total_q || 0}</div>
-              <div class="prog-bar"><div class="prog-fill" style="width:${s.total_q ? ((s.answered || 0) / s.total_q) * 100 : 0}%"></div></div>
+              <div style="font-size:13px;font-weight:600;color:var(--green)">
+                ${s.answered || 0} / <span style="color:var(--muted);font-weight:400">${s.total || s.total_q || '?'}</span>
+              </div>
+              <div class="prog-bar">
+                <div class="prog-fill" style="width:${(s.total || s.total_q) ? ((s.answered || 0) / (s.total || s.total_q)) * 100 : 0}%"></div>
+              </div>
             </td>
             <td style="padding:9px 12px">
               ${s.tab_violations > 0 ? `<span class="violation-badge">⚠ ${s.tab_violations}x</span>` : '<span style="color:var(--muted);font-size:12px">—</span>'}
