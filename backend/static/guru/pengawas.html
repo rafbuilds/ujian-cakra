@@ -367,6 +367,61 @@
       </div>
     </div>
 
+    <!-- Modal Buka Ulang -->
+    <div id="reopen-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;align-items:center;justify-content:center;padding:1rem;backdrop-filter:blur(4px)">
+      <div style="background:#fff;border-radius:20px;width:420px;max-width:97vw;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.2)">
+        <!-- Header -->
+        <div style="background:linear-gradient(135deg,var(--green),#1a6b4a);padding:1.25rem 1.5rem">
+          <div style="font-weight:700;font-size:16px;color:#fff">🔓 Buka Ulang Ujian</div>
+          <div id="reopen-student-name" style="font-size:13px;color:rgba(255,255,255,.7);margin-top:3px"></div>
+        </div>
+
+        <!-- Body -->
+        <div style="padding:1.25rem 1.5rem">
+          <!-- Waktu tambahan -->
+          <div style="margin-bottom:1.25rem">
+            <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:6px">TAMBAHAN WAKTU (menit)</label>
+            <input type="number" id="reopen-extra" value="30" min="5" max="120"
+              class="form-control" style="text-align:center;font-size:20px;font-weight:700;color:var(--green);width:120px" />
+          </div>
+
+          <!-- 2 Pilihan -->
+          <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:10px">PILIH METODE PENGERJAAN ULANG</div>
+
+          <!-- Opsi 1: Lanjut -->
+          <div style="border:1.5px solid var(--border);border-radius:12px;padding:1rem;margin-bottom:.75rem;cursor:pointer;transition:border-color .15s"
+               onmouseover="this.style.borderColor='var(--green)'" onmouseout="this.style.borderColor='var(--border)'"
+               onclick="doReopen('lanjut')">
+            <div style="display:flex;align-items:center;gap:10px">
+              <div style="width:36px;height:36px;border-radius:10px;background:#eaf3de;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">▶️</div>
+              <div style="flex:1">
+                <div style="font-weight:700;font-size:14px;color:var(--green)">Lanjutkan dari Posisi Terakhir</div>
+                <div style="font-size:12px;color:var(--muted);margin-top:2px">Jawaban yang sudah diisi <strong>tetap ada</strong>. Siswa melanjutkan dari soal terakhir.</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Opsi 2: Mulai Ulang -->
+          <div style="border:1.5px solid var(--border);border-radius:12px;padding:1rem;cursor:pointer;transition:border-color .15s"
+               onmouseover="this.style.borderColor='var(--red2)'" onmouseout="this.style.borderColor='var(--border)'"
+               onclick="confirmReset()">
+            <div style="display:flex;align-items:center;gap:10px">
+              <div style="width:36px;height:36px;border-radius:10px;background:#fcebeb;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">🔄</div>
+              <div style="flex:1">
+                <div style="font-weight:700;font-size:14px;color:var(--red2)">Mulai dari Awal</div>
+                <div style="font-size:12px;color:var(--muted);margin-top:2px">Semua jawaban <strong>dihapus</strong>. Siswa mengerjakan ujian dari soal pertama.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div style="padding:.875rem 1.5rem;border-top:.5px solid var(--border);display:flex;justify-content:flex-end">
+          <button class="btn btn-secondary btn-sm" onclick="closeReopenModal()">Batal</button>
+        </div>
+      </div>
+    </div>
+
     <script src="../config.js"></script>
     <script src="../components/api.js"></script>
     <script src="../components/auth.js"></script>
@@ -603,7 +658,14 @@
               ${s.submitted_at ? UI.fmtTime(s.submitted_at) : "—"}
             </td>
             <td style="padding:9px 12px">
-              ${s.status !== "submitted" ? `<button class="btn btn-secondary btn-sm" onclick="allowExit('${s.session_id}','${s.name}')">🔓 Izinkan Keluar</button>` : "—"}
+              <div style="display:flex;flex-direction:column;gap:4px">
+                ${s.status !== 'submitted'
+                  ? `<button class="btn btn-secondary btn-sm" onclick="allowExit('${s.session_id}','${(s.name||'').replace(/'/g,"\\'")}')">🚪 Izinkan Keluar</button>`
+                  : ''}
+                ${s.status === 'submitted'
+                  ? `<button class="btn btn-primary btn-sm" onclick="openReopenModal('${s.session_id}','${(s.name||'').replace(/'/g,"\\'")}')">🔓 Buka Ulang</button>`
+                  : ''}
+              </div>
             </td>
           </tr>
         `,
@@ -616,16 +678,63 @@
 
       async function allowExit(sessionId, studentName) {
         UI.confirm(
-          "Izinkan Keluar",
-          `Izinkan <strong>${studentName}</strong> keluar dari mode ujian?`,
+          '🚪 Izinkan Keluar Sementara',
+          `Izinkan <strong>${studentName}</strong> keluar dari ujian sementara?<br><br>
+           <small style="color:var(--muted)">
+             ⏱ Timer tetap berjalan.<br>
+             💾 Jawaban tersimpan otomatis.<br>
+             🔙 Siswa dapat masuk kembali untuk melanjutkan.
+           </small>`,
           async () => {
             try {
               await API.post(`/api/sessions/${sessionId}/allow-exit`);
-              UI.toast(`✅ ${studentName} diizinkan keluar`, "success");
+              UI.toast(`✅ ${studentName} diizinkan keluar sementara`, 'success');
+              loadMonitor();
             } catch (e) {
-              UI.toast(e.error || "Gagal", "error");
+              UI.toast(e.error || 'Gagal', 'error');
             }
           },
+        );
+      }
+
+      // ── Modal Buka Ulang ────────────────────────────────────────
+      let _reopenSid = null, _reopenName = '';
+
+      function openReopenModal(sessionId, name) {
+        _reopenSid  = sessionId;
+        _reopenName = name;
+        document.getElementById('reopen-student-name').textContent = name;
+        document.getElementById('reopen-modal').style.display = 'flex';
+      }
+      function closeReopenModal() {
+        document.getElementById('reopen-modal').style.display = 'none';
+        _reopenSid = null;
+      }
+
+      async function doReopen(mode) {
+        // mode: 'lanjut' | 'ulang'
+        const extra = parseInt(document.getElementById('reopen-extra').value) || 30;
+        const endpoint = mode === 'ulang'
+          ? `/api/guru/sessions/${_reopenSid}/reset-reopen`
+          : `/api/guru/sessions/${_reopenSid}/reopen`;
+        try {
+          await API.post(endpoint, { extra_minutes: extra });
+          const label = mode === 'ulang' ? 'direset & dibuka ulang' : 'dilanjutkan';
+          UI.toast(`✅ Ujian ${_reopenName} berhasil ${label} (+${extra} menit)`, 'success');
+          closeReopenModal();
+          loadMonitor();
+        } catch(e) {
+          UI.toast(e.error || 'Gagal membuka ulang', 'error');
+        }
+      }
+
+      function confirmReset() {
+        UI.confirm(
+          '⚠️ Hapus Semua Jawaban?',
+          `Semua jawaban <strong>${_reopenName}</strong> akan dihapus permanen dan siswa mengerjakan dari awal.<br><br>
+           <small style="color:var(--red2)">Aksi ini tidak bisa dibatalkan.</small>`,
+          () => doReopen('ulang'),
+          'danger'
         );
       }
 

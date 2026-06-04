@@ -779,6 +779,43 @@ def reopen_session(session_id):
     return jsonify({'ok': True, 'extra_minutes': extra_min,
                     'new_expires': new_expires.isoformat()})
 
+@admin_bp.route('/api/guru/sessions/<session_id>/reset-reopen', methods=['POST'])
+@require_guru
+def guru_reset_reopen(session_id):
+    """Reset semua jawaban + buka ulang sesi (mulai dari awal)."""
+    from datetime import datetime, timezone, timedelta
+    body      = request.json or {}
+    extra_min = int(body.get('extra_minutes', 90))
+
+    sess = query("""SELECT es.*, e.teacher_id FROM exam_sessions es
+                    JOIN exams e ON e.id = es.exam_id
+                    WHERE es.id = %s""", (session_id,), fetch='one')
+    if not sess:
+        return jsonify({'error': 'Sesi tidak ditemukan'}), 404
+    if request.user_role != 'admin' and str(sess['teacher_id']) != request.user_id:
+        return jsonify({'error': 'Akses ditolak'}), 403
+
+    # Hapus semua jawaban
+    query("DELETE FROM answers WHERE session_id=%s",       (session_id,), fetch='none')
+    query("DELETE FROM essay_answers WHERE session_id=%s", (session_id,), fetch='none')
+    query("DELETE FROM multi_answers WHERE session_id=%s", (session_id,), fetch='none')
+    query("DELETE FROM results WHERE session_id=%s",       (session_id,), fetch='none')
+
+    new_expires = datetime.now(timezone.utc) + timedelta(minutes=extra_min)
+    query("""UPDATE exam_sessions
+             SET submitted_at   = NULL,
+                 auto_submitted = FALSE,
+                 status         = 'ongoing',
+                 tab_violations = 0,
+                 expires_at     = %s,
+                 reopen_count   = COALESCE(reopen_count, 0) + 1
+             WHERE id = %s""",
+          (new_expires, session_id), fetch='none')
+
+    log_activity(request.user_id, 'SESSION_RESET',
+                 f"Reset jawaban sesi {session_id[:8]} (+{extra_min} menit)", request.remote_addr)
+    return jsonify({'ok': True, 'extra_minutes': extra_min, 'new_expires': new_expires.isoformat()})
+
 @admin_bp.route('/api/guru/sessions/<session_id>/reopen', methods=['POST'])
 @require_guru
 def guru_reopen_session(session_id):
