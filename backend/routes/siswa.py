@@ -80,6 +80,9 @@ def start_exam(exam_id):
     else:
         session_id = str(existing['id'])
         expires_at = existing.get('expires_at')
+        # Reset exit_allowed saat siswa masuk kembali setelah keluar sementara
+        query("UPDATE exam_sessions SET exit_allowed=FALSE, status='ongoing' WHERE id=%s",
+              (session_id,), fetch='none')
 
     # Ambil soal
     randomize_q = exam.get('randomize_questions', True)
