@@ -176,6 +176,9 @@ CREATE TABLE IF NOT EXISTS semesters (
     created_at       TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- ── 18. Kolom teacher_note di essay_answers ─────────────────
+ALTER TABLE essay_answers ADD COLUMN IF NOT EXISTS teacher_note TEXT;
+
 -- ── 17. Kolom untuk resume session ──────────────────────────
 ALTER TABLE exam_sessions ADD COLUMN IF NOT EXISTS paused_at    TIMESTAMPTZ;
 ALTER TABLE exam_sessions ADD COLUMN IF NOT EXISTS extra_minutes INT DEFAULT 0;

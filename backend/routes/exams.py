@@ -376,7 +376,9 @@ def student_exam_detail(exam_id, student_id):
     # Ambil essay answers (camera_essay) dan gabungkan
     try:
         essays = query("""
-            SELECT question_id, essay_text, photo_b64, teacher_score, teacher_note
+            SELECT question_id, essay_text, photo_b64,
+                   score as teacher_score,
+                   COALESCE(teacher_note, '') as teacher_note
             FROM essay_answers WHERE session_id=%s
         """, (session_id,))
         essay_map = {str(e['question_id']): dict(e) for e in essays}
@@ -386,7 +388,7 @@ def student_exam_detail(exam_id, student_id):
                 q['essay_text']    = essay.get('essay_text', '')
                 q['photo_b64']     = essay.get('photo_b64', '')
                 q['teacher_score'] = essay.get('teacher_score')
-                q['teacher_note']  = essay.get('teacher_note')
+                q['teacher_note']  = essay.get('teacher_note', '')
     except Exception:
         pass  # tabel essay_answers belum ada, tidak masalah
 
@@ -466,12 +468,12 @@ def grade_essay(exam_id, session_id):
     if not qid:
         return jsonify({'error': 'question_id wajib'}), 400
     try:
-        query("""INSERT INTO essay_answers (id, session_id, question_id, teacher_score, teacher_note)
-                 VALUES (gen_random_uuid(), %s, %s, %s, %s)
+        # Kolom di tabel: score (bukan teacher_score), teacher_note (ditambah via migration)
+        query("""INSERT INTO essay_answers (id, session_id, question_id, score, teacher_note)
+                 VALUES (uuid_generate_v4(), %s, %s, %s, %s)
                  ON CONFLICT (session_id, question_id)
-                 DO UPDATE SET teacher_score=%s, teacher_note=%s""",
+                 DO UPDATE SET score=%s, teacher_note=%s""",
               (session_id, qid, score, note, score, note), fetch='none')
-        # Recalculate total score including essay scores
         _recalc_with_essay(session_id)
         return jsonify({'ok': True})
     except Exception as e:
@@ -495,9 +497,9 @@ def _recalc_with_essay(session_id):
                            JOIN options o ON o.id=a.option_id
                            WHERE a.session_id=%s AND o.is_correct=false""", (session_id,), fetch='one')['n']
         # Tambah skor esai dari guru
-        essay_total = query("""SELECT COALESCE(SUM(teacher_score), 0) as s
+        essay_total = query("""SELECT COALESCE(SUM(score), 0) as s
                                FROM essay_answers WHERE session_id=%s
-                               AND teacher_score IS NOT NULL""", (session_id,), fetch='one')['s']
+                               AND score IS NOT NULL""", (session_id,), fetch='one')['s']
         score = round(correct * spc + float(essay_total or 0), 2)
         score = min(100.0, score)
         empty = total_q - correct - wrong
