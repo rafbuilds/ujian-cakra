@@ -299,7 +299,7 @@ def monitor_exam(exam_id):
 @require_guru
 def exam_results(exam_id):
     rows = query("""
-        SELECT u.id as student_id, u.name, u.nisn,
+        SELECT es.id as session_id, u.id as student_id, u.name, u.nisn,
                c.name as class_name, es.submitted_at, es.tab_violations,
                r.score, r.correct_count, r.wrong_count, r.empty_count
         FROM exam_sessions es
