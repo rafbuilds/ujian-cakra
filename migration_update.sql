@@ -176,6 +176,11 @@ CREATE TABLE IF NOT EXISTS semesters (
     created_at       TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- ── 17. Kolom untuk resume session ──────────────────────────
+ALTER TABLE exam_sessions ADD COLUMN IF NOT EXISTS paused_at    TIMESTAMPTZ;
+ALTER TABLE exam_sessions ADD COLUMN IF NOT EXISTS extra_minutes INT DEFAULT 0;
+ALTER TABLE exam_sessions ADD COLUMN IF NOT EXISTS reopen_count INT DEFAULT 0;
+
 -- ── 16. Indexes tambahan ─────────────────────────────────────
 CREATE INDEX IF NOT EXISTS idx_users_device      ON users(device_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_status   ON exam_sessions(status) WHERE submitted_at IS NULL;

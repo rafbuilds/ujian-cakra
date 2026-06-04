@@ -745,6 +745,71 @@ def reset_all_devices():
     query("UPDATE users SET device_id=NULL, device_info=NULL WHERE role='siswa'", fetch='none')
     return jsonify({'ok': True})
 
+# ══════════════════════════════════════════════════════════════
+# SESSION REOPEN — Opsi 2: Guru/Admin buka ulang sesi siswa
+# ══════════════════════════════════════════════════════════════
+
+@admin_bp.route('/api/admin/sessions/<session_id>/reopen', methods=['POST'])
+@require_admin
+def reopen_session(session_id):
+    """Buka ulang sesi ujian yang sudah disubmit. Opsi 2: manual oleh admin."""
+    from datetime import datetime, timezone, timedelta
+    body         = request.json or {}
+    extra_min    = int(body.get('extra_minutes', 15))  # tambahan waktu default 15 mnt
+
+    sess = query("SELECT * FROM exam_sessions WHERE id=%s", (session_id,), fetch='one')
+    if not sess:
+        return jsonify({'error': 'Sesi tidak ditemukan'}), 404
+
+    # Hitung expires_at baru: sekarang + extra_minutes
+    new_expires = datetime.now(timezone.utc) + timedelta(minutes=extra_min)
+
+    query("""UPDATE exam_sessions
+             SET submitted_at  = NULL,
+                 auto_submitted = FALSE,
+                 status         = 'ongoing',
+                 expires_at     = %s,
+                 reopen_count   = COALESCE(reopen_count, 0) + 1
+             WHERE id = %s""",
+          (new_expires, session_id), fetch='none')
+
+    log_activity(request.user_id, 'SESSION_REOPEN',
+                 f"Buka ulang sesi {session_id[:8]} (+{extra_min} menit)", request.remote_addr)
+
+    return jsonify({'ok': True, 'extra_minutes': extra_min,
+                    'new_expires': new_expires.isoformat()})
+
+@admin_bp.route('/api/guru/sessions/<session_id>/reopen', methods=['POST'])
+@require_guru
+def guru_reopen_session(session_id):
+    """Buka ulang sesi oleh guru (hanya ujian milik guru tersebut)."""
+    from datetime import datetime, timezone, timedelta
+    body      = request.json or {}
+    extra_min = int(body.get('extra_minutes', 15))
+
+    sess = query("""SELECT es.*, e.teacher_id FROM exam_sessions es
+                    JOIN exams e ON e.id = es.exam_id
+                    WHERE es.id = %s""", (session_id,), fetch='one')
+    if not sess:
+        return jsonify({'error': 'Sesi tidak ditemukan'}), 404
+
+    if request.user_role != 'admin' and str(sess['teacher_id']) != request.user_id:
+        return jsonify({'error': 'Hanya guru pemilik ujian yang bisa buka ulang'}), 403
+
+    new_expires = datetime.now(timezone.utc) + timedelta(minutes=extra_min)
+
+    query("""UPDATE exam_sessions
+             SET submitted_at  = NULL,
+                 auto_submitted = FALSE,
+                 status         = 'ongoing',
+                 expires_at     = %s,
+                 reopen_count   = COALESCE(reopen_count, 0) + 1
+             WHERE id = %s""",
+          (new_expires, session_id), fetch='none')
+
+    return jsonify({'ok': True, 'extra_minutes': extra_min,
+                    'new_expires': new_expires.isoformat()})
+
 # ── Cleanup finished exams ───────────────────────────────────
 @admin_bp.route('/api/admin/exams/cleanup', methods=['DELETE'])
 @require_admin

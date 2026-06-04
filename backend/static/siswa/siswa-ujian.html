@@ -1032,6 +1032,7 @@
       function startAutoSave() {
         clearInterval(saveInterval);
         saveInterval = setInterval(() => {
+          if (!navigator.onLine) return; // skip saat offline
           Object.entries(answers).forEach(([qid, oid]) => {
             apiFetch(`/api/student/sessions/${sessionData.session_id}/answer`, {
               method: "POST",
@@ -1040,6 +1041,44 @@
           });
         }, 30000);
       }
+
+      // ── Offline Detection (Opsi 1: pause otomatis) ───────────
+      let _offlineBanner = null;
+      function _showOfflineBanner() {
+        if (_offlineBanner) return;
+        _offlineBanner = document.createElement('div');
+        _offlineBanner.id = '_offline_banner';
+        _offlineBanner.style.cssText = `
+          position:fixed;top:0;left:0;right:0;z-index:9999;
+          background:#b45309;color:#fff;text-align:center;
+          padding:10px 16px;font-size:13px;font-weight:600;
+          display:flex;align-items:center;justify-content:center;gap:8px;
+        `;
+        _offlineBanner.innerHTML = `
+          <span>📡</span>
+          <span>Koneksi terputus — jawaban tersimpan lokal. Timer tetap berjalan. Segera sambungkan kembali.</span>
+        `;
+        document.body.prepend(_offlineBanner);
+      }
+      function _hideOfflineBanner() {
+        if (_offlineBanner) { _offlineBanner.remove(); _offlineBanner = null; }
+      }
+
+      window.addEventListener('offline', () => {
+        if (page === 'exam') _showOfflineBanner();
+      });
+      window.addEventListener('online', () => {
+        _hideOfflineBanner();
+        // Saat online kembali, sync semua jawaban yang tersimpan
+        if (page === 'exam' && sessionData) {
+          Object.entries(answers).forEach(([qid, oid]) => {
+            apiFetch(`/api/student/sessions/${sessionData.session_id}/answer`, {
+              method: "POST",
+              body: JSON.stringify({ question_id: qid, option_id: oid }),
+            }).catch(() => {});
+          });
+        }
+      });
 
       function startAntiCheat() {
         document.addEventListener("visibilitychange", () => {

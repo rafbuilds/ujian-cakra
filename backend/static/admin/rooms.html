@@ -597,6 +597,30 @@
       </div>
     </div>
 
+    <!-- Modal Buka Ulang Sesi -->
+    <div id="modal-reopen" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;align-items:center;justify-content:center;padding:1rem;backdrop-filter:blur(4px)">
+      <div style="background:#fff;border-radius:18px;padding:2rem;max-width:400px;width:100%">
+        <div style="text-align:center;margin-bottom:1rem">
+          <div style="font-size:36px">🔓</div>
+          <div style="font-weight:700;font-size:17px;color:var(--green);margin-top:.5rem">Buka Ulang Ujian</div>
+          <div style="font-size:13px;color:var(--muted);margin-top:4px">Siswa: <strong id="reopen-name"></strong></div>
+        </div>
+        <div style="background:#fff3cd;border:1px solid #fde68a;border-radius:10px;padding:.75rem 1rem;font-size:12px;color:#856404;margin-bottom:1.25rem;line-height:1.6">
+          ⚠️ Sesi akan dibuka ulang dengan <strong>waktu tambahan</strong> dari sekarang. Jawaban yang sudah tersimpan sebelumnya <strong>tetap ada</strong>.
+        </div>
+        <div class="form-group">
+          <label style="font-size:12px;font-weight:600;color:var(--muted)">Tambahan Waktu (menit)</label>
+          <input type="number" id="reopen-minutes" class="form-control" value="15" min="5" max="120"
+            style="text-align:center;font-size:18px;font-weight:700;color:var(--green)" />
+          <div style="font-size:11px;color:var(--muted);margin-top:4px;text-align:center">Disarankan: 10–30 menit</div>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:1.25rem">
+          <button class="btn btn-secondary" style="flex:1" onclick="closeReopenModal()">Batal</button>
+          <button class="btn btn-primary" style="flex:1" onclick="confirmReopen()">🔓 Buka Ulang</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Modal Room -->
     <div
       id="modal-room"
@@ -1089,28 +1113,42 @@
             return;
           }
 
-          // Monitor API returns: { session_id, name, class_name, status, answered, total, tab_violations, submitted_at }
+          // Monitor API: { session_id, name, class_name, status, answered, total, tab_violations, submitted_at }
           document.getElementById('mm-body').innerHTML = students.map(s => {
-            const pct  = (s.total > 0) ? Math.round((s.answered||0) / s.total * 100) : 0;
-            const done = s.status === 'submitted' || !!s.submitted_at;
-            const vBadge = (s.tab_violations||0) > 0
+            const pct      = (s.total > 0) ? Math.round((s.answered||0) / s.total * 100) : 0;
+            const done     = s.status === 'submitted' || !!s.submitted_at;
+            const autoSub  = !!s.auto_submitted;
+            const vBadge   = (s.tab_violations||0) > 0
               ? `<span style="background:#fde8e8;color:#b91c1c;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:700">${s.tab_violations}× pelanggaran</span>` : '';
+
+            // Status badge
+            let statusBg, statusColor, statusLabel;
+            if (done && autoSub)      { statusBg='#fff3cd'; statusColor='#856404'; statusLabel='⚠️ Auto-submit'; }
+            else if (done)            { statusBg='#e6f1fb'; statusColor='#185fa5'; statusLabel='✅ Selesai'; }
+            else                      { statusBg='#eaf3de'; statusColor='#3b6d11'; statusLabel='🟢 Mengerjakan'; }
+
+            // Tombol aksi
+            const btnExit   = !done ? `<button class="btn btn-sm" style="font-size:10px;padding:2px 8px;background:var(--light)" onclick="allowExit('${s.session_id}')">Izinkan Keluar</button>` : '';
+            const btnReopen = done   ? `<button class="btn btn-primary btn-sm" style="font-size:10px;padding:2px 8px" onclick="openReopenModal('${s.session_id}','${(s.name||'').replace(/'/g,"\\'")}')">🔓 Buka Ulang</button>` : '';
+
             return `
-              <div style="display:flex;align-items:center;gap:10px;padding:.5rem 0;border-bottom:.5px solid var(--border)">
-                <div style="width:30px;height:30px;border-radius:50%;background:${done?'#185fa5':'var(--green)'};display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:12px;flex-shrink:0">${(s.name||'?')[0]}</div>
+              <div style="display:flex;align-items:center;gap:10px;padding:.625rem 0;border-bottom:.5px solid var(--border)">
+                <div style="width:32px;height:32px;border-radius:50%;background:${done?'#6b7280':'var(--green)'};display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:13px;flex-shrink:0">${(s.name||'?')[0]}</div>
                 <div style="flex:1;min-width:0">
-                  <div style="font-size:13px;font-weight:500;display:flex;align-items:center;gap:6px">
-                    ${s.name}
-                    <span style="font-size:10px;font-weight:600;padding:1px 6px;border-radius:10px;background:${done?'#e6f1fb':'#eaf3de'};color:${done?'#185fa5':'#3b6d11'}">${done?'Selesai':'Mengerjakan'}</span>
+                  <div style="font-size:13px;font-weight:500;display:flex;align-items:center;gap:5px;flex-wrap:wrap">
+                    <span>${s.name}</span>
+                    <span style="font-size:10px;font-weight:600;padding:1px 6px;border-radius:10px;background:${statusBg};color:${statusColor}">${statusLabel}</span>
                     ${vBadge}
                   </div>
                   <div style="font-size:11px;color:var(--muted)">${s.class_name||'—'}</div>
                   ${!done ? `<div style="display:flex;align-items:center;gap:6px;margin-top:4px">
-                    <div style="height:5px;background:#e5e7eb;border-radius:3px;flex:1"><div style="height:100%;width:${pct}%;background:var(--green);border-radius:3px"></div></div>
-                    <span style="font-size:10px;color:var(--muted)">${s.answered||0}/${s.total||0} soal</span>
-                  </div>` : ''}
+                    <div style="height:5px;background:#e5e7eb;border-radius:3px;flex:1"><div style="height:100%;width:${pct}%;background:var(--green);border-radius:3px;transition:width .3s"></div></div>
+                    <span style="font-size:10px;color:var(--muted);white-space:nowrap">${s.answered||0}/${s.total||0} soal</span>
+                  </div>` : `<div style="font-size:10px;color:var(--muted);margin-top:2px">Submit: ${s.submitted_at ? new Date(s.submitted_at).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'}) : '—'}</div>`}
                 </div>
-                ${!done ? `<button class="btn btn-sm" style="font-size:10px;padding:2px 8px;background:var(--light)" onclick="allowExit('${s.session_id}')">Izinkan Keluar</button>` : ''}
+                <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
+                  ${btnExit}${btnReopen}
+                </div>
               </div>`;
           }).join('');
         } catch(e) {
@@ -1126,6 +1164,29 @@
           UI.toast('✅ Izin keluar diberikan', 'success');
           refreshMonitor();
         } catch(e) { UI.toast('Gagal: ' + (e.error||e.message||''), 'error'); }
+      }
+
+      // ── Buka Ulang Session ────────────────────────────────────
+      let _reopenSessionId = null;
+      function openReopenModal(sessionId, name) {
+        _reopenSessionId = sessionId;
+        document.getElementById('reopen-name').textContent   = name;
+        document.getElementById('reopen-minutes').value      = '15';
+        document.getElementById('modal-reopen').style.display = 'flex';
+      }
+      function closeReopenModal() {
+        document.getElementById('modal-reopen').style.display = 'none';
+        _reopenSessionId = null;
+      }
+      async function confirmReopen() {
+        const extra = parseInt(document.getElementById('reopen-minutes').value) || 15;
+        try {
+          const r = await API.post('/api/admin/sessions/' + _reopenSessionId + '/reopen',
+                                   { extra_minutes: extra });
+          UI.toast('✅ Sesi dibuka ulang +' + extra + ' menit', 'success');
+          closeReopenModal();
+          setTimeout(refreshMonitor, 500);
+        } catch(e) { UI.toast('Gagal: ' + (e.error||''), 'error'); }
       }
 
       function closeMonitor() {
