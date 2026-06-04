@@ -62,6 +62,44 @@ def login():
         'id':    str(user['id']),
     })
 
+@app.route('/api/auth/device-login', methods=['POST'])
+def device_login():
+    """Login siswa menggunakan email + device fingerprint (tanpa password)."""
+    from db import query
+    body      = request.json or {}
+    email     = (body.get('email') or '').strip().lower()
+    device_id = (body.get('device_id') or '').strip()
+    device_info = (body.get('device_info') or '').strip()[:250]
+
+    if not email or not device_id:
+        return jsonify({'error': 'Email dan device wajib'}), 400
+
+    user = query(
+        "SELECT * FROM users WHERE LOWER(email)=%s AND role='siswa' AND is_active=true",
+        (email,), fetch='one'
+    )
+    if not user:
+        return jsonify({'error': 'Akun siswa tidak ditemukan atau tidak aktif.\nHubungi admin sekolah.'}), 401
+
+    existing_device = user.get('device_id')
+
+    if not existing_device:
+        # Pertama kali login → daftarkan device sekarang
+        query("UPDATE users SET device_id=%s, device_info=%s, last_login=NOW() WHERE id=%s",
+              (device_id, device_info, user['id']), fetch='none')
+    elif existing_device != device_id:
+        return jsonify({'error': 'HP ini tidak terdaftar.\nHubungi admin untuk reset perangkat.'}), 403
+    else:
+        query("UPDATE users SET last_login=NOW() WHERE id=%s", (user['id'],), fetch='none')
+
+    token = create_token(str(user['id']), user['role'])
+    return jsonify({
+        'token': token,
+        'role':  user['role'],
+        'name':  user['name'],
+        'id':    str(user['id']),
+    })
+
 @app.route('/api/auth/me')
 @require_auth
 def auth_me():
