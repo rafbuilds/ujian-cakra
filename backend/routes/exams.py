@@ -375,12 +375,19 @@ def student_exam_detail(exam_id, student_id):
 
     # Ambil essay answers (camera_essay) dan gabungkan
     try:
-        essays = query("""
-            SELECT question_id, essay_text, photo_b64,
-                   score as teacher_score,
-                   COALESCE(teacher_note, '') as teacher_note
-            FROM essay_answers WHERE session_id=%s
-        """, (session_id,))
+        # Coba dengan teacher_note, fallback tanpa jika kolom belum ada
+        try:
+            essays = query("""
+                SELECT question_id, essay_text, photo_b64,
+                       score as teacher_score, teacher_note
+                FROM essay_answers WHERE session_id=%s
+            """, (session_id,))
+        except Exception:
+            essays = query("""
+                SELECT question_id, essay_text, photo_b64,
+                       score as teacher_score
+                FROM essay_answers WHERE session_id=%s
+            """, (session_id,))
         essay_map = {str(e['question_id']): dict(e) for e in essays}
         for q in q_list:
             if q['type'] == 'camera_essay':
@@ -390,7 +397,7 @@ def student_exam_detail(exam_id, student_id):
                 q['teacher_score'] = essay.get('teacher_score')
                 q['teacher_note']  = essay.get('teacher_note', '')
     except Exception:
-        pass  # tabel essay_answers belum ada, tidak masalah
+        pass  # tabel essay_answers belum ada
 
     # Ambil multi_answers dan gabungkan
     try:
