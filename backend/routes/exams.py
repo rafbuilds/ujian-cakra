@@ -360,11 +360,14 @@ def student_exam_detail(exam_id, student_id):
                a.option_id as student_option_id,
                ao.label as student_label, ao.content as student_answer,
                ao.is_correct as is_correct,
-               co.label as correct_label, co.content as correct_answer
+               -- Agregasi semua kunci jawaban menjadi 1 baris per soal
+               (SELECT STRING_AGG(label, ', ' ORDER BY label)
+                FROM options WHERE question_id=q.id AND is_correct=true) as correct_label,
+               (SELECT STRING_AGG(content, ' / ' ORDER BY label)
+                FROM options WHERE question_id=q.id AND is_correct=true) as correct_answer
         FROM questions q
         LEFT JOIN answers a ON a.question_id=q.id AND a.session_id=%s
         LEFT JOIN options ao ON ao.id=a.option_id
-        LEFT JOIN options co ON co.question_id=q.id AND co.is_correct=true
         WHERE q.exam_id=%s ORDER BY q.order_num, q.created_at
     """, (session_id, exam_id))
 
