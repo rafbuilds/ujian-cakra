@@ -391,12 +391,17 @@ def student_exam_detail(exam_id, student_id):
         essay_debug['count'] = len(essays)
         essay_map = {str(e['question_id']): dict(e) for e in essays}
         for q in q_list:
-            if q['type'] == 'camera_essay':
-                essay = essay_map.get(str(q['id']), {})
+            qid = str(q['id'])
+            # Attach essay jika tipe soal camera_essay ATAU ada data di essay_answers
+            if q.get('type') == 'camera_essay' or qid in essay_map:
+                essay = essay_map.get(qid, {})
                 q['essay_text']    = essay.get('essay_text') or ''
                 q['photo_b64']     = essay.get('photo_b64') or ''
                 q['teacher_score'] = essay.get('teacher_score')
                 q['teacher_note']  = essay.get('teacher_note') or ''
+                # Paksa tipe agar frontend render dengan benar
+                if qid in essay_map:
+                    q['type'] = 'camera_essay'
     except Exception as ex:
         essay_debug['error'] = str(ex)  # tampilkan error, jangan diam
 
