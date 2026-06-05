@@ -1121,9 +1121,9 @@
           // Update tampilan langsung tanpa reload full
           if (scoreEl) scoreEl.style.borderColor = 'var(--green)';
           // Refresh data nilai agar skor total diupdate
-          const [r] = await Promise.all([API.get(`/api/exams/${currentExamId}/results`)]);
+          const r = await API.get(`/api/exams/${currentExamId}/results`);
           nilaiData = r.results || [];
-          renderTable(nilaiData);
+          renderCards(nilaiData);
         } catch(e) { UI.toast(e.error || 'Gagal simpan', 'error'); }
       }
 
