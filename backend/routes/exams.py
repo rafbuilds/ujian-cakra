@@ -374,8 +374,8 @@ def student_exam_detail(exam_id, student_id):
     q_list = [dict(q) for q in questions]
 
     # Ambil essay answers (camera_essay) dan gabungkan
+    essay_debug = {'error': None, 'count': 0, 'session_id': str(session_id)}
     try:
-        # Coba dengan teacher_note, fallback tanpa jika kolom belum ada
         try:
             essays = query("""
                 SELECT question_id, essay_text, photo_b64,
@@ -388,16 +388,17 @@ def student_exam_detail(exam_id, student_id):
                        score as teacher_score
                 FROM essay_answers WHERE session_id=%s
             """, (session_id,))
+        essay_debug['count'] = len(essays)
         essay_map = {str(e['question_id']): dict(e) for e in essays}
         for q in q_list:
             if q['type'] == 'camera_essay':
                 essay = essay_map.get(str(q['id']), {})
-                q['essay_text']    = essay.get('essay_text', '')
-                q['photo_b64']     = essay.get('photo_b64', '')
+                q['essay_text']    = essay.get('essay_text') or ''
+                q['photo_b64']     = essay.get('photo_b64') or ''
                 q['teacher_score'] = essay.get('teacher_score')
-                q['teacher_note']  = essay.get('teacher_note', '')
-    except Exception:
-        pass  # tabel essay_answers belum ada
+                q['teacher_note']  = essay.get('teacher_note') or ''
+    except Exception as ex:
+        essay_debug['error'] = str(ex)  # tampilkan error, jangan diam
 
     # Ambil multi_answers dan gabungkan
     try:
@@ -426,7 +427,30 @@ def student_exam_detail(exam_id, student_id):
     except Exception:
         pass
 
-    return jsonify({'questions': q_list})
+    return jsonify({'questions': q_list, '_essay_debug': essay_debug})
+
+# ── Debug: cek essay answers langsung ─────────────────────────
+@exams_bp.route('/api/debug/essays/<session_id>', methods=['GET'])
+@require_guru
+def debug_essays(session_id):
+    """Endpoint debug — cek isi essay_answers untuk session tertentu."""
+    try:
+        rows = query("""
+            SELECT ea.id, ea.question_id, ea.essay_text,
+                   LENGTH(ea.photo_b64) as photo_size,
+                   ea.score, ea.submitted_at,
+                   q.type as question_type, q.content as question_content
+            FROM essay_answers ea
+            LEFT JOIN questions q ON q.id = ea.question_id
+            WHERE ea.session_id=%s
+        """, (session_id,))
+        return jsonify({
+            'session_id': session_id,
+            'count': len(rows),
+            'records': [dict(r) for r in rows]
+        })
+    except Exception as ex:
+        return jsonify({'error': str(ex), 'hint': 'Kemungkinan tabel essay_answers belum dibuat'}), 500
 
 # ── Sessions ───────────────────────────────────────────────────
 @exams_bp.route('/api/sessions/<session_id>/detail', methods=['GET'])

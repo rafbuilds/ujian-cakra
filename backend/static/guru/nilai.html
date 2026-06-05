@@ -924,6 +924,16 @@
           const detail = await API.get(
             `/api/exams/${currentExamId}/student/${studentId}/detail`,
           );
+          // Debug: lihat di browser console apakah essay ada
+          if (detail._essay_debug) {
+            const d = detail._essay_debug;
+            console.log('[Essay Debug]', d);
+            if (d.error) {
+              UI.toast('⚠ Error essay: ' + d.error, 'error');
+            } else {
+              console.log(`Essay di DB: ${d.count} record(s) untuk session ${d.session_id}`);
+            }
+          }
           renderDetailQ(detail.questions || []);
         } catch (e) {
           const msg = e.error || e.toString();
