@@ -105,20 +105,12 @@ def add_question(exam_id):
     attachment_url = data.get('attachment_url')
     audio_url      = data.get('audio_url')
 
-    # Pastikan kolom type/attachment_url/audio_url ada — jalankan migration dulu jika belum
-    try:
-        query("""INSERT INTO questions
-                   (id, exam_id, content, image_url, type, attachment_url, audio_url, order_num, score)
-                 VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
-              (q_id, exam_id, data.get('content',''), data.get('image_url'),
-               q_type, attachment_url, audio_url,
-               total+1, data.get('score',1)), fetch='none')
-    except Exception:
-        # Fallback: kolom baru belum ada, insert tanpa kolom baru
-        query("""INSERT INTO questions (id, exam_id, content, image_url, order_num, score)
-                 VALUES (%s,%s,%s,%s,%s,%s)""",
-              (q_id, exam_id, data.get('content',''), data.get('image_url'),
-               total+1, data.get('score',1)), fetch='none')
+    query("""INSERT INTO questions
+               (id, exam_id, content, image_url, type, attachment_url, audio_url, order_num, score)
+             VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+          (q_id, exam_id, data.get('content',''), data.get('image_url'),
+           q_type, attachment_url, audio_url,
+           total+1, data.get('score',1)), fetch='none')
 
     for opt in (data.get('options') or []):
         query("INSERT INTO options (id, question_id, label, content, is_correct) VALUES (%s,%s,%s,%s,%s)",
@@ -134,6 +126,12 @@ def update_question(question_id):
     data = request.json or {}
     if 'content' in data:
         query("UPDATE questions SET content=%s WHERE id=%s", (data['content'], question_id), fetch='none')
+    if 'type' in data:
+        query("UPDATE questions SET type=%s WHERE id=%s", (data['type'], question_id), fetch='none')
+    if 'attachment_url' in data:
+        query("UPDATE questions SET attachment_url=%s WHERE id=%s", (data['attachment_url'], question_id), fetch='none')
+    if 'audio_url' in data:
+        query("UPDATE questions SET audio_url=%s WHERE id=%s", (data['audio_url'], question_id), fetch='none')
     if 'options' in data:
         query("DELETE FROM options WHERE question_id=%s", (question_id,), fetch='none')
         for opt in data['options']:

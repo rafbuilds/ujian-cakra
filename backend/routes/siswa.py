@@ -84,13 +84,15 @@ def start_exam(exam_id):
         query("UPDATE exam_sessions SET exit_allowed=FALSE, status='ongoing' WHERE id=%s",
               (session_id,), fetch='none')
 
-    # Ambil soal
+    # Ambil soal — dengan auto-deteksi type dari data (fix untuk soal lama tanpa type)
     randomize_q = exam.get('randomize_questions', True)
     randomize_o = exam.get('randomize_options', True)
     order_clause = "ORDER BY RANDOM()" if randomize_q else "ORDER BY q.order_num"
     questions = query(f"""
         SELECT q.id, q.content, q.image_url,
-               q.type, q.attachment_url, q.audio_url
+               q.type, q.attachment_url, q.audio_url,
+               (SELECT COUNT(*) FROM options WHERE question_id=q.id) AS opt_count,
+               (SELECT COUNT(*) FROM options WHERE question_id=q.id AND is_correct=true) AS correct_count
         FROM questions q
         WHERE q.exam_id=%s {order_clause}
     """, (exam_id,))
@@ -99,7 +101,20 @@ def start_exam(exam_id):
     for q in questions:
         opt_order = "ORDER BY RANDOM()" if randomize_o else "ORDER BY o.label"
         options = query(f"SELECT id, label, content FROM options o WHERE o.question_id=%s {opt_order}", (q['id'],))
-        result_questions.append({**dict(q), 'options': [dict(o) for o in options]})
+        q_dict = dict(q)
+        opt_count     = q_dict.pop('opt_count', 0) or 0
+        correct_count = q_dict.pop('correct_count', 0) or 0
+        # Auto-deteksi type jika belum di-set
+        if not q_dict.get('type') or q_dict['type'] == 'multiple_choice':
+            if q_dict.get('audio_url'):
+                q_dict['type'] = 'audio'
+            elif opt_count == 0:
+                q_dict['type'] = 'camera_essay'
+            elif correct_count > 1:
+                q_dict['type'] = 'multiple_answer'
+            else:
+                q_dict['type'] = 'multiple_choice'
+        result_questions.append({**q_dict, 'options': [dict(o) for o in options]})
 
     # Ambil jawaban tersimpan
     saved = query("""SELECT question_id, option_id FROM answers WHERE session_id=%s""", (session_id,))

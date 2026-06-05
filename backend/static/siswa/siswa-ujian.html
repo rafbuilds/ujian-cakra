@@ -614,6 +614,53 @@
           transform: rotate(360deg);
         }
       }
+      /* ── Tipe soal tambahan ── */
+      .yes-no-wrap { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:4px; }
+      .yn-btn {
+        padding:20px 12px; border-radius:16px; border:2px solid var(--border);
+        background:#fff; font-size:15px; font-weight:700; cursor:pointer;
+        display:flex; flex-direction:column; align-items:center; gap:8px;
+        transition:all 0.17s; font-family:inherit;
+      }
+      .yn-btn .yn-emoji { font-size:32px; }
+      .yn-btn:hover { border-color:var(--green3); background:var(--green4); }
+      .yn-btn.selected { border-color:var(--green); background:var(--green4);
+        box-shadow:0 0 0 3px rgba(15,76,53,.1); }
+      .opt-checkbox {
+        width:22px; height:22px; border-radius:5px; border:2px solid var(--border);
+        flex-shrink:0; transition:all 0.17s; position:relative; background:#fff;
+      }
+      .opt-btn.multi-selected { border-color:var(--green); background:var(--green4); }
+      .opt-btn.multi-selected .opt-checkbox {
+        background:var(--green); border-color:var(--green);
+      }
+      .opt-btn.multi-selected .opt-checkbox::after {
+        content:"✓"; position:absolute; inset:0; display:flex; align-items:center;
+        justify-content:center; color:#fff; font-size:13px; font-weight:700;
+      }
+      .essay-wrap { display:flex; flex-direction:column; gap:10px; }
+      .essay-info {
+        display:flex; align-items:flex-start; gap:10px; padding:12px 14px;
+        background:#fef9ec; border-radius:12px; border:1px solid #f5e6b2;
+        font-size:13px; color:#7c5e08; line-height:1.5;
+      }
+      .essay-textarea {
+        width:100%; min-height:140px; padding:12px 14px; border:1.5px solid var(--border);
+        border-radius:12px; font-size:14px; font-family:inherit; resize:vertical;
+        outline:none; line-height:1.6; transition:border-color 0.2s; color:var(--text);
+      }
+      .essay-textarea:focus { border-color:var(--green3); }
+      .audio-player-wrap {
+        display:flex; align-items:center; gap:14px; padding:14px 18px;
+        background:#e8f0fe; border-radius:14px; margin-bottom:12px;
+        border:1px solid rgba(21,101,192,.2);
+      }
+      .audio-play-btn {
+        width:48px; height:48px; border-radius:50%; background:#1565c0;
+        border:none; color:#fff; font-size:22px; cursor:pointer; display:flex;
+        align-items:center; justify-content:center; flex-shrink:0; transition:all 0.15s;
+      }
+      .audio-play-btn:hover { background:#0d47a1; transform:scale(1.05); }
       @media (max-width: 768px) {
         .login-left {
           display: none;
@@ -653,7 +700,9 @@
         examData = null,
         sessionData = null;
       let current = 0,
-        answers = {},
+        answers = {},       // { qid: optionId | 'essay' | 'multi' }
+        essayTexts = {},    // { qid: text }
+        multiAnswers = {},  // { qid: Set<optionId> }
         violations = 0,
         showViolation = false,
         showSubmit = false;
@@ -805,20 +854,10 @@
           <div class="q-progress-txt">${answered} dari ${total} soal terjawab</div>
           <div class="q-card">
             <div class="q-num-badge">Soal ${current + 1} dari ${total}</div>
+            ${renderTypeChip(q)}
+            ${q.attachment_url ? `<img src="${q.attachment_url}" style="max-width:100%;border-radius:10px;margin-bottom:1rem">` : ''}
             <div class="q-text">${q.content}</div>
-            <div class="options">
-              ${q.options
-                .map(
-                  (o) => `
-                <button class="opt-btn ${answers[q.id] === o.id ? "selected" : ""}" data-qid="${q.id}" data-oid="${o.id}">
-                  <div class="opt-circle"></div>
-                  <div class="opt-label-box">${o.label}</div>
-                  <div class="opt-text">${o.content}</div>
-                </button>
-              `,
-                )
-                .join("")}
-            </div>
+            ${renderQuestionBody(q)}
           </div>
           <div style="display:flex;align-items:center;justify-content:space-between;margin-top:.5rem">
             <button class="nav-btn nav-prev" id="btn-prev" ${current === 0 ? "disabled" : ""}>← Sebelumnya</button>
@@ -860,6 +899,99 @@
       </div>
     </div>
   </div>`;
+      }
+
+      // ── Render soal berdasarkan tipe ────────────────────────────
+      function renderTypeChip(q) {
+        const labels = {
+          camera_essay: '📷 Kamera+Uraian',
+          yes_no:       '✅ Ya/Tidak',
+          multiple_answer: '☑️ Jawaban Ganda',
+          audio:        '🎵 Audio',
+        };
+        const lbl = labels[q.type];
+        if (!lbl) return '';
+        return `<div style="display:inline-block;font-size:11px;font-weight:600;color:#7c5e08;background:#fef9ec;border:1px solid #f5e6b2;border-radius:6px;padding:3px 9px;margin-bottom:10px">${lbl}</div>`;
+      }
+
+      function renderQuestionBody(q) {
+        const type = q.type || 'multiple_choice';
+        if (type === 'camera_essay')    return renderCameraEssay(q);
+        if (type === 'yes_no')          return renderYesNo(q);
+        if (type === 'audio')           return renderAudio(q);
+        if (type === 'multiple_answer') return renderMultiAnswer(q);
+        return renderOptions(q);
+      }
+
+      function renderOptions(q) {
+        const labels = ['A','B','C','D','E'];
+        return `<div class="options">${q.options.map((o, i) =>
+          `<button class="opt-btn ${answers[q.id] === o.id ? 'selected' : ''}" data-qid="${q.id}" data-oid="${o.id}">
+            <div class="opt-circle"></div>
+            <div class="opt-label-box">${labels[i] || o.label}</div>
+            <div class="opt-text">${o.content}</div>
+          </button>`).join('')}</div>`;
+      }
+
+      function renderYesNo(q) {
+        const yOpt = q.options.find(o => o.label === 'Ya'    || o.content?.toLowerCase() === 'ya')    || q.options[0];
+        const nOpt = q.options.find(o => o.label === 'Tidak' || o.content?.toLowerCase() === 'tidak') || q.options[1];
+        const selY = yOpt && answers[q.id] === yOpt.id;
+        const selN = nOpt && answers[q.id] === nOpt.id;
+        return `<div class="yes-no-wrap">
+          <button class="yn-btn ${selY?'selected':''}" data-qid="${q.id}" data-oid="${yOpt?.id}">
+            <span class="yn-emoji">✅</span><span>Ya</span>
+          </button>
+          <button class="yn-btn ${selN?'selected':''}" data-qid="${q.id}" data-oid="${nOpt?.id}">
+            <span class="yn-emoji">❌</span><span>Tidak</span>
+          </button>
+        </div>`;
+      }
+
+      function renderAudio(q) {
+        const src = q.audio_url || '';
+        const labels = ['A','B','C','D','E'];
+        return `
+          <div class="audio-player-wrap">
+            <button class="audio-play-btn" id="audio-play-btn" data-src="${src}">▶</button>
+            <div>
+              <div style="font-size:13px;font-weight:600;color:#1565c0">🎵 Audio Soal</div>
+              <div id="audio-status" style="font-size:11px;color:#5c6bc0">Tekan play untuk mendengarkan</div>
+            </div>
+            <audio id="audio-el" src="${src}" style="display:none" preload="auto"></audio>
+          </div>
+          <div class="options">${q.options.map((o, i) =>
+            `<button class="opt-btn ${answers[q.id] === o.id ? 'selected' : ''}" data-qid="${q.id}" data-oid="${o.id}">
+              <div class="opt-circle"></div>
+              <div class="opt-label-box">${labels[i] || o.label}</div>
+              <div class="opt-text">${o.content}</div>
+            </button>`).join('')}
+          </div>`;
+      }
+
+      function renderMultiAnswer(q) {
+        const sel = multiAnswers[q.id] || new Set();
+        const labels = ['A','B','C','D','E'];
+        return `<div class="options">${q.options.map((o, i) =>
+          `<button class="opt-btn ${sel.has(o.id) ? 'multi-selected' : ''}" data-multi-qid="${q.id}" data-multi-oid="${o.id}">
+            <div class="opt-checkbox"></div>
+            <div class="opt-label-box">${labels[i] || o.label}</div>
+            <div class="opt-text">${o.content}</div>
+          </button>`).join('')}</div>`;
+      }
+
+      function renderCameraEssay(q) {
+        const txt = essayTexts[q.id] || '';
+        return `<div class="essay-wrap">
+          <div class="essay-info">
+            📱 Soal ini butuh foto jawaban di aplikasi HP.
+            Jika mengerjakan lewat web, tulis jawaban/langkah penyelesaian di bawah ini — guru akan menilai secara manual.
+          </div>
+          <textarea class="essay-textarea" data-essay-qid="${q.id}"
+            placeholder="Tuliskan jawaban atau langkah penyelesaian kamu di sini..."
+            oninput="setEssayText('${q.id}', this.value)">${txt}</textarea>
+          <div style="font-size:11px;color:var(--muted);text-align:right">${txt.length} karakter</div>
+        </div>`;
       }
 
       // ── RESULT ───────────────────────────────────────────────────
@@ -911,14 +1043,32 @@
             startExam(el.dataset.start);
           }),
         );
-        // Options
-        document
-          .querySelectorAll(".opt-btn")
-          .forEach((btn) =>
-            btn.addEventListener("click", () =>
-              selectAnswer(btn.dataset.qid, btn.dataset.oid),
-            ),
-          );
+        // Pilihan ganda, ya/tidak
+        document.querySelectorAll(".opt-btn[data-qid], .yn-btn[data-qid]").forEach((btn) =>
+          btn.addEventListener("click", () => selectAnswer(btn.dataset.qid, btn.dataset.oid)));
+        // Jawaban ganda (multi)
+        document.querySelectorAll(".opt-btn[data-multi-qid]").forEach((btn) =>
+          btn.addEventListener("click", () => selectMulti(btn.dataset.multiQid, btn.dataset.multiOid)));
+        // Audio player
+        const audioBtn = document.getElementById('audio-play-btn');
+        const audioEl  = document.getElementById('audio-el');
+        if (audioBtn && audioEl) {
+          audioBtn.addEventListener('click', () => {
+            if (audioEl.paused) {
+              audioEl.play();
+              audioBtn.textContent = '⏸';
+              document.getElementById('audio-status').textContent = 'Sedang diputar...';
+            } else {
+              audioEl.pause();
+              audioBtn.textContent = '▶';
+              document.getElementById('audio-status').textContent = 'Dijeda';
+            }
+          });
+          audioEl.addEventListener('ended', () => {
+            audioBtn.textContent = '▶';
+            document.getElementById('audio-status').textContent = 'Selesai diputar';
+          });
+        }
         // Nav
         document.getElementById("btn-prev")?.addEventListener("click", () => {
           current--;
@@ -991,6 +1141,19 @@
           examData = exams.find((e) => e.id === id);
           sessionData = sess;
           answers = sess.saved_answers || {};
+          essayTexts = {};
+          multiAnswers = {};
+          // Restore essay texts dari pertanyaan yang sudah ada data
+          (sess.questions || []).forEach(q => {
+            if (q.essay_text) {
+              essayTexts[q.id] = q.essay_text;
+              answers[q.id] = 'essay';
+            }
+            if (q.saved_option_ids && Array.isArray(q.saved_option_ids) && q.saved_option_ids.length) {
+              multiAnswers[q.id] = new Set(q.saved_option_ids);
+              answers[q.id] = 'multi';
+            }
+          });
           timeLeft =
             sess.remaining_seconds || examData?.duration_minutes * 60 || 5400;
           page = "exam";
@@ -1029,16 +1192,39 @@
         }, 1000);
       }
 
-      function startAutoSave() {
-        clearInterval(saveInterval);
-        saveInterval = setInterval(() => {
-          if (!navigator.onLine) return; // skip saat offline
-          Object.entries(answers).forEach(([qid, oid]) => {
-            apiFetch(`/api/student/sessions/${sessionData.session_id}/answer`, {
+      function syncAllAnswers() {
+        if (!sessionData) return;
+        const sid = sessionData.session_id;
+        Object.entries(answers).forEach(([qid, oid]) => {
+          if (oid === 'essay') {
+            // Sync essay text
+            const text = essayTexts[qid] || '';
+            apiFetch(`/api/student/sessions/${sid}/answer-essay`, {
+              method: "POST",
+              body: JSON.stringify({ question_id: qid, essay_text: text, photo_b64: '' }),
+            }).catch(() => {});
+          } else if (oid === 'multi') {
+            // Sync multi answer
+            const opts = multiAnswers[qid] ? [...multiAnswers[qid]] : [];
+            apiFetch(`/api/student/sessions/${sid}/answer-multi`, {
+              method: "POST",
+              body: JSON.stringify({ question_id: qid, option_ids: opts }),
+            }).catch(() => {});
+          } else {
+            // Sync regular single answer
+            apiFetch(`/api/student/sessions/${sid}/answer`, {
               method: "POST",
               body: JSON.stringify({ question_id: qid, option_id: oid }),
             }).catch(() => {});
-          });
+          }
+        });
+      }
+
+      function startAutoSave() {
+        clearInterval(saveInterval);
+        saveInterval = setInterval(() => {
+          if (!navigator.onLine) return;
+          syncAllAnswers();
         }, 30000);
       }
 
@@ -1069,15 +1255,7 @@
       });
       window.addEventListener('online', () => {
         _hideOfflineBanner();
-        // Saat online kembali, sync semua jawaban yang tersimpan
-        if (page === 'exam' && sessionData) {
-          Object.entries(answers).forEach(([qid, oid]) => {
-            apiFetch(`/api/student/sessions/${sessionData.session_id}/answer`, {
-              method: "POST",
-              body: JSON.stringify({ question_id: qid, option_id: oid }),
-            }).catch(() => {});
-          });
-        }
+        if (page === 'exam' && sessionData) syncAllAnswers();
       });
 
       function startAntiCheat() {
@@ -1114,6 +1292,45 @@
           body: JSON.stringify({ question_id: qid, option_id: oid }),
         }).catch(() => {});
         render();
+      }
+
+      function selectMulti(qid, oid) {
+        if (!multiAnswers[qid]) multiAnswers[qid] = new Set();
+        if (multiAnswers[qid].has(oid)) multiAnswers[qid].delete(oid);
+        else                            multiAnswers[qid].add(oid);
+        if (multiAnswers[qid].size > 0) answers[qid] = 'multi';
+        else                            delete answers[qid];
+        apiFetch(`/api/student/sessions/${sessionData.session_id}/answer-multi`, {
+          method: "POST",
+          body: JSON.stringify({ question_id: qid, option_ids: [...multiAnswers[qid]] }),
+        }).catch(() => {});
+        render();
+      }
+
+      let _essayTimer = {};
+      function setEssayText(qid, text) {
+        essayTexts[qid] = text;
+        if (text.trim()) answers[qid] = 'essay';
+        else             delete answers[qid];
+        // Update karakter count tanpa re-render penuh
+        const charEl = document.querySelector(`[data-essay-qid="${qid}"]`)
+          ?.closest('.essay-wrap')?.querySelector('div:last-child');
+        if (charEl) charEl.textContent = text.length + ' karakter';
+        // Debounce save 1 detik
+        clearTimeout(_essayTimer[qid]);
+        _essayTimer[qid] = setTimeout(() => {
+          apiFetch(`/api/student/sessions/${sessionData.session_id}/answer-essay`, {
+            method: "POST",
+            body: JSON.stringify({ question_id: qid, essay_text: text, photo_b64: '' }),
+          }).catch(() => {});
+        }, 1000);
+        // Update progress bar dan navigasi soal tanpa full render
+        const prog = document.querySelector('.q-progress-bar');
+        const txt  = document.querySelector('.q-progress-txt');
+        const ans  = Object.keys(answers).length;
+        const tot  = sessionData.questions.length;
+        if (prog) prog.style.width = `${(ans/tot)*100}%`;
+        if (txt)  txt.textContent  = `${ans} dari ${tot} soal terjawab`;
       }
 
       async function submitExam(auto = false) {
