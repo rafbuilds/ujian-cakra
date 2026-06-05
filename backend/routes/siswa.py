@@ -156,6 +156,56 @@ def save_answer(session_id):
               (str(uuid.uuid4()), session_id, question_id, option_id), fetch='none')
     return jsonify({'ok': True})
 
+# ── Essay / Kamera ─────────────────────────────────────────────
+@siswa_bp.route('/api/student/sessions/<session_id>/answer-essay', methods=['POST'])
+@require_auth
+def save_essay_answer(session_id):
+    data        = request.json or {}
+    question_id = data.get('question_id')
+    essay_text  = data.get('essay_text', '') or ''
+    photo_b64   = data.get('photo_b64', '') or None  # simpan NULL jika kosong
+    if not question_id:
+        return jsonify({'error': 'question_id wajib'}), 400
+    sess = query(
+        "SELECT id FROM exam_sessions WHERE id=%s AND student_id=%s AND submitted_at IS NULL",
+        (session_id, request.user_id), fetch='one')
+    if not sess:
+        return jsonify({'error': 'Sesi tidak valid'}), 403
+    existing = query(
+        "SELECT id FROM essay_answers WHERE session_id=%s AND question_id=%s",
+        (session_id, question_id), fetch='one')
+    if existing:
+        query("UPDATE essay_answers SET essay_text=%s, photo_b64=%s WHERE id=%s",
+              (essay_text, photo_b64, existing['id']), fetch='none')
+    else:
+        query("""INSERT INTO essay_answers (id, session_id, question_id, essay_text, photo_b64)
+                 VALUES (%s,%s,%s,%s,%s)""",
+              (str(uuid.uuid4()), session_id, question_id, essay_text, photo_b64), fetch='none')
+    return jsonify({'ok': True})
+
+# ── Multi-answer (pilih lebih dari 1) ──────────────────────────
+@siswa_bp.route('/api/student/sessions/<session_id>/answer-multi', methods=['POST'])
+@require_auth
+def save_multi_answer(session_id):
+    data        = request.json or {}
+    question_id = data.get('question_id')
+    option_ids  = data.get('option_ids', [])
+    if not question_id:
+        return jsonify({'error': 'question_id wajib'}), 400
+    sess = query(
+        "SELECT id FROM exam_sessions WHERE id=%s AND student_id=%s AND submitted_at IS NULL",
+        (session_id, request.user_id), fetch='one')
+    if not sess:
+        return jsonify({'error': 'Sesi tidak valid'}), 403
+    # Hapus pilihan lama lalu insert ulang
+    query("DELETE FROM multi_answers WHERE session_id=%s AND question_id=%s",
+          (session_id, question_id), fetch='none')
+    for opt_id in option_ids:
+        query("""INSERT INTO multi_answers (id, session_id, question_id, option_id)
+                 VALUES (%s,%s,%s,%s)""",
+              (str(uuid.uuid4()), session_id, question_id, opt_id), fetch='none')
+    return jsonify({'ok': True})
+
 # ── Violation ──────────────────────────────────────────────────
 @siswa_bp.route('/api/student/sessions/<session_id>/violation', methods=['POST'])
 @require_auth
