@@ -383,11 +383,18 @@ def student_exam_detail(exam_id, student_id):
                 FROM essay_answers WHERE session_id=%s
             """, (session_id,))
         except Exception:
-            essays = query("""
-                SELECT question_id, essay_text, photo_b64,
-                       score as teacher_score
-                FROM essay_answers WHERE session_id=%s
-            """, (session_id,))
+            try:
+                essays = query("""
+                    SELECT question_id, essay_text, photo_b64,
+                           score as teacher_score
+                    FROM essay_answers WHERE session_id=%s
+                """, (session_id,))
+            except Exception:
+                # score / teacher_note belum ada — ambil kolom dasar saja
+                essays = query("""
+                    SELECT question_id, essay_text, photo_b64
+                    FROM essay_answers WHERE session_id=%s
+                """, (session_id,))
         essay_debug['count'] = len(essays)
         essay_map = {str(e['question_id']): dict(e) for e in essays}
         for q in q_list:
