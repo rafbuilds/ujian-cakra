@@ -8,6 +8,7 @@ load_dotenv()
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key')
+app.config['MAX_CONTENT_LENGTH'] = 20 * 1024 * 1024  # 20 MB max request body
 _allowed_origins = [o.strip() for o in os.environ.get('ALLOWED_ORIGINS', 'http://localhost:5000,http://localhost:8080').split(',') if o.strip()]
 CORS(app, resources={r"/api/*": {"origins": _allowed_origins}}, supports_credentials=True)
 
