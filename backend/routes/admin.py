@@ -598,6 +598,60 @@ def guru_leave_room(room_id):
           (room_id, request.user_id), fetch='none')
     return jsonify({'ok': True})
 
+@admin_bp.route('/api/guru/rooms/<room_id>/members', methods=['GET'])
+@require_guru
+def guru_room_members(room_id):
+    """Guru bisa lihat siapa saja anggota room yang sudah dia join sendiri —
+    TIDAK termasuk soal/isi ujian mereka, hanya nama."""
+    is_member = query("SELECT 1 FROM room_teachers WHERE room_id=%s AND teacher_id=%s",
+                      (room_id, request.user_id), fetch='one')
+    if not is_member:
+        return jsonify({'error': 'Anda belum join room ini'}), 403
+    rows = query("""
+        SELECT u.id, u.name, u.email FROM users u
+        JOIN room_teachers rt ON rt.teacher_id=u.id
+        WHERE rt.room_id=%s ORDER BY u.name
+    """, (room_id,))
+    return jsonify([dict(r) for r in rows])
+
+@admin_bp.route('/api/guru/rooms/<room_id>/classes', methods=['GET'])
+@require_guru
+def guru_room_classes(room_id):
+    """Guru bisa lihat kelas mana saja yang termasuk room ini (tidak pasti semua jenjang ikut)."""
+    is_member = query("SELECT 1 FROM room_teachers WHERE room_id=%s AND teacher_id=%s",
+                      (room_id, request.user_id), fetch='one')
+    if not is_member:
+        return jsonify({'error': 'Anda belum join room ini'}), 403
+    rows = query("""
+        SELECT c.* FROM classes c
+        JOIN room_classes rc ON rc.class_id=c.id
+        WHERE rc.room_id=%s ORDER BY c.grade, LENGTH(c.id), c.id
+    """, (room_id,))
+    return jsonify([dict(r) for r in rows])
+
+@admin_bp.route('/api/guru/rooms/<room_id>/exams', methods=['GET'])
+@require_guru
+def guru_room_exams(room_id):
+    """Guru bisa lihat siapa membuat ujian untuk jenjang apa di room ini —
+    metadata saja (judul, mapel, jenjang, guru), TIDAK termasuk soal/kunci jawaban."""
+    is_member = query("SELECT 1 FROM room_teachers WHERE room_id=%s AND teacher_id=%s",
+                      (room_id, request.user_id), fetch='one')
+    if not is_member:
+        return jsonify({'error': 'Anda belum join room ini'}), 403
+    rows = query("""
+        SELECT e.id, e.title, e.grade, e.status, e.teacher_id,
+               s.name as subject_name, u.name as teacher_name,
+               (SELECT COUNT(*) FROM questions q WHERE q.exam_id=e.id) as question_count,
+               (SELECT STRING_AGG(c.name,', ') FROM exam_classes ec
+                JOIN classes c ON c.id=ec.class_id WHERE ec.exam_id=e.id) as class_names
+        FROM exams e
+        LEFT JOIN subjects s ON s.id=e.subject_id
+        LEFT JOIN users u ON u.id=e.teacher_id
+        WHERE e.room_id=%s
+        ORDER BY e.grade, u.name
+    """, (room_id,))
+    return jsonify([dict(r) for r in rows])
+
 # ══════════════════════════════════════════════════════════════
 # GURU INVITATION SYSTEM — Hanya guru yang diundang admin bisa daftar
 # ══════════════════════════════════════════════════════════════

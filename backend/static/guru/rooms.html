@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+    <title>Room Ujian — Ujian Online</title>
+    <link rel="stylesheet" href="../style.css" />
+    <style>
+      .room-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 0.875rem 1.25rem;
+        border-bottom: 0.5px solid #f0ede5;
+      }
+      .room-row:last-child {
+        border-bottom: none;
+      }
+      .class-chip {
+        display: inline-flex;
+        align-items: center;
+        background: var(--light);
+        border: 0.5px solid var(--border);
+        border-radius: 20px;
+        padding: 3px 10px;
+        font-size: 11px;
+        color: var(--muted);
+        margin: 2px 4px 0 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-shell">
+      <nav class="sidebar">
+        <div class="sb-logo">
+          <div class="sb-logo-title">📋 Ujian Online</div>
+          <div class="sb-logo-sub">SMAN 1 Batangan</div>
+        </div>
+        <div class="sb-nav">
+          <div class="sb-section">Menu</div>
+          <a href="dashboard.html" class="sb-item" id="nav-dashboard">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" stroke-linecap="round" stroke-linejoin="round" />
+              <polyline points="9 22 9 12 15 12 15 22" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            Dashboard
+          </a>
+          <a href="ujian.html" class="sb-item" id="nav-ujian">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" stroke-linecap="round" />
+            </svg>
+            Daftar Ujian
+          </a>
+          <a href="rooms.html" class="sb-item active" id="nav-rooms">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke-linecap="round" />
+              <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke-linecap="round" />
+            </svg>
+            Room Ujian
+          </a>
+          <a href="pengawas.html" class="sb-item" id="nav-pengawas">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M15 10l4.553-2.069A1 1 0 0121 8.82V15.18a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" stroke-linecap="round" />
+            </svg>
+            Pengawas Live
+          </a>
+          <a href="nilai.html" class="sb-item" id="nav-nilai">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <line x1="18" y1="20" x2="18" y2="10" stroke-linecap="round" />
+              <line x1="12" y1="20" x2="12" y2="4" stroke-linecap="round" />
+              <line x1="6" y1="20" x2="6" y2="14" stroke-linecap="round" />
+            </svg>
+            Nilai & Rekap
+          </a>
+          <a href="mapel.html" class="sb-item" id="nav-mapel">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" stroke-linecap="round" />
+            </svg>
+            Mata Pelajaran
+          </a>
+          <a href="siswa.html" class="sb-item" id="nav-siswa">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke-linecap="round" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke-linecap="round" />
+            </svg>
+            Data Siswa
+          </a>
+        </div>
+        <div class="sb-user">
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px">
+            <div class="sb-avatar" id="sb-avatar">G</div>
+            <div>
+              <div class="sb-user-name" id="sb-user-name">Guru</div>
+              <div class="sb-user-role">Guru Pengampu</div>
+            </div>
+          </div>
+          <button class="sb-logout" onclick="Auth.logout()">⏻ Keluar</button>
+        </div>
+      </nav>
+
+      <div class="main-wrap">
+        <div class="topbar">
+          <div class="topbar-title">Room Ujian</div>
+        </div>
+
+        <div class="page-main">
+          <div class="card" style="margin-bottom: 1rem; padding: 1rem 1.25rem; background: var(--green4); border: none">
+            <div style="font-size: 13px; color: var(--green); line-height: 1.6">
+              💡 Room dibuat admin untuk periode ujian resmi (misal "TTS 2026/2027", "TTS 2027/2028").
+              <strong>Join room yang sesuai</strong> tanpa perlu diundang admin, lalu saat membuat ujian di menu Daftar
+              Ujian, pilih room ini & jenjang (X/XI/XII) sebagai foldernya. Tidak semua room pasti mencakup semua
+              jenjang — cek dulu kelas mana yang termasuk room ini. Boleh beberapa guru membuat ujian untuk jenjang &
+              mapel yang sama (kelas dibagi antar guru). Anda bisa lihat nama guru lain di room ini, tapi tidak bisa
+              melihat soal mereka.
+            </div>
+          </div>
+
+          <div class="card" style="padding: 0; overflow: hidden">
+            <div style="padding: 0.875rem 1.25rem; border-bottom: 0.5px solid var(--border); font-weight: 600; font-size: 14px">
+              Room yang Tersedia
+            </div>
+            <div id="room-list">
+              <div style="padding: 3rem; text-align: center"><div class="loading-spinner"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="../config.js"></script>
+    <script src="../components/api.js"></script>
+    <script src="../components/auth.js"></script>
+    <script src="../components/common.js"></script>
+    <script>
+      if (!Auth.requireRole(["guru", "admin"])) throw new Error();
+      UI.initSidebar();
+
+      async function load() {
+        const el = document.getElementById("room-list");
+        try {
+          const rooms = await API.get("/api/guru/rooms/all");
+          if (!rooms.length) {
+            el.innerHTML =
+              '<div class="empty-state" style="padding:3rem"><div class="empty-icon">🏠</div><div class="empty-text">Belum ada room ujian dari admin</div></div>';
+            return;
+          }
+          el.innerHTML = rooms
+            .map(
+              (r) => `
+      <div>
+        <div class="room-row">
+          <div style="width:40px;height:40px;border-radius:10px;background:${r.is_member ? "var(--green4)" : "var(--light)"};display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">🏠</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:600;font-size:14px">${r.name}</div>
+            <div style="font-size:12px;color:var(--muted)">${r.description || ""}</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px">👨‍🏫 ${r.teacher_count || 0} guru sudah join · 🏫 ${r.class_count || 0} kelas · 📋 ${r.exam_count || 0} ujian dibuat</div>
+          </div>
+          ${
+            r.is_member
+              ? `<span style="background:var(--green4);color:var(--green);padding:5px 12px;border-radius:20px;font-size:12px;font-weight:600;flex-shrink:0">✓ Sudah Join</span>
+                 <button class="btn btn-secondary btn-sm" onclick="toggleDetail('${r.id}')" id="btn-det-${r.id}">👁 Lihat Detail</button>
+                 <button class="btn btn-secondary btn-sm" onclick="leaveRoom('${r.id}','${r.name.replace(/'/g, "\\'")}')">Keluar</button>`
+              : `<button class="btn btn-primary btn-sm" onclick="joinRoom('${r.id}','${r.name.replace(/'/g, "\\'")}')">+ Join</button>`
+          }
+        </div>
+        <div id="detail-${r.id}" style="display:none;padding:0 1.25rem .875rem 4.25rem"></div>
+      </div>`,
+            )
+            .join("");
+        } catch {
+          el.innerHTML = '<div class="empty-state" style="padding:3rem"><div class="empty-text">Gagal memuat room ujian</div></div>';
+        }
+      }
+
+      async function toggleDetail(roomId) {
+        const box = document.getElementById(`detail-${roomId}`);
+        const btn = document.getElementById(`btn-det-${roomId}`);
+        if (box.style.display === "block") {
+          box.style.display = "none";
+          btn.textContent = "👁 Lihat Detail";
+          return;
+        }
+        box.style.display = "block";
+        btn.textContent = "🔼 Tutup";
+        box.innerHTML = '<div style="font-size:12px;color:var(--muted)">Memuat...</div>';
+        try {
+          const [classes, members, exams] = await Promise.all([
+            API.get(`/api/guru/rooms/${roomId}/classes`),
+            API.get(`/api/guru/rooms/${roomId}/members`),
+            API.get(`/api/guru/rooms/${roomId}/exams`),
+          ]);
+          const gradeLabel = { 10: "X", 11: "XI", 12: "XII" };
+          const byGrade = (g) => exams.filter((e) => e.grade === g);
+          box.innerHTML = `
+            <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:4px">KELAS DALAM ROOM INI</div>
+            <div style="margin-bottom:.75rem">${
+              classes.length
+                ? classes.map((c) => `<span class="class-chip">${c.name}</span>`).join("")
+                : '<span style="font-size:12px;color:var(--muted)">Belum ada kelas diset admin</span>'
+            }</div>
+            <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:4px">GURU DI ROOM INI (tidak bisa lihat soal mereka)</div>
+            <div style="margin-bottom:.75rem">${
+              members.length
+                ? members.map((m) => `<div style="font-size:12px;padding:2px 0">👤 ${m.name}</div>`).join("")
+                : '<div style="font-size:12px;color:var(--muted)">Belum ada guru</div>'
+            }</div>
+            <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:4px">UJIAN PER JENJANG</div>
+            ${[10, 11, 12]
+              .map((g) => {
+                const list = byGrade(g);
+                if (!list.length) return "";
+                return `<div style="font-size:12px;font-weight:600;margin-top:6px">Kelas ${gradeLabel[g]}</div>` +
+                  list
+                    .map(
+                      (e) =>
+                        `<div style="font-size:12px;padding:3px 0;color:var(--muted)">📝 ${e.title} — ${e.teacher_name || "—"} (${e.subject_name || "—"}, ${e.question_count || 0} soal)</div>`,
+                    )
+                    .join("");
+              })
+              .join("") || '<div style="font-size:12px;color:var(--muted)">Belum ada ujian di room ini</div>'}
+          `;
+        } catch {
+          box.innerHTML = '<div style="font-size:12px;color:var(--muted)">Gagal memuat detail room</div>';
+        }
+      }
+
+      async function joinRoom(id, name) {
+        try {
+          await API.post(`/api/guru/rooms/${id}/join`, {});
+          UI.toast(`✅ Berhasil join room "${name}" — silakan buat ujian Anda di menu Daftar Ujian`, "success");
+          load();
+        } catch (e) {
+          UI.toast(e.error || "Gagal join room", "error");
+        }
+      }
+
+      async function leaveRoom(id, name) {
+        UI.confirm("Keluar Room", `Keluar dari room "<strong>${name}</strong>"? Ujian yang sudah Anda buat di room ini tidak akan terhapus.`, async () => {
+          try {
+            await API.del(`/api/guru/rooms/${id}/leave`);
+            UI.toast("Keluar dari room", "success");
+            load();
+          } catch (e) {
+            UI.toast(e.error || "Gagal keluar room", "error");
+          }
+        });
+      }
+
+      load();
+    </script>
+  </body>
+</html>

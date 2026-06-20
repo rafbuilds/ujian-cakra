@@ -44,23 +44,21 @@ def get_exams_for_proctor():
 @require_guru
 def create_exam():
     data = request.json or {}
-    exam_id  = str(uuid.uuid4())
-    group_id = data.get('group_id') or None
+    exam_id = str(uuid.uuid4())
+    room_id = data.get('room_id') or None
 
-    # Grup ujian murni struktur organisasi (Grup > Jenjang > Guru+Soal) —
-    # tidak mengunci jadwal. Cukup pastikan guru memang sudah join grup ini.
-    if group_id:
-        grp = query("""SELECT 1 FROM exam_groups eg
-                       JOIN exam_group_members egm ON egm.group_id=eg.id
-                       WHERE eg.id=%s AND egm.teacher_id=%s AND eg.is_active=true""",
-                    (group_id, request.user_id), fetch='one')
-        if not grp:
-            return jsonify({'error': 'Anda belum join grup ujian ini'}), 403
+    # Room ujian (misal "TTS 2026/2027") murni struktur organisasi —
+    # tidak mengunci jadwal. Cukup pastikan guru memang sudah join room ini.
+    if room_id:
+        rm = query("SELECT 1 FROM room_teachers WHERE room_id=%s AND teacher_id=%s",
+                   (room_id, request.user_id), fetch='one')
+        if not rm:
+            return jsonify({'error': 'Anda belum join room ujian ini'}), 403
 
     query("""INSERT INTO exams
              (id, teacher_id, subject_id, title, instructions, duration_minutes,
               start_at, status, randomize_questions, randomize_options,
-              show_result_after, show_key_after, score_per_correct, group_id, grade)
+              show_result_after, show_key_after, score_per_correct, room_id, grade)
              VALUES (%s,%s,%s,%s,%s,%s,%s,'draft',%s,%s,%s,%s,%s,%s,%s)""",
           (exam_id, request.user_id,
            data.get('subject_id') or None,
@@ -73,7 +71,7 @@ def create_exam():
            data.get('show_result_after', True),
            data.get('show_key_after', False),
            data.get('score_per_correct') or None,
-           group_id, data.get('grade') or None), fetch='none')
+           room_id, data.get('grade') or None), fetch='none')
     # Assign classes
     for cls in (data.get('class_ids') or []):
         query("INSERT INTO exam_classes (exam_id, class_id) VALUES (%s,%s) ON CONFLICT DO NOTHING",
@@ -107,16 +105,14 @@ def update_exam(exam_id):
         if not owner:
             return jsonify({'error': 'Ujian tidak ditemukan atau bukan milik Anda'}), 403
     data = request.json or {}
-    if 'group_id' in data:
-        group_id = data['group_id'] or None
-        if group_id:
-            grp = query("""SELECT 1 FROM exam_groups eg
-                           JOIN exam_group_members egm ON egm.group_id=eg.id
-                           WHERE eg.id=%s AND egm.teacher_id=%s AND eg.is_active=true""",
-                        (group_id, request.user_id), fetch='one')
-            if not grp:
-                return jsonify({'error': 'Anda belum join grup ujian ini'}), 403
-        query("UPDATE exams SET group_id=%s WHERE id=%s", (group_id, exam_id), fetch='none')
+    if 'room_id' in data:
+        room_id = data['room_id'] or None
+        if room_id:
+            rm = query("SELECT 1 FROM room_teachers WHERE room_id=%s AND teacher_id=%s",
+                      (room_id, request.user_id), fetch='one')
+            if not rm:
+                return jsonify({'error': 'Anda belum join room ujian ini'}), 403
+        query("UPDATE exams SET room_id=%s WHERE id=%s", (room_id, exam_id), fetch='none')
     allowed = ['title','instructions','duration_minutes','start_at','status',
                'randomize_questions','randomize_options','show_result_after',
                'show_key_after','subject_id','score_per_correct','grade']

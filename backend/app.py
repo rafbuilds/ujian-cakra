@@ -140,91 +140,9 @@ def dev_login():
     return jsonify({'token': token, 'role': user['role'], 'name': user['name']})
 
 # ══════════════════════════════════════════════════════════════
-# ADMIN — Exam Groups (dibuat admin, guru bisa join)
-# ══════════════════════════════════════════════════════════════
-import uuid as _uuid
-
-@app.route('/api/admin/exam-groups', methods=['GET'])
-@require_admin
-def admin_list_groups():
-    from db import query
-    rows = query("""
-        SELECT eg.*, u.name as created_by_name,
-               COUNT(DISTINCT egm.teacher_id) as member_count,
-               COUNT(DISTINCT e.id) as exam_count
-        FROM exam_groups eg
-        LEFT JOIN users u ON u.id=eg.created_by
-        LEFT JOIN exam_group_members egm ON egm.group_id=eg.id
-        LEFT JOIN exams e ON e.group_id=eg.id
-        GROUP BY eg.id, u.name
-        ORDER BY eg.created_at DESC
-    """, ())
-    return jsonify([dict(r) for r in rows])
-
-@app.route('/api/admin/exam-groups', methods=['POST'])
-@require_admin
-def admin_create_group():
-    from db import query
-    body = request.json or {}
-    name = body.get('name','').strip()
-    if not name: return jsonify({'error': 'Nama group wajib'}), 400
-    grp = query("""
-        INSERT INTO exam_groups (id, name, description, created_by, is_active)
-        VALUES (%s,%s,%s,%s,true) RETURNING *
-    """, (str(_uuid.uuid4()), name, body.get('description',''), request.user_id), fetch='one')
-    return jsonify(dict(grp)), 201
-
-@app.route('/api/admin/exam-groups/<group_id>', methods=['PATCH'])
-@require_admin
-def admin_update_group(group_id):
-    from db import query
-    body = request.json or {}
-    query("UPDATE exam_groups SET name=%s, description=%s WHERE id=%s",
-          (body.get('name',''), body.get('description',''), group_id), fetch='none')
-    return jsonify({'ok': True})
-
-@app.route('/api/admin/exam-groups/<group_id>', methods=['DELETE'])
-@require_admin
-def admin_delete_group(group_id):
-    from db import query
-    query("UPDATE exam_groups SET is_active=false WHERE id=%s", (group_id,), fetch='none')
-    return jsonify({'ok': True})
-
-@app.route('/api/admin/exam-groups/<group_id>/members', methods=['GET'])
-@require_admin
-def admin_group_members(group_id):
-    from db import query
-    rows = query("""
-        SELECT u.id, u.name, u.email, egm.joined_at
-        FROM exam_group_members egm
-        JOIN users u ON u.id=egm.teacher_id
-        WHERE egm.group_id=%s
-        ORDER BY egm.joined_at DESC
-    """, (group_id,))
-    return jsonify([dict(r) for r in rows])
-
-@app.route('/api/admin/exam-groups/<group_id>/exams', methods=['GET'])
-@require_admin
-def admin_group_exams(group_id):
-    """Folder Jenjang (X/XI/XII) -> daftar Guru+Soal di grup ini. Admin bisa lihat semua."""
-    from db import query
-    rows = query("""
-        SELECT e.id, e.title, e.grade, e.status, e.teacher_id,
-               s.name as subject_name, u.name as teacher_name,
-               (SELECT COUNT(*) FROM questions q WHERE q.exam_id=e.id) as question_count,
-               (SELECT STRING_AGG(c.name,', ') FROM exam_classes ec
-                JOIN classes c ON c.id=ec.class_id WHERE ec.exam_id=e.id) as class_names
-        FROM exams e
-        LEFT JOIN subjects s ON s.id=e.subject_id
-        LEFT JOIN users u ON u.id=e.teacher_id
-        WHERE e.group_id=%s
-        ORDER BY e.grade, u.name
-    """, (group_id,))
-    return jsonify([dict(r) for r in rows])
-
-# ══════════════════════════════════════════════════════════════
 # UPLOAD MEDIA — Lampiran & Audio untuk soal
 # ══════════════════════════════════════════════════════════════
+import uuid as _uuid
 import base64, mimetypes
 from werkzeug.utils import secure_filename
 
