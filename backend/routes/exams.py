@@ -1,19 +1,10 @@
 # backend/routes/exams.py
 from flask import Blueprint, request, jsonify, send_file
-import uuid, io, secrets, string
+import uuid, io
 from db import query, count_correct_wrong
 from auth import require_guru, require_auth, require_admin
 
 exams_bp = Blueprint('exams', __name__)
-
-def _generate_proctor_code():
-    """Kode 6 karakter unik untuk akses pengawas universal."""
-    alphabet = string.ascii_uppercase + string.digits
-    for _ in range(10):
-        code = ''.join(secrets.choice(alphabet) for _ in range(6))
-        if not query("SELECT 1 FROM exams WHERE proctor_code=%s", (code,), fetch='one'):
-            return code
-    return ''.join(secrets.choice(alphabet) for _ in range(8))
 
 # ── CRUD Ujian ─────────────────────────────────────────────────
 @exams_bp.route('/api/exams', methods=['GET'])
@@ -31,50 +22,63 @@ def get_exams():
     """, (request.user_id,))
     return jsonify([dict(r) for r in rows])
 
+@exams_bp.route('/api/exams/all-for-proctor', methods=['GET'])
+@require_guru
+def get_exams_for_proctor():
+    """Semua ujian dari semua guru — untuk dropdown Pengawas Live universal.
+    Hanya metadata, TIDAK termasuk soal/kunci jawaban."""
+    rows = query("""
+        SELECT e.id, e.title, e.status, e.start_at, e.teacher_id,
+               s.name as subject_name, u.name as teacher_name,
+               (SELECT STRING_AGG(c.name,', ') FROM exam_classes ec
+                JOIN classes c ON c.id=ec.class_id WHERE ec.exam_id=e.id) as class_names
+        FROM exams e
+        LEFT JOIN subjects s ON s.id=e.subject_id
+        LEFT JOIN users u ON u.id=e.teacher_id
+        WHERE e.status IN ('published','ongoing','finished')
+        ORDER BY e.start_at DESC
+    """, ())
+    return jsonify([dict(r) for r in rows])
+
 @exams_bp.route('/api/exams', methods=['POST'])
 @require_guru
 def create_exam():
     data = request.json or {}
     exam_id  = str(uuid.uuid4())
     group_id = data.get('group_id') or None
-    start_at = data.get('start_at')
-    duration = int(data.get('duration_minutes', 90))
 
-    # Kalau ujian dibuat dalam sebuah grup/sesi, jadwal WAJIB ikut grup
-    # (server-side, agar tidak bisa diakali walau form di-bypass).
+    # Grup ujian murni struktur organisasi (Grup > Jenjang > Guru+Soal) —
+    # tidak mengunci jadwal. Cukup pastikan guru memang sudah join grup ini.
     if group_id:
-        grp = query("""SELECT eg.start_at, eg.duration_minutes FROM exam_groups eg
+        grp = query("""SELECT 1 FROM exam_groups eg
                        JOIN exam_group_members egm ON egm.group_id=eg.id
                        WHERE eg.id=%s AND egm.teacher_id=%s AND eg.is_active=true""",
                     (group_id, request.user_id), fetch='one')
         if not grp:
             return jsonify({'error': 'Anda belum join grup ujian ini'}), 403
-        if grp.get('start_at'):         start_at = grp['start_at']
-        if grp.get('duration_minutes'): duration = grp['duration_minutes']
 
-    proctor_code = _generate_proctor_code()
     query("""INSERT INTO exams
              (id, teacher_id, subject_id, title, instructions, duration_minutes,
               start_at, status, randomize_questions, randomize_options,
-              show_result_after, show_key_after, score_per_correct, group_id, proctor_code)
+              show_result_after, show_key_after, score_per_correct, group_id, grade)
              VALUES (%s,%s,%s,%s,%s,%s,%s,'draft',%s,%s,%s,%s,%s,%s,%s)""",
           (exam_id, request.user_id,
            data.get('subject_id') or None,
            data.get('title','Ujian Baru'),
            data.get('instructions',''),
-           duration,
-           start_at,
+           int(data.get('duration_minutes',90)),
+           data.get('start_at'),
            data.get('randomize_questions', True),
            data.get('randomize_options', True),
            data.get('show_result_after', True),
            data.get('show_key_after', False),
            data.get('score_per_correct') or None,
-           group_id, proctor_code), fetch='none')
+           group_id, data.get('grade') or None), fetch='none')
     # Assign classes
     for cls in (data.get('class_ids') or []):
         query("INSERT INTO exam_classes (exam_id, class_id) VALUES (%s,%s) ON CONFLICT DO NOTHING",
               (exam_id, cls), fetch='none')
-    return jsonify({'id': exam_id, 'proctor_code': proctor_code}), 201
+    return jsonify({'id': exam_id}), 201
 
 @exams_bp.route('/api/exams/<exam_id>', methods=['GET'])
 @require_guru
@@ -106,18 +110,16 @@ def update_exam(exam_id):
     if 'group_id' in data:
         group_id = data['group_id'] or None
         if group_id:
-            grp = query("""SELECT eg.start_at, eg.duration_minutes FROM exam_groups eg
+            grp = query("""SELECT 1 FROM exam_groups eg
                            JOIN exam_group_members egm ON egm.group_id=eg.id
                            WHERE eg.id=%s AND egm.teacher_id=%s AND eg.is_active=true""",
                         (group_id, request.user_id), fetch='one')
             if not grp:
                 return jsonify({'error': 'Anda belum join grup ujian ini'}), 403
-            if grp.get('start_at'):         data['start_at'] = grp['start_at']
-            if grp.get('duration_minutes'): data['duration_minutes'] = grp['duration_minutes']
         query("UPDATE exams SET group_id=%s WHERE id=%s", (group_id, exam_id), fetch='none')
     allowed = ['title','instructions','duration_minutes','start_at','status',
                'randomize_questions','randomize_options','show_result_after',
-               'show_key_after','subject_id','score_per_correct']
+               'show_key_after','subject_id','score_per_correct','grade']
     for f in [k for k in data if k in allowed]:
         query(f"UPDATE exams SET {f}=%s WHERE id=%s", (data[f], exam_id), fetch='none')
     if 'class_ids' in data:
@@ -302,48 +304,34 @@ def import_questions(exam_id):
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
-# ── Pengawas Universal — akses via kode, tanpa join apa pun ────
-@exams_bp.route('/api/exams/join-proctor', methods=['POST'])
+# ── Pengawas Universal — SATU kode global (diset admin) ────────
+@exams_bp.route('/api/exams/<exam_id>/join-proctor', methods=['POST'])
 @require_guru
-def join_proctor():
-    code = (request.json or {}).get('code', '').strip().upper()
+def join_proctor(exam_id):
+    code = (request.json or {}).get('code', '').strip()
     if not code:
         return jsonify({'error': 'Kode wajib diisi'}), 400
-    exam = query("SELECT id, title FROM exams WHERE proctor_code=%s", (code,), fetch='one')
+    exam = query("SELECT id, title, teacher_id FROM exams WHERE id=%s", (exam_id,), fetch='one')
     if not exam:
-        return jsonify({'error': 'Kode pengawas tidak valid'}), 404
+        return jsonify({'error': 'Ujian tidak ditemukan'}), 404
+    if str(exam['teacher_id']) == request.user_id:
+        return jsonify({'error': 'Anda pembuat soal ujian ini — sudah otomatis bisa mengawasi tanpa kode'}), 400
+    setting = query("SELECT proctor_code FROM exam_settings LIMIT 1", fetch='one')
+    master_code = (setting or {}).get('proctor_code')
+    if not master_code:
+        return jsonify({'error': 'Kode pengawas belum diset admin'}), 400
+    if code.strip().upper() != master_code.strip().upper():
+        return jsonify({'error': 'Kode pengawas salah'}), 403
     query("""INSERT INTO exam_proctors (exam_id, teacher_id) VALUES (%s,%s)
-             ON CONFLICT DO NOTHING""", (exam['id'], request.user_id), fetch='none')
+             ON CONFLICT DO NOTHING""", (exam_id, request.user_id), fetch='none')
     return jsonify({'ok': True, 'exam_id': str(exam['id']), 'title': exam['title']})
 
 @exams_bp.route('/api/exams/proctoring', methods=['GET'])
 @require_guru
 def list_proctoring_exams():
-    """Ujian yang diawasi guru ini lewat kode (bukan ujian miliknya sendiri)."""
-    rows = query("""
-        SELECT e.*, s.name as subject_name, u.name as teacher_name,
-               (SELECT COUNT(*) FROM questions q WHERE q.exam_id=e.id) as question_count,
-               (SELECT STRING_AGG(c.name,', ') FROM exam_classes ec
-                JOIN classes c ON c.id=ec.class_id WHERE ec.exam_id=e.id) as class_names
-        FROM exam_proctors ep
-        JOIN exams e ON e.id=ep.exam_id
-        LEFT JOIN subjects s ON s.id=e.subject_id
-        LEFT JOIN users u ON u.id=e.teacher_id
-        WHERE ep.teacher_id=%s
-        ORDER BY ep.joined_at DESC
-    """, (request.user_id,))
-    return jsonify([dict(r) for r in rows])
-
-@exams_bp.route('/api/exams/<exam_id>/regenerate-proctor-code', methods=['POST'])
-@require_guru
-def regenerate_proctor_code(exam_id):
-    exam = query("SELECT teacher_id FROM exams WHERE id=%s", (exam_id,), fetch='one')
-    if not exam: return jsonify({'error': 'Tidak ditemukan'}), 404
-    if request.user_role != 'admin' and str(exam['teacher_id']) != request.user_id:
-        return jsonify({'error': 'Akses ditolak'}), 403
-    new_code = _generate_proctor_code()
-    query("UPDATE exams SET proctor_code=%s WHERE id=%s", (new_code, exam_id), fetch='none')
-    return jsonify({'ok': True, 'proctor_code': new_code})
+    """ID ujian yang sudah berhasil dibuka guru ini lewat kode (bukan miliknya sendiri)."""
+    rows = query("SELECT exam_id FROM exam_proctors WHERE teacher_id=%s", (request.user_id,))
+    return jsonify([str(r['exam_id']) for r in rows])
 
 # ── Monitor ────────────────────────────────────────────────────
 @exams_bp.route('/api/exams/<exam_id>/monitor', methods=['GET'])

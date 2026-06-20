@@ -272,37 +272,7 @@
         </div>
 
         <div class="page-main">
-          <!-- Pengawas Universal — masuk via kode -->
-          <div class="select-exam">
-            <div
-              style="
-                font-size: 13px;
-                font-weight: 600;
-                color: var(--muted);
-                margin-bottom: 0.75rem;
-              "
-            >
-              🔑 Masukkan Kode Pengawas
-              <span style="font-weight: 400; color: var(--muted)"
-                >(untuk mengawasi ujian guru lain — minta kodenya ke pembuat
-                soal)</span
-              >
-            </div>
-            <div style="display: flex; gap: 8px">
-              <input
-                class="form-control"
-                id="proctor-code-input"
-                placeholder="Contoh: A1B2C3"
-                style="text-transform: uppercase; max-width: 200px"
-                onkeydown="if(event.key==='Enter')joinByCode()"
-              />
-              <button class="btn btn-primary btn-sm" onclick="joinByCode()">
-                Masuk
-              </button>
-            </div>
-          </div>
-
-          <!-- Pilih ujian -->
+          <!-- Pilih ujian (semua ujian, dari semua guru) -->
           <div class="select-exam">
             <div
               style="
@@ -313,14 +283,44 @@
               "
             >
               Pilih Ujian yang Dipantau
+              <span style="font-weight: 400; color: var(--muted)"
+                >(ujian guru lain butuh kode pengawas dari admin)</span
+              >
             </div>
             <select
               class="form-control"
               id="exam-select"
               onchange="onExamSelect(this.value)"
             >
-              <option value="">— Pilih ujian aktif —</option>
+              <option value="">— Pilih ujian —</option>
             </select>
+          </div>
+
+          <!-- Prompt kode — muncul kalau pilih ujian guru lain yang belum dibuka -->
+          <div class="select-exam" id="code-prompt" style="display: none">
+            <div
+              style="
+                font-size: 13px;
+                font-weight: 600;
+                color: var(--muted);
+                margin-bottom: 0.75rem;
+              "
+            >
+              🔑 Ujian ini bukan buatan Anda — masukkan kode pengawas untuk
+              bisa memantau
+            </div>
+            <div style="display: flex; gap: 8px">
+              <input
+                class="form-control"
+                id="proctor-code-input"
+                placeholder="Kode pengawas dari admin"
+                style="text-transform: uppercase; max-width: 220px"
+                onkeydown="if(event.key==='Enter')joinByCode()"
+              />
+              <button class="btn btn-primary btn-sm" onclick="joinByCode()">
+                Masuk
+              </button>
+            </div>
           </div>
 
           <div id="monitor-content" style="display: none">
@@ -482,46 +482,27 @@
       let currentExamId = null,
         monitorData = null,
         autoRefresh = null,
-        soundOn = true;
+        soundOn = true,
+        myUserId = null,
+        allExamsForProctor = [],
+        unlockedIds = new Set();
       const prevViolations = {};
 
       async function init() {
+        myUserId = Auth.getUser()?.id;
         try {
-          const [ownRes, proctoringRes] = await Promise.all([
-            API.get("/api/exams"),
+          const [all, unlocked] = await Promise.all([
+            API.get("/api/exams/all-for-proctor"),
             API.get("/api/exams/proctoring").catch(() => []),
           ]);
-          const own = Array.isArray(ownRes) ? ownRes : ownRes.exams || ownRes.data || [];
-          const proctoring = Array.isArray(proctoringRes) ? proctoringRes : [];
-          const ownIds = new Set(own.map((e) => e.id));
-          const activeOwn = own
-            .filter((e) => ["published", "ongoing", "finished"].includes(e.status))
-            .map((e) => ({ ...e, _mine: true }));
-          const activeProctoring = proctoring
-            .filter((e) => ["published", "ongoing", "finished"].includes(e.status) && !ownIds.has(e.id))
-            .map((e) => ({ ...e, _mine: false }));
-          const active = [...activeOwn, ...activeProctoring];
-
-          const statusLabel = (e) =>
-            e.status === "ongoing" ? "🟢 Berlangsung" : e.status === "published" ? "📋 Terbuka" : "✅ Selesai";
-          const sel = document.getElementById("exam-select");
-          sel.innerHTML =
-            '<option value="">— Pilih ujian aktif —</option>' +
-            (activeOwn.length
-              ? `<optgroup label="Ujian Saya">${activeOwn
-                  .map((e) => `<option value="${e.id}">${e.title} — ${statusLabel(e)}</option>`)
-                  .join("")}</optgroup>`
-              : "") +
-            (activeProctoring.length
-              ? `<optgroup label="Sedang Saya Awasi">${activeProctoring
-                  .map((e) => `<option value="${e.id}">👁 ${e.title} (${e.teacher_name || "—"}) — ${statusLabel(e)}</option>`)
-                  .join("")}</optgroup>`
-              : "");
+          allExamsForProctor = Array.isArray(all) ? all : [];
+          unlockedIds = new Set(Array.isArray(unlocked) ? unlocked : []);
+          renderExamSelect();
 
           // URL param
           const id = new URLSearchParams(location.search).get("id");
-          if (id && active.find((e) => e.id === id)) {
-            sel.value = id;
+          if (id && allExamsForProctor.find((e) => e.id === id)) {
+            document.getElementById("exam-select").value = id;
             onExamSelect(id);
           }
         } catch {
@@ -529,21 +510,47 @@
         }
       }
 
+      function renderExamSelect() {
+        const statusLabel = (e) =>
+          e.status === "ongoing" ? "🟢 Berlangsung" : e.status === "published" ? "📋 Terbuka" : "✅ Selesai";
+        const mine = allExamsForProctor.filter((e) => e.teacher_id === myUserId);
+        const others = allExamsForProctor.filter((e) => e.teacher_id !== myUserId);
+        const sel = document.getElementById("exam-select");
+        const prevValue = sel.value;
+        sel.innerHTML =
+          '<option value="">— Pilih ujian —</option>' +
+          (mine.length
+            ? `<optgroup label="Ujian Saya">${mine
+                .map((e) => `<option value="${e.id}">${e.title} — ${statusLabel(e)}</option>`)
+                .join("")}</optgroup>`
+            : "") +
+          (others.length
+            ? `<optgroup label="Ujian Guru Lain">${others
+                .map(
+                  (e) =>
+                    `<option value="${e.id}">${unlockedIds.has(e.id) ? "🔓" : "🔒"} ${e.title} (${e.teacher_name || "—"}) — ${statusLabel(e)}</option>`,
+                )
+                .join("")}</optgroup>`
+            : "");
+        sel.value = prevValue;
+      }
+
       async function joinByCode() {
         const input = document.getElementById("proctor-code-input");
-        const code = input.value.trim().toUpperCase();
+        const code = input.value.trim();
         if (!code) {
           UI.toast("Masukkan kode pengawas dulu", "warn");
           return;
         }
+        if (!currentExamId) return;
         try {
-          const r = await API.post("/api/exams/join-proctor", { code });
-          UI.toast(`✅ Berhasil masuk sebagai pengawas: ${r.title}`, "success");
-          input.value = "";
-          await init();
-          const sel = document.getElementById("exam-select");
-          sel.value = r.exam_id;
-          onExamSelect(r.exam_id);
+          await API.post(`/api/exams/${currentExamId}/join-proctor`, { code });
+          unlockedIds.add(currentExamId);
+          UI.toast("✅ Berhasil masuk sebagai pengawas", "success");
+          document.getElementById("code-prompt").style.display = "none";
+          renderExamSelect();
+          document.getElementById("exam-select").value = currentExamId;
+          onExamSelect(currentExamId);
         } catch (e) {
           UI.toast(e.error || "Kode tidak valid", "error");
         }
@@ -552,8 +559,17 @@
       function onExamSelect(id) {
         currentExamId = id;
         clearInterval(autoRefresh);
+        document.getElementById("code-prompt").style.display = "none";
         if (!id) {
           document.getElementById("monitor-content").style.display = "none";
+          return;
+        }
+        const exam = allExamsForProctor.find((e) => e.id === id);
+        const needsCode = exam && exam.teacher_id !== myUserId && !unlockedIds.has(id);
+        if (needsCode) {
+          document.getElementById("monitor-content").style.display = "none";
+          document.getElementById("code-prompt").style.display = "block";
+          document.getElementById("proctor-code-input").value = "";
           return;
         }
         document.getElementById("monitor-content").style.display = "block";

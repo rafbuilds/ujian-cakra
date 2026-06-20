@@ -207,6 +207,16 @@
               <div class="stat-mini-card"><div class="stat-mini-num" id="st-uj-done">—</div><div class="stat-mini-label">Selesai</div></div>
             </div>
             <div class="ctrl-card" style="margin-bottom:.75rem">
+              <div style="font-weight:600;font-size:14px;margin-bottom:.5rem">🔑 Kode Pengawas Universal</div>
+              <div class="ctrl-desc" style="margin-bottom:.75rem">
+                Satu kode ini dipakai oleh SEMUA guru untuk bisa mengawasi ujian siapa pun (selain ujian buatannya sendiri) di menu Pengawas Live. Bagikan kode ini ke seluruh guru.
+              </div>
+              <div style="display:flex;gap:8px">
+                <input id="proctor-code" class="form-control" placeholder="Contoh: PENGAWAS2026" style="max-width:260px;text-transform:uppercase" />
+                <button class="btn btn-primary btn-sm" onclick="saveProctorCode()">💾 Simpan</button>
+              </div>
+            </div>
+            <div class="ctrl-card" style="margin-bottom:.75rem">
               <div style="font-weight:600;font-size:14px;margin-bottom:.75rem;color:#3b6d11">🟢 Ujian Berlangsung Sekarang</div>
               <div id="ongoing-exams"><div class="loading-spinner"></div></div>
             </div>
@@ -580,7 +590,11 @@
       // ── Tab Ujian ───────────────────────────────────────────────
       async function loadUjianTab() {
         try {
-          const exams   = await API.get('/api/admin/exams');
+          const [exams, settings] = await Promise.all([
+            API.get('/api/admin/exams'),
+            API.get('/api/admin/exam-settings').catch(() => ({})),
+          ]);
+          document.getElementById('proctor-code').value = settings.proctor_code || '';
           const ongoing = exams.filter(e => e.status === 'ongoing');
           document.getElementById('st-uj-total').textContent   = exams.length;
           document.getElementById('st-uj-ongoing').textContent = ongoing.length;
@@ -692,6 +706,16 @@
             <div class="ctrl-row"><div class="ctrl-label">Ujian Berlangsung</div><div>${exams.filter(e=>e.status==='ongoing').length} ujian</div></div>
             <div class="ctrl-row"><div class="ctrl-label">Backend URL</div><div style="font-size:11px;font-family:monospace;color:var(--muted)">${CONFIG.API_BASE||window.location.origin}</div></div>`;
         } catch { UI.toast('Gagal memuat sistem','error'); }
+      }
+
+      async function saveProctorCode() {
+        const code = document.getElementById('proctor-code').value.trim().toUpperCase();
+        if (!code) { UI.toast('Kode tidak boleh kosong', 'warn'); return; }
+        try {
+          await API.patch('/api/admin/exam-settings', { proctor_code: code });
+          document.getElementById('proctor-code').value = code;
+          UI.toast('✅ Kode pengawas disimpan', 'success');
+        } catch (e) { UI.toast(e.error || 'Gagal menyimpan', 'error'); }
       }
 
       async function saveMaxViolations() {

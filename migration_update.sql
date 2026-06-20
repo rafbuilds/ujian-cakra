@@ -191,16 +191,22 @@ CREATE INDEX IF NOT EXISTS idx_sessions_status   ON exam_sessions(status) WHERE 
 CREATE INDEX IF NOT EXISTS idx_results_session   ON results(session_id);
 CREATE INDEX IF NOT EXISTS idx_guru_invites_token ON guru_invites(token);
 
--- ── 19. Exam Groups sebagai slot jadwal bersama ───────────────
--- Admin set jadwal sekali di level group; semua ujian anak yang dibuat
--- guru dalam group ini mengikuti jadwal yang sama (dikunci di backend).
-ALTER TABLE exam_groups ADD COLUMN IF NOT EXISTS start_at         TIMESTAMPTZ;
-ALTER TABLE exam_groups ADD COLUMN IF NOT EXISTS duration_minutes INT;
+-- ── 19. Exam Groups sebagai struktur Grup > Jenjang > Guru+Soal ──
+-- Grup ujian (misal "TTS 2026/2027") murni struktur organisasi, BUKAN slot
+-- jadwal bersama. Guru join sendiri ke grup, lalu saat bikin ujian pilih
+-- jenjang (grade) sebagai "folder" — banyak guru boleh bikin ujian sendiri
+-- untuk jenjang & mapel yang sama (kelas dibagi antar guru).
+-- Catatan: exam_groups.start_at/duration_minutes (migrasi versi lama) sudah
+-- tidak dipakai lagi, dibiarkan ada di DB (tidak di-drop, tidak berbahaya).
+ALTER TABLE exams ADD COLUMN IF NOT EXISTS grade INT; -- 10/11/12, opsional
 
--- ── 20. Pengawas Universal — kode akses ───────────────────────
--- Guru pembuat soal cukup join exam_group; guru pengawas (siapa saja)
--- masuk dengan memasukkan kode ujian tanpa perlu join apa pun.
-ALTER TABLE exams ADD COLUMN IF NOT EXISTS proctor_code TEXT;
+-- ── 20. Pengawas Universal — SATU kode global untuk semua ujian ─
+-- Admin set 1 kode di exam_settings (bukan kode acak per-ujian seperti versi
+-- lama — kolom exams.proctor_code dari migrasi lama sudah tidak dipakai).
+-- Guru pembuat soal otomatis bisa mengawasi ujiannya sendiri tanpa kode.
+-- Guru lain pilih ujian dari dropdown lalu masukkan kode global untuk bisa
+-- mengawasi — akses tersimpan permanen per-ujian setelah berhasil sekali.
+ALTER TABLE exam_settings ADD COLUMN IF NOT EXISTS proctor_code TEXT;
 CREATE TABLE IF NOT EXISTS exam_proctors (
     exam_id    UUID NOT NULL REFERENCES exams(id) ON DELETE CASCADE,
     teacher_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,

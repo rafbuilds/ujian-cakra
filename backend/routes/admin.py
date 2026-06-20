@@ -395,14 +395,15 @@ def get_exam_settings():
     s = query("SELECT * FROM exam_settings LIMIT 1", fetch='one')
     return jsonify(dict(s) if s else {
         'passing_grade': 75, 'allow_remedial': True,
-        'max_violations': 5, 'auto_submit_on_violation': True, 'show_ranking': True
+        'max_violations': 5, 'auto_submit_on_violation': True, 'show_ranking': True,
+        'proctor_code': None
     })
 
 @admin_bp.route('/api/admin/exam-settings', methods=['PATCH'])
 @require_admin
 def update_exam_settings():
     _ALLOWED = {'passing_grade', 'allow_remedial', 'max_violations',
-                'auto_submit_on_violation', 'show_ranking'}
+                'auto_submit_on_violation', 'show_ranking', 'proctor_code'}
     data = {k: v for k, v in (request.json or {}).items() if k in _ALLOWED}
     if not data:
         return jsonify({'error': 'Tidak ada field yang valid'}), 400
@@ -717,14 +718,15 @@ def get_settings():
     s = query("SELECT * FROM exam_settings LIMIT 1", fetch='one')
     return jsonify(dict(s) if s else {
         'passing_grade': 75, 'allow_remedial': True,
-        'max_violations': 5, 'auto_submit_on_violation': True, 'show_ranking': True
+        'max_violations': 5, 'auto_submit_on_violation': True, 'show_ranking': True,
+        'proctor_code': None
     })
 
 @admin_bp.route('/api/admin/settings', methods=['POST'])
 @require_admin
 def save_settings():
     _ALLOWED = {'passing_grade', 'allow_remedial', 'max_violations',
-                'auto_submit_on_violation', 'show_ranking'}
+                'auto_submit_on_violation', 'show_ranking', 'proctor_code'}
     data = {k: v for k, v in (request.json or {}).items() if k in _ALLOWED}
     if not data:
         return jsonify({'error': 'Tidak ada field yang valid'}), 400

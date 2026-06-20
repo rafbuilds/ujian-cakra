@@ -234,7 +234,6 @@ def list_exam_groups():
     try:
         rows = query("""
             SELECT eg.id, eg.name, eg.description, eg.created_at,
-                   eg.start_at, eg.duration_minutes,
                    u.name as created_by_name,
                    COUNT(DISTINCT egm.teacher_id) as member_count,
                    COUNT(DISTINCT e.id) as exam_count,
@@ -244,7 +243,7 @@ def list_exam_groups():
             LEFT JOIN exam_group_members egm ON egm.group_id = eg.id
             LEFT JOIN exams e ON e.group_id = eg.id
             WHERE eg.is_active = true
-            GROUP BY eg.id, eg.name, eg.description, eg.created_at, eg.start_at, eg.duration_minutes, u.name
+            GROUP BY eg.id, eg.name, eg.description, eg.created_at, u.name
             ORDER BY eg.created_at DESC
         """, (request.user_id,))
         return jsonify([dict(r) for r in rows])
@@ -285,15 +284,55 @@ def my_exam_groups():
     try:
         rows = query("""
             SELECT eg.id, eg.name, eg.description,
-                   eg.start_at, eg.duration_minutes,
                    COUNT(DISTINCT e.id) as exam_count, egm.joined_at
             FROM exam_groups eg
             JOIN exam_group_members egm ON egm.group_id = eg.id
             LEFT JOIN exams e ON e.group_id = eg.id
             WHERE egm.teacher_id = %s AND eg.is_active = true
-            GROUP BY eg.id, eg.name, eg.description, eg.start_at, eg.duration_minutes, egm.joined_at
+            GROUP BY eg.id, eg.name, eg.description, egm.joined_at
             ORDER BY egm.joined_at DESC
         """, (request.user_id,))
         return jsonify([dict(r) for r in rows])
     except Exception:
         return jsonify([])
+
+@guru_bp.route('/api/exam-groups/<group_id>/members', methods=['GET'])
+@require_guru
+def group_members_for_guru(group_id):
+    """Guru bisa lihat siapa saja anggota grup yang sudah dia join sendiri —
+    TIDAK termasuk soal/isi ujian mereka, hanya nama."""
+    is_member = query("SELECT 1 FROM exam_group_members WHERE group_id=%s AND teacher_id=%s",
+                      (group_id, request.user_id), fetch='one')
+    if not is_member:
+        return jsonify({'error': 'Anda belum join grup ini'}), 403
+    rows = query("""
+        SELECT u.id, u.name, u.email, egm.joined_at
+        FROM exam_group_members egm
+        JOIN users u ON u.id=egm.teacher_id
+        WHERE egm.group_id=%s
+        ORDER BY u.name
+    """, (group_id,))
+    return jsonify([dict(r) for r in rows])
+
+@guru_bp.route('/api/exam-groups/<group_id>/exams', methods=['GET'])
+@require_guru
+def group_exams_for_guru(group_id):
+    """Guru bisa lihat siapa membuat ujian untuk jenjang apa di grup ini —
+    metadata saja (judul, mapel, jenjang, guru), TIDAK termasuk soal/kunci jawaban."""
+    is_member = query("SELECT 1 FROM exam_group_members WHERE group_id=%s AND teacher_id=%s",
+                      (group_id, request.user_id), fetch='one')
+    if not is_member:
+        return jsonify({'error': 'Anda belum join grup ini'}), 403
+    rows = query("""
+        SELECT e.id, e.title, e.grade, e.status, e.teacher_id,
+               s.name as subject_name, u.name as teacher_name,
+               (SELECT COUNT(*) FROM questions q WHERE q.exam_id=e.id) as question_count,
+               (SELECT STRING_AGG(c.name,', ') FROM exam_classes ec
+                JOIN classes c ON c.id=ec.class_id WHERE ec.exam_id=e.id) as class_names
+        FROM exams e
+        LEFT JOIN subjects s ON s.id=e.subject_id
+        LEFT JOIN users u ON u.id=e.teacher_id
+        WHERE e.group_id=%s
+        ORDER BY e.grade, u.name
+    """, (group_id,))
+    return jsonify([dict(r) for r in rows])

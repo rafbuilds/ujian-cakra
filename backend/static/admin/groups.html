@@ -118,12 +118,13 @@
         <div class="page-main">
           <div class="card" style="background: linear-gradient(135deg, #0a3323, #0f4c35); border: none; margin-bottom: 1rem; padding: 1rem 1.25rem">
             <div style="display: flex; align-items: center; gap: 16px">
-              <div style="font-size: 36px">📅</div>
+              <div style="font-size: 36px">📁</div>
               <div>
-                <div style="font-weight: 700; font-size: 15px; color: #fff">Grup Ujian = Sesi Jadwal Bersama</div>
+                <div style="font-weight: 700; font-size: 15px; color: #fff">Grup Ujian = Struktur Grup → Jenjang → Guru + Soal</div>
                 <div style="font-size: 12px; color: rgba(255, 255, 255, 0.65); margin-top: 2px">
-                  Buat 1 grup untuk tiap sesi serentak (misal "Hari 1 — Bahasa Indonesia, Senin 08:00, 90 menit").
-                  Guru join sendiri lalu buat ujian masing-masing dengan soal &amp; kelas berbeda — jadwal otomatis ikut grup, tidak bisa diubah manual.
+                  Buat 1 grup untuk tiap periode ujian (misal "TTS 2026/2027"). Guru join sendiri, lalu buat ujian
+                  masing-masing untuk jenjang (X/XI/XII) tertentu — boleh beberapa guru per jenjang untuk mapel yang sama
+                  (kelas dibagi antar guru). Klik grup untuk lihat isinya per jenjang.
                 </div>
               </div>
             </div>
@@ -142,7 +143,6 @@
           <div>
             <div style="font-weight: 700; font-size: 20px; color: #fff" id="dp-name">Grup</div>
             <div style="font-size: 13px; color: rgba(255, 255, 255, 0.6); margin-top: 4px" id="dp-desc"></div>
-            <div style="font-size: 12px; color: #d4af37; margin-top: 8px; font-weight: 600" id="dp-schedule"></div>
           </div>
           <button onclick="closeDetail()" style="background: rgba(255, 255, 255, 0.15); border: none; color: #fff; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 16px">✕</button>
         </div>
@@ -161,6 +161,14 @@
       <div style="padding: 1.25rem; flex: 1; overflow-y: auto">
         <div style="font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: 0.4px; margin-bottom: 0.625rem">GURU YANG SUDAH JOIN</div>
         <div id="dp-members">Memuat...</div>
+
+        <div style="font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: 0.4px; margin: 1.25rem 0 0.625rem">FOLDER JENJANG — GURU & SOAL</div>
+        <div style="display: flex; gap: 6px; margin-bottom: 0.75rem" id="dp-grade-tabs">
+          <button class="btn btn-secondary btn-sm" onclick="selectGradeTab(10)" id="gt-10" style="font-size:12px">Kelas X</button>
+          <button class="btn btn-secondary btn-sm" onclick="selectGradeTab(11)" id="gt-11" style="font-size:12px">Kelas XI</button>
+          <button class="btn btn-secondary btn-sm" onclick="selectGradeTab(12)" id="gt-12" style="font-size:12px">Kelas XII</button>
+        </div>
+        <div id="dp-grade-exams">Memuat...</div>
 
         <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 0.5px solid var(--border); display: flex; gap: 8px">
           <button class="btn btn-secondary" style="flex: 1" onclick="editGroup()">✏️ Edit Grup</button>
@@ -185,19 +193,6 @@
           <label>Deskripsi</label>
           <textarea class="form-control" id="mg-desc" rows="2" placeholder="Deskripsi singkat..."></textarea>
         </div>
-        <div style="display: flex; gap: 10px">
-          <div class="form-group" style="flex: 1">
-            <label>Jam Mulai</label>
-            <input type="datetime-local" class="form-control" id="mg-start" />
-          </div>
-          <div class="form-group" style="width: 140px">
-            <label>Durasi (menit)</label>
-            <input type="number" class="form-control" id="mg-duration" min="5" value="90" />
-          </div>
-        </div>
-        <div style="font-size: 11px; color: var(--muted); margin-top: -0.5rem; margin-bottom: 1rem">
-          Jadwal ini otomatis dipakai untuk semua ujian yang dibuat guru di dalam grup ini — tidak bisa diubah manual per ujian.
-        </div>
         <div style="display: flex; gap: 10px; margin-top: 1rem">
           <button class="btn btn-secondary" style="flex: 1" onclick="closeModal()">Batal</button>
           <button class="btn btn-primary" style="flex: 1" onclick="saveGroup()">💾 Simpan</button>
@@ -213,15 +208,9 @@
       if (!Auth.requireRole(["admin"])) throw new Error();
       UI.initSidebar();
 
-      let currentGroupId = null, currentGroup = null, allGroups = [];
+      let currentGroupId = null, currentGroup = null, allGroups = [], currentGradeTab = 10, currentGroupExams = [];
 
       (async function init() { await loadGroups(); })();
-
-      function fmtSchedule(g) {
-        if (!g.start_at) return "⏱ Jadwal belum diset";
-        const d = new Date(g.start_at);
-        return `📅 ${d.toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" })} · ${g.duration_minutes || 90} menit`;
-      }
 
       async function loadGroups() {
         const grid = document.getElementById("groups-grid");
@@ -242,7 +231,6 @@
                 <div style="font-weight:700;font-size:16px">${g.name}</div>
               </div>
               ${g.description ? `<div style="font-size:12px;color:var(--muted)">${g.description}</div>` : ""}
-              <div style="font-size:12px;color:var(--green);font-weight:600">${fmtSchedule(g)}</div>
               <div style="display:flex;gap:10px;margin-top:4px">
                 <span style="font-size:12px;color:var(--muted)">👨‍🏫 ${g.member_count || 0} guru</span>
                 <span style="font-size:12px;color:var(--muted)">📋 ${g.exam_count || 0} ujian</span>
@@ -257,14 +245,15 @@
       async function openDetail(groupId) {
         currentGroupId = groupId;
         currentGroup = allGroups.find(g => g.id === groupId);
+        currentGradeTab = 10;
         document.getElementById("overlay").classList.add("show");
         document.getElementById("detail-panel").classList.add("open");
         document.getElementById("dp-name").textContent = currentGroup.name;
         document.getElementById("dp-desc").textContent = currentGroup.description || "";
-        document.getElementById("dp-schedule").textContent = fmtSchedule(currentGroup);
         document.getElementById("dp-member-count").textContent = currentGroup.member_count || 0;
         document.getElementById("dp-exam-count").textContent = currentGroup.exam_count || 0;
         document.getElementById("dp-members").innerHTML = "Memuat...";
+        document.getElementById("dp-grade-exams").innerHTML = "Memuat...";
         try {
           const members = await API.get(`/api/admin/exam-groups/${groupId}/members`);
           document.getElementById("dp-members").innerHTML = members.length
@@ -277,6 +266,37 @@
         } catch (e) {
           document.getElementById("dp-members").innerHTML = '<div style="font-size:13px;color:var(--muted)">Gagal memuat anggota</div>';
         }
+        try {
+          currentGroupExams = await API.get(`/api/admin/exam-groups/${groupId}/exams`);
+        } catch (e) {
+          currentGroupExams = [];
+        }
+        selectGradeTab(10);
+      }
+
+      function selectGradeTab(grade) {
+        currentGradeTab = grade;
+        [10, 11, 12].forEach(g => {
+          const btn = document.getElementById("gt-" + g);
+          btn.className = g === grade ? "btn btn-primary btn-sm" : "btn btn-secondary btn-sm";
+          btn.style.fontSize = "12px";
+        });
+        const list = currentGroupExams.filter(e => e.grade === grade);
+        const el = document.getElementById("dp-grade-exams");
+        if (!list.length) {
+          el.innerHTML = '<div style="font-size:13px;color:var(--muted);padding:.75rem 0">Belum ada ujian guru untuk jenjang ini</div>';
+          return;
+        }
+        el.innerHTML = list.map(e => `
+          <div style="padding:.625rem 0;border-bottom:.5px solid var(--border)">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+              <div style="flex:1;min-width:0">
+                <div style="font-size:13px;font-weight:600">${e.title}</div>
+                <div style="font-size:11px;color:var(--muted)">👤 ${e.teacher_name || "—"} · 📚 ${e.subject_name || "—"} · 📝 ${e.question_count || 0} soal</div>
+                ${e.class_names ? `<div style="font-size:10px;color:var(--muted)">Kelas: ${e.class_names}</div>` : ""}
+              </div>
+            </div>
+          </div>`).join("");
       }
 
       function closeDetail() {
@@ -290,8 +310,6 @@
         document.getElementById("mg-id").value = "";
         document.getElementById("mg-name").value = "";
         document.getElementById("mg-desc").value = "";
-        document.getElementById("mg-start").value = "";
-        document.getElementById("mg-duration").value = "90";
         document.getElementById("modal-group-title").textContent = "Buat Grup Ujian";
         document.getElementById("modal-group").style.display = "flex";
       }
@@ -300,8 +318,6 @@
         document.getElementById("mg-id").value = currentGroup.id;
         document.getElementById("mg-name").value = currentGroup.name;
         document.getElementById("mg-desc").value = currentGroup.description || "";
-        document.getElementById("mg-start").value = currentGroup.start_at ? currentGroup.start_at.slice(0, 16) : "";
-        document.getElementById("mg-duration").value = currentGroup.duration_minutes || 90;
         document.getElementById("modal-group-title").textContent = "Edit Grup Ujian";
         document.getElementById("modal-group").style.display = "flex";
       }
@@ -313,10 +329,8 @@
         const id = document.getElementById("mg-id").value;
         const name = document.getElementById("mg-name").value.trim();
         const desc = document.getElementById("mg-desc").value.trim();
-        const start = document.getElementById("mg-start").value;
-        const duration = parseInt(document.getElementById("mg-duration").value) || 90;
         if (!name) { UI.toast("Nama grup wajib", "warn"); return; }
-        const body = { name, description: desc, start_at: start || null, duration_minutes: duration };
+        const body = { name, description: desc };
         if (id) {
           await API.patch("/api/admin/exam-groups/" + id, body);
           UI.toast("✅ Grup diperbarui", "success");

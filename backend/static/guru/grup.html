@@ -96,9 +96,10 @@
         <div class="page-main">
           <div class="card" style="margin-bottom: 1rem; padding: 1rem 1.25rem; background: var(--green4); border: none">
             <div style="font-size: 13px; color: var(--green); line-height: 1.6">
-              💡 Grup ujian dibuat admin untuk sesi yang serentak (misal "Hari 1 — Bahasa Indonesia").
-              <strong>Join grup yang sesuai</strong>, lalu buat ujian Anda sendiri (soal &amp; kelas bisa berbeda dari guru lain) —
-              jadwal mulai &amp; durasi otomatis ikut grup, jadi tidak akan selisih waktu dengan guru lain di sesi yang sama.
+              💡 Grup ujian dibuat admin untuk periode ujian resmi (misal "TTS 2026/2027").
+              <strong>Join grup yang sesuai</strong>, lalu saat membuat ujian di menu Daftar Ujian, pilih grup ini & jenjang
+              (X/XI/XII) sebagai foldernya. Boleh beberapa guru membuat ujian untuk jenjang & mapel yang sama
+              (kelas dibagi antar guru). Anda bisa lihat nama guru lain di grup ini, tapi tidak bisa melihat soal mereka.
             </div>
           </div>
 
@@ -122,12 +123,6 @@
       if (!Auth.requireRole(["guru", "admin"])) throw new Error();
       UI.initSidebar();
 
-      function fmtSchedule(g) {
-        return g.start_at
-          ? `📅 ${UI.fmtDT(g.start_at)} · ${g.duration_minutes || 90} menit`
-          : "⏱ Jadwal belum diset admin";
-      }
-
       async function load() {
         const el = document.getElementById("grup-list");
         try {
@@ -140,25 +135,50 @@
           el.innerHTML = groups
             .map(
               (g) => `
-      <div class="grp-row">
-        <div style="width:40px;height:40px;border-radius:10px;background:${g.is_member ? "var(--green4)" : "var(--light)"};display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">📅</div>
-        <div style="flex:1;min-width:0">
-          <div style="font-weight:600;font-size:14px">${g.name}</div>
-          <div style="font-size:12px;color:var(--muted)">${g.description || ""}</div>
-          <div style="font-size:12px;color:var(--green);font-weight:600;margin-top:2px">${fmtSchedule(g)}</div>
-          <div style="font-size:11px;color:var(--muted);margin-top:2px">👨‍🏫 ${g.member_count || 0} guru sudah join · 📋 ${g.exam_count || 0} ujian dibuat</div>
+      <div>
+        <div class="grp-row">
+          <div style="width:40px;height:40px;border-radius:10px;background:${g.is_member ? "var(--green4)" : "var(--light)"};display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">📁</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:600;font-size:14px">${g.name}</div>
+            <div style="font-size:12px;color:var(--muted)">${g.description || ""}</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px">👨‍🏫 ${g.member_count || 0} guru sudah join · 📋 ${g.exam_count || 0} ujian dibuat</div>
+          </div>
+          ${
+            g.is_member
+              ? `<span style="background:var(--green4);color:var(--green);padding:5px 12px;border-radius:20px;font-size:12px;font-weight:600;flex-shrink:0">✓ Sudah Join</span>
+                 <button class="btn btn-secondary btn-sm" onclick="toggleMembers('${g.id}')" id="btn-mem-${g.id}">👁 Lihat Guru</button>
+                 <button class="btn btn-secondary btn-sm" onclick="leaveGroup('${g.id}','${g.name.replace(/'/g, "\\'")}')">Keluar</button>`
+              : `<button class="btn btn-primary btn-sm" onclick="joinGroup('${g.id}','${g.name.replace(/'/g, "\\'")}')">+ Join</button>`
+          }
         </div>
-        ${
-          g.is_member
-            ? `<span style="background:var(--green4);color:var(--green);padding:5px 12px;border-radius:20px;font-size:12px;font-weight:600;flex-shrink:0">✓ Sudah Join</span>
-               <button class="btn btn-secondary btn-sm" onclick="leaveGroup('${g.id}','${g.name.replace(/'/g, "\\'")}')">Keluar</button>`
-            : `<button class="btn btn-primary btn-sm" onclick="joinGroup('${g.id}','${g.name.replace(/'/g, "\\'")}')">+ Join</button>`
-        }
+        <div id="members-${g.id}" style="display:none;padding:0 1.25rem .875rem 4.25rem"></div>
       </div>`,
             )
             .join("");
         } catch {
           el.innerHTML = '<div class="empty-state" style="padding:3rem"><div class="empty-text">Gagal memuat grup ujian</div></div>';
+        }
+      }
+
+      async function toggleMembers(groupId) {
+        const box = document.getElementById(`members-${groupId}`);
+        const btn = document.getElementById(`btn-mem-${groupId}`);
+        if (box.style.display === "block") {
+          box.style.display = "none";
+          btn.textContent = "👁 Lihat Guru";
+          return;
+        }
+        box.style.display = "block";
+        btn.textContent = "🔼 Tutup";
+        box.innerHTML = '<div style="font-size:12px;color:var(--muted)">Memuat...</div>';
+        try {
+          const members = await API.get(`/api/exam-groups/${groupId}/members`);
+          box.innerHTML = members.length
+            ? `<div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:4px">GURU DI GRUP INI (tidak bisa lihat soal mereka)</div>` +
+              members.map((m) => `<div style="font-size:12px;padding:2px 0">👤 ${m.name}</div>`).join("")
+            : '<div style="font-size:12px;color:var(--muted)">Belum ada guru</div>';
+        } catch {
+          box.innerHTML = '<div style="font-size:12px;color:var(--muted)">Gagal memuat daftar guru</div>';
         }
       }
 
