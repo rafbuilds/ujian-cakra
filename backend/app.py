@@ -169,9 +169,11 @@ def admin_create_group():
     name = body.get('name','').strip()
     if not name: return jsonify({'error': 'Nama group wajib'}), 400
     grp = query("""
-        INSERT INTO exam_groups (id, name, description, created_by, is_active)
-        VALUES (%s,%s,%s,%s,true) RETURNING *
-    """, (str(_uuid.uuid4()), name, body.get('description',''), request.user_id), fetch='one')
+        INSERT INTO exam_groups (id, name, description, created_by, is_active, start_at, duration_minutes)
+        VALUES (%s,%s,%s,%s,true,%s,%s) RETURNING *
+    """, (str(_uuid.uuid4()), name, body.get('description',''), request.user_id,
+          body.get('start_at') or None,
+          int(body['duration_minutes']) if body.get('duration_minutes') else None), fetch='one')
     return jsonify(dict(grp)), 201
 
 @app.route('/api/admin/exam-groups/<group_id>', methods=['PATCH'])
@@ -179,8 +181,11 @@ def admin_create_group():
 def admin_update_group(group_id):
     from db import query
     body = request.json or {}
-    query("UPDATE exam_groups SET name=%s, description=%s WHERE id=%s",
-          (body.get('name',''), body.get('description',''), group_id), fetch='none')
+    query("UPDATE exam_groups SET name=%s, description=%s, start_at=%s, duration_minutes=%s WHERE id=%s",
+          (body.get('name',''), body.get('description',''),
+           body.get('start_at') or None,
+           int(body['duration_minutes']) if body.get('duration_minutes') else None,
+           group_id), fetch='none')
     return jsonify({'ok': True})
 
 @app.route('/api/admin/exam-groups/<group_id>', methods=['DELETE'])

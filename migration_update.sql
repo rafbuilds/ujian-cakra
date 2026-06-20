@@ -191,6 +191,24 @@ CREATE INDEX IF NOT EXISTS idx_sessions_status   ON exam_sessions(status) WHERE 
 CREATE INDEX IF NOT EXISTS idx_results_session   ON results(session_id);
 CREATE INDEX IF NOT EXISTS idx_guru_invites_token ON guru_invites(token);
 
+-- ── 19. Exam Groups sebagai slot jadwal bersama ───────────────
+-- Admin set jadwal sekali di level group; semua ujian anak yang dibuat
+-- guru dalam group ini mengikuti jadwal yang sama (dikunci di backend).
+ALTER TABLE exam_groups ADD COLUMN IF NOT EXISTS start_at         TIMESTAMPTZ;
+ALTER TABLE exam_groups ADD COLUMN IF NOT EXISTS duration_minutes INT;
+
+-- ── 20. Pengawas Universal — kode akses ───────────────────────
+-- Guru pembuat soal cukup join exam_group; guru pengawas (siapa saja)
+-- masuk dengan memasukkan kode ujian tanpa perlu join apa pun.
+ALTER TABLE exams ADD COLUMN IF NOT EXISTS proctor_code TEXT;
+CREATE TABLE IF NOT EXISTS exam_proctors (
+    exam_id    UUID NOT NULL REFERENCES exams(id) ON DELETE CASCADE,
+    teacher_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    joined_at  TIMESTAMPTZ DEFAULT NOW(),
+    PRIMARY KEY (exam_id, teacher_id)
+);
+CREATE INDEX IF NOT EXISTS idx_exam_proctors_teacher ON exam_proctors(teacher_id);
+
 -- ── Selesai ───────────────────────────────────────────────────
 -- Verifikasi: SELECT table_name FROM information_schema.tables
 --             WHERE table_schema='public' ORDER BY table_name;

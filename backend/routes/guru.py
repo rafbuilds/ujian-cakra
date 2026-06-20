@@ -234,6 +234,7 @@ def list_exam_groups():
     try:
         rows = query("""
             SELECT eg.id, eg.name, eg.description, eg.created_at,
+                   eg.start_at, eg.duration_minutes,
                    u.name as created_by_name,
                    COUNT(DISTINCT egm.teacher_id) as member_count,
                    COUNT(DISTINCT e.id) as exam_count,
@@ -243,7 +244,7 @@ def list_exam_groups():
             LEFT JOIN exam_group_members egm ON egm.group_id = eg.id
             LEFT JOIN exams e ON e.group_id = eg.id
             WHERE eg.is_active = true
-            GROUP BY eg.id, eg.name, eg.description, eg.created_at, u.name
+            GROUP BY eg.id, eg.name, eg.description, eg.created_at, eg.start_at, eg.duration_minutes, u.name
             ORDER BY eg.created_at DESC
         """, (request.user_id,))
         return jsonify([dict(r) for r in rows])
@@ -284,12 +285,13 @@ def my_exam_groups():
     try:
         rows = query("""
             SELECT eg.id, eg.name, eg.description,
+                   eg.start_at, eg.duration_minutes,
                    COUNT(DISTINCT e.id) as exam_count, egm.joined_at
             FROM exam_groups eg
             JOIN exam_group_members egm ON egm.group_id = eg.id
             LEFT JOIN exams e ON e.group_id = eg.id
             WHERE egm.teacher_id = %s AND eg.is_active = true
-            GROUP BY eg.id, eg.name, eg.description, egm.joined_at
+            GROUP BY eg.id, eg.name, eg.description, eg.start_at, eg.duration_minutes, egm.joined_at
             ORDER BY egm.joined_at DESC
         """, (request.user_id,))
         return jsonify([dict(r) for r in rows])

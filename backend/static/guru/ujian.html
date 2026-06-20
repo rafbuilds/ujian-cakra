@@ -166,6 +166,13 @@
             </svg>
             Daftar Ujian
           </a>
+          <a href="grup.html" class="sb-item" id="nav-grup">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <rect x="3" y="4" width="18" height="16" rx="2" />
+              <path d="M3 10h18M8 2v4M16 2v4" stroke-linecap="round" />
+            </svg>
+            Grup Ujian
+          </a>
           <a href="pengawas.html" class="sb-item" id="nav-pengawas">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path
@@ -331,6 +338,17 @@
             />
           </div>
         </div>
+        <div class="form-group">
+          <label
+            >Sesi / Grup Ujian
+            <span style="font-weight: 400; color: var(--muted)"
+              >(opsional — kalau dipilih, jadwal otomatis ikut grup)</span
+            ></label
+          >
+          <select class="form-control" id="f-group" onchange="onGroupChange()">
+            <option value="">— Tanpa grup (atur jadwal manual) —</option>
+          </select>
+        </div>
         <div class="form-row">
           <div class="form-group">
             <label>Tanggal & Jam Mulai *</label>
@@ -490,17 +508,49 @@
 
       let allClasses = [],
         allExams = [],
+        allGroups = [],
         editingId = null;
 
       async function init() {
         [allClasses] = await Promise.all([
           API.get("/api/classes"),
           loadExams(),
+          loadGroups(),
         ]);
         loadSubjects();
         // Cek URL param action=new
         if (new URLSearchParams(location.search).get("action") === "new")
           openModal();
+      }
+
+      async function loadGroups() {
+        try {
+          allGroups = await API.get("/api/exam-groups/my");
+          document.getElementById("f-group").innerHTML =
+            '<option value="">— Tanpa grup (atur jadwal manual) —</option>' +
+            allGroups
+              .map(
+                (g) =>
+                  `<option value="${g.id}">${g.name}${g.start_at ? " · " + UI.fmtDT(g.start_at) : ""}</option>`,
+              )
+              .join("");
+        } catch {}
+      }
+
+      function onGroupChange() {
+        const gid = document.getElementById("f-group").value;
+        const grp = allGroups.find((g) => g.id === gid);
+        const startInput = document.getElementById("f-start");
+        const durInput = document.getElementById("f-duration");
+        if (grp) {
+          if (grp.start_at) startInput.value = grp.start_at.slice(0, 16);
+          if (grp.duration_minutes) durInput.value = grp.duration_minutes;
+          startInput.disabled = true;
+          durInput.disabled = true;
+        } else {
+          startInput.disabled = false;
+          durInput.disabled = false;
+        }
       }
 
       async function loadSubjects() {
@@ -568,6 +618,7 @@
           <span>📝 ${e.question_count || 0} soal</span>
           <span>👥 ${e.classes?.map((c) => c.name).join(", ") || "Belum ada kelas"}</span>
           <span>📅 ${UI.fmtDT(e.start_at)}</span>
+          <span title="Kode Pengawas — bagikan ke guru lain agar bisa mengawasi ujian ini di Pengawas Live" style="cursor:pointer" onclick="event.stopPropagation();copyProctorCode('${e.proctor_code || ""}')">🔑 ${e.proctor_code || "—"}</span>
         </div>
       </div>
       <div style="display:flex;align-items:center;gap:8px;flex-shrink:0" onclick="event.stopPropagation()">
@@ -575,6 +626,7 @@
         ${e.status === "draft" ? `<button class="btn btn-success btn-sm" onclick="changeStatus('${e.id}','published')">Publish</button>` : ""}
         ${e.status === "published" || e.status === "ongoing" ? `<button class="btn btn-secondary btn-sm" onclick="goMonitor('${e.id}')">👁 Monitor</button>` : ""}
         ${e.status === "finished" ? `<button class="btn btn-secondary btn-sm" onclick="goNilai('${e.id}')">📊 Nilai</button>` : ""}
+        <button class="btn btn-secondary btn-sm" onclick="regenCode('${e.id}')" title="Buat ulang kode pengawas">🔄🔑</button>
         <button class="btn btn-secondary btn-sm" onclick="editExam('${e.id}')">✏️</button>
         <button class="btn btn-danger btn-sm" onclick="deleteExam('${e.id}','${e.title.replace(/'/g, "\\'")}')">🗑</button>
       </div>
@@ -582,6 +634,28 @@
   `,
           )
           .join("");
+      }
+
+      function copyProctorCode(code) {
+        if (!code) return;
+        navigator.clipboard?.writeText(code);
+        UI.toast(`Kode pengawas "${code}" disalin — bagikan ke guru yang akan mengawasi`, "success");
+      }
+
+      async function regenCode(id) {
+        UI.confirm(
+          "Buat Ulang Kode Pengawas",
+          "Kode lama tidak akan berlaku lagi. Guru yang sudah masuk sebagai pengawas tidak terpengaruh, tapi kode lama yang belum dipakai jadi tidak valid.",
+          async () => {
+            try {
+              const r = await API.post(`/api/exams/${id}/regenerate-proctor-code`);
+              UI.toast(`✅ Kode baru: ${r.proctor_code}`, "success");
+              loadExams();
+            } catch (e) {
+              UI.toast(e.error || "Gagal membuat ulang kode", "error");
+            }
+          },
+        );
       }
 
       function goToSoal(id) {
@@ -647,6 +721,8 @@
         document.getElementById("f-submit").textContent = exam
           ? "Simpan Perubahan"
           : "Simpan & Tambah Soal";
+        document.getElementById("f-group").value = exam?.group_id || "";
+        onGroupChange();
 
         // Kelas checkbox
         const selectedClasses = exam?.classes?.map((c) => c.id) || [];
@@ -758,6 +834,7 @@
           show_result_after: document.getElementById("f-sr").checked,
           show_key_after: document.getElementById("f-sk").checked,
           score_per_correct: spcVal ? parseFloat(spcVal) : null,
+          group_id: document.getElementById("f-group").value || null,
         };
 
         const btn = document.getElementById("f-submit");

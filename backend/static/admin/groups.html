@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+    <title>Grup Ujian — Admin</title>
+    <link rel="stylesheet" href="../style.css" />
+    <style>
+      .grp-card {
+        background: #fff;
+        border: 0.5px solid var(--border);
+        border-radius: 16px;
+        padding: 1.25rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .grp-card:hover {
+        border-color: var(--green3);
+        box-shadow: 0 4px 20px rgba(15, 76, 53, 0.1);
+        transform: translateY(-2px);
+      }
+      .grp-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 1rem;
+      }
+      .detail-panel {
+        position: fixed;
+        top: 0;
+        right: -480px;
+        width: 480px;
+        height: 100vh;
+        background: #fff;
+        box-shadow: -8px 0 40px rgba(0, 0, 0, 0.15);
+        z-index: 200;
+        transition: right 0.3s;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+      }
+      .detail-panel.open { right: 0; }
+      .detail-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.3);
+        z-index: 199;
+        display: none;
+        backdrop-filter: blur(2px);
+      }
+      .detail-overlay.show { display: block; }
+    </style>
+  </head>
+  <body>
+    <div class="app-shell">
+      <nav class="sidebar">
+        <div class="sb-logo">
+          <div class="sb-logo-title">⚙️ Admin Panel</div>
+          <div class="sb-logo-sub">SMAN 1 Batangan</div>
+        </div>
+        <div class="sb-nav">
+          <div class="sb-section">MENU</div>
+          <a href="dashboard.html" class="sb-item"
+            ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" stroke-linecap="round" /></svg
+            >Dashboard</a
+          >
+          <a href="siswa.html" class="sb-item"
+            ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke-linecap="round" />
+              <circle cx="9" cy="7" r="4" /></svg
+            >Data Siswa</a
+          >
+          <a href="rooms.html" class="sb-item"
+            ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke-linecap="round" />
+              <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke-linecap="round" /></svg
+            >Room Ujian</a
+          >
+          <a href="groups.html" class="sb-item active"
+            ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <rect x="3" y="4" width="18" height="16" rx="2" />
+              <path d="M3 10h18M8 2v4M16 2v4" stroke-linecap="round" /></svg
+            >Grup Ujian</a
+          >
+          <a href="settings.html" class="sb-item"
+            ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <circle cx="12" cy="12" r="3" />
+              <path
+                d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"
+                stroke-linecap="round"
+              /></svg
+            >Pengaturan</a
+          >
+        </div>
+        <div class="sb-user">
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px">
+            <div class="sb-avatar" id="sb-avatar">A</div>
+            <div>
+              <div class="sb-user-name" id="sb-user-name">Admin</div>
+              <div class="sb-user-role">Administrator</div>
+            </div>
+          </div>
+          <button class="sb-logout" onclick="Auth.logout()">⏻ Keluar</button>
+        </div>
+      </nav>
+
+      <div class="main-wrap">
+        <div class="topbar" style="padding: 0 1.25rem">
+          <div style="font-weight: 700; font-size: 16px">Grup Ujian</div>
+          <div class="topbar-right">
+            <button class="btn btn-primary btn-sm" onclick="openCreateGroup()">+ Buat Grup</button>
+          </div>
+        </div>
+
+        <div class="page-main">
+          <div class="card" style="background: linear-gradient(135deg, #0a3323, #0f4c35); border: none; margin-bottom: 1rem; padding: 1rem 1.25rem">
+            <div style="display: flex; align-items: center; gap: 16px">
+              <div style="font-size: 36px">📅</div>
+              <div>
+                <div style="font-weight: 700; font-size: 15px; color: #fff">Grup Ujian = Sesi Jadwal Bersama</div>
+                <div style="font-size: 12px; color: rgba(255, 255, 255, 0.65); margin-top: 2px">
+                  Buat 1 grup untuk tiap sesi serentak (misal "Hari 1 — Bahasa Indonesia, Senin 08:00, 90 menit").
+                  Guru join sendiri lalu buat ujian masing-masing dengan soal &amp; kelas berbeda — jadwal otomatis ikut grup, tidak bisa diubah manual.
+                </div>
+              </div>
+            </div>
+          </div>
+          <div id="groups-grid" class="grp-grid">
+            <div class="loading-spinner" style="margin: 2rem auto"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="detail-overlay" id="overlay" onclick="closeDetail()"></div>
+    <div class="detail-panel" id="detail-panel">
+      <div style="background: linear-gradient(135deg, #0a3323, #1a6b4a); padding: 1.5rem; flex-shrink: 0">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start">
+          <div>
+            <div style="font-weight: 700; font-size: 20px; color: #fff" id="dp-name">Grup</div>
+            <div style="font-size: 13px; color: rgba(255, 255, 255, 0.6); margin-top: 4px" id="dp-desc"></div>
+            <div style="font-size: 12px; color: #d4af37; margin-top: 8px; font-weight: 600" id="dp-schedule"></div>
+          </div>
+          <button onclick="closeDetail()" style="background: rgba(255, 255, 255, 0.15); border: none; color: #fff; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 16px">✕</button>
+        </div>
+        <div style="display: flex; gap: 12px; margin-top: 1rem">
+          <div style="background: rgba(255, 255, 255, 0.1); border-radius: 10px; padding: 0.5rem 1rem; text-align: center">
+            <div style="font-size: 22px; font-weight: 700; color: #fff" id="dp-member-count">0</div>
+            <div style="font-size: 11px; color: rgba(255, 255, 255, 0.5)">Guru Join</div>
+          </div>
+          <div style="background: rgba(255, 255, 255, 0.1); border-radius: 10px; padding: 0.5rem 1rem; text-align: center">
+            <div style="font-size: 22px; font-weight: 700; color: #fff" id="dp-exam-count">0</div>
+            <div style="font-size: 11px; color: rgba(255, 255, 255, 0.5)">Ujian Dibuat</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="padding: 1.25rem; flex: 1; overflow-y: auto">
+        <div style="font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: 0.4px; margin-bottom: 0.625rem">GURU YANG SUDAH JOIN</div>
+        <div id="dp-members">Memuat...</div>
+
+        <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 0.5px solid var(--border); display: flex; gap: 8px">
+          <button class="btn btn-secondary" style="flex: 1" onclick="editGroup()">✏️ Edit Grup</button>
+          <button class="btn btn-danger" onclick="deleteGroup()">🗑 Hapus</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Grup -->
+    <div id="modal-group" style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); z-index: 300; align-items: center; justify-content: center; padding: 1rem; backdrop-filter: blur(4px)">
+      <div style="background: #fff; border-radius: 18px; padding: 2rem; max-width: 480px; width: 100%">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem">
+          <div style="font-weight: 700; font-size: 18px; color: var(--green)" id="modal-group-title">Buat Grup Ujian</div>
+          <button onclick="closeModal()" style="background: none; border: none; font-size: 22px; cursor: pointer">✕</button>
+        </div>
+        <input type="hidden" id="mg-id" />
+        <div class="form-group">
+          <label>Nama Grup / Sesi <span style="color: var(--red2)">*</span></label>
+          <input class="form-control" id="mg-name" placeholder="Contoh: Hari 1 — Bahasa Indonesia" />
+        </div>
+        <div class="form-group">
+          <label>Deskripsi</label>
+          <textarea class="form-control" id="mg-desc" rows="2" placeholder="Deskripsi singkat..."></textarea>
+        </div>
+        <div style="display: flex; gap: 10px">
+          <div class="form-group" style="flex: 1">
+            <label>Jam Mulai</label>
+            <input type="datetime-local" class="form-control" id="mg-start" />
+          </div>
+          <div class="form-group" style="width: 140px">
+            <label>Durasi (menit)</label>
+            <input type="number" class="form-control" id="mg-duration" min="5" value="90" />
+          </div>
+        </div>
+        <div style="font-size: 11px; color: var(--muted); margin-top: -0.5rem; margin-bottom: 1rem">
+          Jadwal ini otomatis dipakai untuk semua ujian yang dibuat guru di dalam grup ini — tidak bisa diubah manual per ujian.
+        </div>
+        <div style="display: flex; gap: 10px; margin-top: 1rem">
+          <button class="btn btn-secondary" style="flex: 1" onclick="closeModal()">Batal</button>
+          <button class="btn btn-primary" style="flex: 1" onclick="saveGroup()">💾 Simpan</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="../config.js"></script>
+    <script src="../components/api.js"></script>
+    <script src="../components/auth.js"></script>
+    <script src="../components/common.js"></script>
+    <script>
+      if (!Auth.requireRole(["admin"])) throw new Error();
+      UI.initSidebar();
+
+      let currentGroupId = null, currentGroup = null, allGroups = [];
+
+      (async function init() { await loadGroups(); })();
+
+      function fmtSchedule(g) {
+        if (!g.start_at) return "⏱ Jadwal belum diset";
+        const d = new Date(g.start_at);
+        return `📅 ${d.toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" })} · ${g.duration_minutes || 90} menit`;
+      }
+
+      async function loadGroups() {
+        const grid = document.getElementById("groups-grid");
+        grid.innerHTML = '<div class="loading-spinner" style="margin:2rem auto"></div>';
+        try {
+          allGroups = await API.get("/api/admin/exam-groups");
+          if (!allGroups.length) {
+            grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:3rem;color:var(--muted)">
+              <div style="font-size:48px;margin-bottom:.75rem">📅</div>
+              <div style="font-size:16px;font-weight:600">Belum ada grup ujian</div>
+              <div style="font-size:13px;margin-top:.5rem">Klik "+ Buat Grup" untuk mulai</div>
+            </div>`;
+            return;
+          }
+          grid.innerHTML = allGroups.map(g => `
+            <div class="grp-card" onclick="openDetail('${g.id}')">
+              <div style="display:flex;align-items:flex-start;justify-content:space-between">
+                <div style="font-weight:700;font-size:16px">${g.name}</div>
+              </div>
+              ${g.description ? `<div style="font-size:12px;color:var(--muted)">${g.description}</div>` : ""}
+              <div style="font-size:12px;color:var(--green);font-weight:600">${fmtSchedule(g)}</div>
+              <div style="display:flex;gap:10px;margin-top:4px">
+                <span style="font-size:12px;color:var(--muted)">👨‍🏫 ${g.member_count || 0} guru</span>
+                <span style="font-size:12px;color:var(--muted)">📋 ${g.exam_count || 0} ujian</span>
+              </div>
+            </div>`).join("");
+        } catch (e) {
+          console.error(e);
+          UI.toast("Gagal memuat grup", "error");
+        }
+      }
+
+      async function openDetail(groupId) {
+        currentGroupId = groupId;
+        currentGroup = allGroups.find(g => g.id === groupId);
+        document.getElementById("overlay").classList.add("show");
+        document.getElementById("detail-panel").classList.add("open");
+        document.getElementById("dp-name").textContent = currentGroup.name;
+        document.getElementById("dp-desc").textContent = currentGroup.description || "";
+        document.getElementById("dp-schedule").textContent = fmtSchedule(currentGroup);
+        document.getElementById("dp-member-count").textContent = currentGroup.member_count || 0;
+        document.getElementById("dp-exam-count").textContent = currentGroup.exam_count || 0;
+        document.getElementById("dp-members").innerHTML = "Memuat...";
+        try {
+          const members = await API.get(`/api/admin/exam-groups/${groupId}/members`);
+          document.getElementById("dp-members").innerHTML = members.length
+            ? members.map(m => `
+              <div style="display:flex;align-items:center;gap:8px;padding:.5rem 0;border-bottom:.5px solid var(--border)">
+                <div style="width:30px;height:30px;border-radius:50%;background:var(--green);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:12px">${(m.name || "?")[0]}</div>
+                <div style="flex:1"><div style="font-size:13px;font-weight:500">${m.name}</div><div style="font-size:11px;color:var(--muted)">${m.email || ""}</div></div>
+              </div>`).join("")
+            : '<div style="font-size:13px;color:var(--muted)">Belum ada guru yang join</div>';
+        } catch (e) {
+          document.getElementById("dp-members").innerHTML = '<div style="font-size:13px;color:var(--muted)">Gagal memuat anggota</div>';
+        }
+      }
+
+      function closeDetail() {
+        document.getElementById("overlay").classList.remove("show");
+        document.getElementById("detail-panel").classList.remove("open");
+        currentGroupId = null;
+        currentGroup = null;
+      }
+
+      function openCreateGroup() {
+        document.getElementById("mg-id").value = "";
+        document.getElementById("mg-name").value = "";
+        document.getElementById("mg-desc").value = "";
+        document.getElementById("mg-start").value = "";
+        document.getElementById("mg-duration").value = "90";
+        document.getElementById("modal-group-title").textContent = "Buat Grup Ujian";
+        document.getElementById("modal-group").style.display = "flex";
+      }
+      function editGroup() {
+        if (!currentGroup) return;
+        document.getElementById("mg-id").value = currentGroup.id;
+        document.getElementById("mg-name").value = currentGroup.name;
+        document.getElementById("mg-desc").value = currentGroup.description || "";
+        document.getElementById("mg-start").value = currentGroup.start_at ? currentGroup.start_at.slice(0, 16) : "";
+        document.getElementById("mg-duration").value = currentGroup.duration_minutes || 90;
+        document.getElementById("modal-group-title").textContent = "Edit Grup Ujian";
+        document.getElementById("modal-group").style.display = "flex";
+      }
+      function closeModal() {
+        document.getElementById("modal-group").style.display = "none";
+      }
+
+      async function saveGroup() {
+        const id = document.getElementById("mg-id").value;
+        const name = document.getElementById("mg-name").value.trim();
+        const desc = document.getElementById("mg-desc").value.trim();
+        const start = document.getElementById("mg-start").value;
+        const duration = parseInt(document.getElementById("mg-duration").value) || 90;
+        if (!name) { UI.toast("Nama grup wajib", "warn"); return; }
+        const body = { name, description: desc, start_at: start || null, duration_minutes: duration };
+        if (id) {
+          await API.patch("/api/admin/exam-groups/" + id, body);
+          UI.toast("✅ Grup diperbarui", "success");
+        } else {
+          await API.post("/api/admin/exam-groups", body);
+          UI.toast("✅ Grup dibuat", "success");
+        }
+        closeModal();
+        closeDetail();
+        loadGroups();
+      }
+
+      async function deleteGroup() {
+        if (!currentGroup) return;
+        UI.confirm("Hapus Grup", "Nonaktifkan grup <strong>" + currentGroup.name + "</strong>?", async () => {
+          await API.del("/api/admin/exam-groups/" + currentGroupId);
+          UI.toast("Grup dinonaktifkan", "success");
+          closeDetail();
+          loadGroups();
+        });
+      }
+    </script>
+  </body>
+</html>
