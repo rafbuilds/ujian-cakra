@@ -1,7 +1,7 @@
 # backend/routes/exams.py
 from flask import Blueprint, request, jsonify, send_file
 import uuid, io
-from db import query
+from db import query, count_correct_wrong
 from auth import require_guru, require_auth, require_admin
 
 exams_bp = Blueprint('exams', __name__)
@@ -104,13 +104,14 @@ def add_question(exam_id):
     q_type         = data.get('type', 'multiple_choice')
     attachment_url = data.get('attachment_url')
     audio_url      = data.get('audio_url')
+    max_choices    = data.get('max_choices') if q_type == 'multiple_answer' else None
 
     query("""INSERT INTO questions
-               (id, exam_id, content, image_url, type, attachment_url, audio_url, order_num, score)
-             VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+               (id, exam_id, content, image_url, type, attachment_url, audio_url, order_num, score, max_choices)
+             VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
           (q_id, exam_id, data.get('content',''), data.get('image_url'),
            q_type, attachment_url, audio_url,
-           total+1, data.get('score',1)), fetch='none')
+           total+1, data.get('score',1), max_choices), fetch='none')
 
     for opt in (data.get('options') or []):
         query("INSERT INTO options (id, question_id, label, content, is_correct) VALUES (%s,%s,%s,%s,%s)",
@@ -132,6 +133,8 @@ def update_question(question_id):
         query("UPDATE questions SET attachment_url=%s WHERE id=%s", (data['attachment_url'], question_id), fetch='none')
     if 'audio_url' in data:
         query("UPDATE questions SET audio_url=%s WHERE id=%s", (data['audio_url'], question_id), fetch='none')
+    if 'max_choices' in data:
+        query("UPDATE questions SET max_choices=%s WHERE id=%s", (data['max_choices'], question_id), fetch='none')
     if 'options' in data:
         query("DELETE FROM options WHERE question_id=%s", (question_id,), fetch='none')
         for opt in data['options']:
@@ -414,7 +417,7 @@ def student_exam_detail(exam_id, student_id):
     try:
         multis = query("""
             SELECT ma.question_id, STRING_AGG(o.label, ', ' ORDER BY o.label) as student_answer,
-                   BOOL_AND(o.is_correct) as is_correct
+                   ARRAY_AGG(ma.option_id ORDER BY ma.option_id) as picked
             FROM multi_answers ma
             JOIN options o ON o.id=ma.option_id
             WHERE ma.session_id=%s
@@ -422,18 +425,20 @@ def student_exam_detail(exam_id, student_id):
         """, (session_id,))
         multi_map = {str(m['question_id']): dict(m) for m in multis}
         correct_multi = query("""
-            SELECT question_id, STRING_AGG(label, ', ' ORDER BY label) as correct_answer
+            SELECT question_id, STRING_AGG(label, ', ' ORDER BY label) as correct_answer,
+                   ARRAY_AGG(id ORDER BY id) as correct_ids
             FROM options WHERE question_id IN (
                 SELECT id FROM questions WHERE exam_id=%s AND type='multiple_answer'
             ) AND is_correct=true GROUP BY question_id
         """, (exam_id,))
-        correct_multi_map = {str(r['question_id']): r['correct_answer'] for r in correct_multi}
+        correct_multi_map = {str(r['question_id']): dict(r) for r in correct_multi}
         for q in q_list:
             if q['type'] == 'multiple_answer':
                 multi = multi_map.get(str(q['id']), {})
+                cinfo = correct_multi_map.get(str(q['id']), {})
                 q['student_answer'] = multi.get('student_answer', '')
-                q['is_correct']     = multi.get('is_correct', False)
-                q['correct_answer'] = correct_multi_map.get(str(q['id']), '—')
+                q['is_correct']     = bool(multi.get('picked')) and multi.get('picked') == cinfo.get('correct_ids')
+                q['correct_answer'] = cinfo.get('correct_answer', '—')
     except Exception:
         pass
 
@@ -531,12 +536,7 @@ def _recalc_with_essay(session_id):
         exam    = query("SELECT score_per_correct FROM exams WHERE id=%s", (exam_id,), fetch='one')
         spc     = float(exam.get('score_per_correct') or (100.0 / total_q))
 
-        correct = query("""SELECT COUNT(*) as n FROM answers a
-                           JOIN options o ON o.id=a.option_id
-                           WHERE a.session_id=%s AND o.is_correct=true""", (session_id,), fetch='one')['n']
-        wrong   = query("""SELECT COUNT(*) as n FROM answers a
-                           JOIN options o ON o.id=a.option_id
-                           WHERE a.session_id=%s AND o.is_correct=false""", (session_id,), fetch='one')['n']
+        correct, wrong = count_correct_wrong(session_id, exam_id)
         # Tambah skor esai dari guru
         essay_total = query("""SELECT COALESCE(SUM(score), 0) as s
                                FROM essay_answers WHERE session_id=%s

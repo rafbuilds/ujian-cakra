@@ -2,7 +2,7 @@
 from flask import Blueprint, request, jsonify
 import uuid
 from datetime import datetime, timezone, timedelta
-from db import query
+from db import query, count_correct_wrong
 from auth import require_auth
 
 siswa_bp = Blueprint('siswa', __name__)
@@ -90,7 +90,7 @@ def start_exam(exam_id):
     order_clause = "ORDER BY RANDOM()" if randomize_q else "ORDER BY q.order_num"
     questions = query(f"""
         SELECT q.id, q.content, q.image_url,
-               q.type, q.attachment_url, q.audio_url,
+               q.type, q.attachment_url, q.audio_url, q.max_choices,
                (SELECT COUNT(*) FROM options WHERE question_id=q.id) AS opt_count,
                (SELECT COUNT(*) FROM options WHERE question_id=q.id AND is_correct=true) AS correct_count
         FROM questions q
@@ -114,6 +114,8 @@ def start_exam(exam_id):
                 q_dict['type'] = 'multiple_answer'
             else:
                 q_dict['type'] = 'multiple_choice'
+        if q_dict['type'] == 'multiple_answer' and not q_dict.get('max_choices'):
+            q_dict['max_choices'] = correct_count or 1
         result_questions.append({**q_dict, 'options': [dict(o) for o in options]})
 
     # Ambil jawaban tersimpan
@@ -212,6 +214,10 @@ def save_multi_answer(session_id):
         (session_id, request.user_id), fetch='one')
     if not sess:
         return jsonify({'error': 'Sesi tidak valid'}), 403
+    q = query("SELECT max_choices, type FROM questions WHERE id=%s", (question_id,), fetch='one')
+    if q and q.get('type') == 'multiple_answer' and q.get('max_choices'):
+        if len(option_ids) > q['max_choices']:
+            return jsonify({'error': f"Maksimal {q['max_choices']} jawaban"}), 400
     # Hapus pilihan lama lalu insert ulang
     query("DELETE FROM multi_answers WHERE session_id=%s AND question_id=%s",
           (session_id, question_id), fetch='none')
@@ -249,12 +255,7 @@ def submit_exam(session_id):
     exam_data = query("SELECT * FROM exams WHERE id=%s", (sess['exam_id'],), fetch='one')
     total_q = query("SELECT COUNT(*) as n FROM questions WHERE exam_id=%s",
                     (sess['exam_id'],), fetch='one')['n']
-    correct = query("""SELECT COUNT(*) as n FROM answers a
-                       JOIN options o ON o.id=a.option_id
-                       WHERE a.session_id=%s AND o.is_correct=true""", (session_id,), fetch='one')['n']
-    wrong   = query("""SELECT COUNT(*) as n FROM answers a
-                       JOIN options o ON o.id=a.option_id
-                       WHERE a.session_id=%s AND o.is_correct=false""", (session_id,), fetch='one')['n']
+    correct, wrong = count_correct_wrong(session_id, sess['exam_id'])
     empty   = total_q - correct - wrong
     spc     = float(exam_data.get('score_per_correct') or (100.0/total_q if total_q else 0))
     score   = round(correct * spc, 2)

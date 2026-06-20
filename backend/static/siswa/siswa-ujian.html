@@ -972,7 +972,11 @@
       function renderMultiAnswer(q) {
         const sel = multiAnswers[q.id] || new Set();
         const labels = ['A','B','C','D','E'];
-        return `<div class="options">${q.options.map((o, i) =>
+        const max = q.max_choices || 1;
+        return `<div style="font-size:12px;color:var(--muted);margin-bottom:8px">
+            Pilih maksimal <b>${max}</b> jawaban (terpilih: ${sel.size}/${max})
+          </div>
+          <div class="options">${q.options.map((o, i) =>
           `<button class="opt-btn ${sel.has(o.id) ? 'multi-selected' : ''}" data-multi-qid="${q.id}" data-multi-oid="${o.id}">
             <div class="opt-checkbox"></div>
             <div class="opt-label-box">${labels[i] || o.label}</div>
@@ -1295,9 +1299,18 @@
       }
 
       function selectMulti(qid, oid) {
+        const q = sessionData.questions.find(qq => qq.id === qid);
+        const max = (q && q.max_choices) || 1;
         if (!multiAnswers[qid]) multiAnswers[qid] = new Set();
-        if (multiAnswers[qid].has(oid)) multiAnswers[qid].delete(oid);
-        else                            multiAnswers[qid].add(oid);
+        if (multiAnswers[qid].has(oid)) {
+          multiAnswers[qid].delete(oid);
+        } else {
+          if (multiAnswers[qid].size >= max) {
+            UI.toast(`Maksimal hanya bisa memilih ${max} jawaban`, "error");
+            return;
+          }
+          multiAnswers[qid].add(oid);
+        }
         if (multiAnswers[qid].size > 0) answers[qid] = 'multi';
         else                            delete answers[qid];
         apiFetch(`/api/student/sessions/${sessionData.session_id}/answer-multi`, {

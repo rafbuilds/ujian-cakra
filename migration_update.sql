@@ -31,6 +31,7 @@ ALTER TABLE exams ADD COLUMN IF NOT EXISTS room_id     UUID;
 ALTER TABLE questions ADD COLUMN IF NOT EXISTS type           TEXT DEFAULT 'multiple_choice';
 ALTER TABLE questions ADD COLUMN IF NOT EXISTS attachment_url TEXT;
 ALTER TABLE questions ADD COLUMN IF NOT EXISTS audio_url      TEXT;
+ALTER TABLE questions ADD COLUMN IF NOT EXISTS max_choices    INT; -- batas maksimal pilihan siswa untuk type='multiple_answer'
 
 -- ── 5. Kolom tambahan di exam_sessions ───────────────────────
 -- device_key boleh NULL (siswa yang belum register device)

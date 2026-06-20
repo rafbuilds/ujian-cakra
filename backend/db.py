@@ -61,3 +61,42 @@ def query(sql, params=None, fetch="all"):
         raise
     finally:
         release_db(conn)
+
+def count_correct_wrong(session_id, exam_id):
+    """Hitung correct/wrong untuk soal single-choice (answers) + multiple_answer (multi_answers).
+    Soal multiple_answer dianggap benar hanya jika pilihan siswa sama persis dengan kunci jawaban."""
+    correct = query("""
+        SELECT COUNT(*) as n FROM answers a
+        JOIN options o ON o.id=a.option_id
+        JOIN questions q ON q.id=a.question_id
+        WHERE a.session_id=%s AND o.is_correct=true
+          AND COALESCE(q.type,'multiple_choice') != 'multiple_answer'
+    """, (session_id,), fetch='one')['n']
+    wrong = query("""
+        SELECT COUNT(*) as n FROM answers a
+        JOIN options o ON o.id=a.option_id
+        JOIN questions q ON q.id=a.question_id
+        WHERE a.session_id=%s AND o.is_correct=false
+          AND COALESCE(q.type,'multiple_choice') != 'multiple_answer'
+    """, (session_id,), fetch='one')['n']
+
+    multi_rows = query("""
+        WITH student_sets AS (
+            SELECT question_id, ARRAY_AGG(option_id ORDER BY option_id) as picked
+            FROM multi_answers WHERE session_id=%s GROUP BY question_id
+        ),
+        correct_sets AS (
+            SELECT q.id as question_id, ARRAY_AGG(o.id ORDER BY o.id) as correct
+            FROM questions q JOIN options o ON o.question_id=q.id AND o.is_correct=true
+            WHERE q.exam_id=%s AND COALESCE(q.type,'multiple_choice')='multiple_answer'
+            GROUP BY q.id
+        )
+        SELECT ss.picked IS NOT NULL as answered,
+               ss.picked IS NOT NULL AND ss.picked = cs.correct as is_correct
+        FROM correct_sets cs LEFT JOIN student_sets ss ON ss.question_id=cs.question_id
+    """, (session_id, exam_id))
+    for r in multi_rows:
+        if r['answered']:
+            correct += 1 if r['is_correct'] else 0
+            wrong   += 0 if r['is_correct'] else 1
+    return correct, wrong

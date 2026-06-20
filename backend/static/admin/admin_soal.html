@@ -466,6 +466,15 @@
                   <div style="font-size:11px;color:var(--muted);margin-top:4px" id="options-tip">Klik huruf A/B/C/D/E untuk set kunci jawaban</div>
                 </div>
 
+                <!-- Batas maksimal pilihan siswa (multiple_answer) -->
+                <div class="form-group" id="max-choices-group" style="display:none;margin-bottom:.875rem">
+                  <label style="display:block;font-size:12px;font-weight:600;color:#5f5e5a;margin-bottom:8px">
+                    Maksimal Pilihan Siswa
+                    <span style="color:var(--muted);font-weight:400">(berapa opsi yang boleh dicentang siswa)</span>
+                  </label>
+                  <input type="number" id="nq-max-choices" class="form-control" min="1" max="5" style="max-width:120px" oninput="maxChoicesEdited = true"/>
+                </div>
+
                 <!-- Ya/Tidak (yes_no) -->
                 <div id="yesno-group" style="display:none;margin-bottom:.875rem">
                   <label style="display:block;font-size:12px;font-weight:600;color:#5f5e5a;margin-bottom:8px">Jawaban Benar</label>
@@ -601,7 +610,7 @@
       ${(q.type!=='yes_no'&&q.type!=='camera_essay') ? (kunciMode ? renderKunciOptions(q) : renderNormalOptions(q)) : ''}
       <div class="q-footer">
         <div style="font-size:11px;color:var(--muted)">
-          ${q.type==='multiple_answer' ? '☑️ Multi-kunci: '+q.options?.filter(o=>o.is_correct).map(o=>o.label).join(', ')
+          ${q.type==='multiple_answer' ? '☑️ Multi-kunci: '+q.options?.filter(o=>o.is_correct).map(o=>o.label).join(', ')+' · maks. pilihan siswa: '+(q.max_choices || q.options?.filter(o=>o.is_correct).length || 1)
             : q.type==='yes_no' ? '✅ Kunci: '+(q.options?.find(o=>o.is_correct)?.label||'—')
             : q.type==='camera_essay' ? '📷 Dinilai manual guru'
             : (q.options?.filter(o=>o.is_correct).length ? "Kunci: "+q.options.find(o=>o.is_correct)?.label : "⚠ Belum ada kunci")}
@@ -736,6 +745,9 @@
             .querySelectorAll("#opt-inputs input")
             .forEach((i) => (i.value = ""));
           setKey("A");
+          multiCorrectKeys = new Set(['A']);
+          maxChoicesEdited = false;
+          document.getElementById('nq-max-choices').value = 1;
         }
       }
       // ── Tipe soal state ─────────────────────────────────
@@ -755,6 +767,7 @@
         const isAudio  = type === 'audio';
 
         document.getElementById('options-group').style.display  = (isChoice||isMulti) ? '' : 'none';
+        document.getElementById('max-choices-group').style.display = isMulti ? '' : 'none';
         document.getElementById('yesno-group').style.display    = isYesNo  ? '' : 'none';
         document.getElementById('camera-info').style.display    = isCamera ? '' : 'none';
         document.getElementById('audio-info').style.display     = isAudio  ? '' : 'none';
@@ -782,6 +795,7 @@
         }
       }
 
+      let maxChoicesEdited = false;
       function toggleMultiKey(label) {
         if (!label) return;
         multiCorrectKeys.has(label) ? multiCorrectKeys.delete(label) : multiCorrectKeys.add(label);
@@ -797,6 +811,10 @@
             if (kunciEl) kunciEl.style.color = 'transparent';
           }
         });
+        // Default maksimal pilihan = jumlah kunci jawaban, kecuali guru sudah ubah manual
+        if (!maxChoicesEdited) {
+          document.getElementById('nq-max-choices').value = multiCorrectKeys.size || 1;
+        }
       }
 
       function setYesNo(val) {
@@ -898,6 +916,7 @@
             if (options.length < 2) { UI.toast("Minimal 2 pilihan jawaban", "warn"); return; }
             if (!options.some(o => o.is_correct)) { UI.toast("Centang minimal 1 kunci jawaban", "warn"); return; }
             payload.options = options;
+            payload.max_choices = Math.max(1, parseInt(document.getElementById('nq-max-choices').value) || multiCorrectKeys.size);
 
           } else if (currentType === 'yes_no') {
             payload.options = [
