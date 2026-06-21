@@ -253,6 +253,8 @@
 
         <div class="page-main">
           <div class="filter-bar">
+            <select id="f-year"></select>
+            <select id="f-semester"></select>
             <select id="filter-status" onchange="loadExams()">
               <option value="">Semua Status</option>
               <option value="draft">Draft</option>
@@ -529,7 +531,7 @@
       async function init() {
         [allClasses] = await Promise.all([
           API.get("/api/classes"),
-          loadExams(),
+          loadYearSemesterFilter(),
           loadRooms(),
         ]);
         loadSubjects();
@@ -564,16 +566,47 @@
         } catch {}
       }
 
+      async function loadYearSemesterFilter() {
+        try {
+          const [years, active] = await Promise.all([
+            API.get("/api/guru/academic-years"),
+            API.get("/api/guru/active-period").catch(() => ({})),
+          ]);
+          const ySel = document.getElementById("f-year");
+          ySel.innerHTML = (years || [])
+            .map((y) => `<option value="${y.id}">${y.name}${y.is_active ? " (aktif)" : ""}</option>`)
+            .join("");
+          const defaultYearId = active?.academic_year?.id || years?.[0]?.id || "";
+          if (defaultYearId) ySel.value = defaultYearId;
+          ySel.onchange = () => loadSemesterOptions();
+          document.getElementById("f-semester").onchange = loadExams;
+          await loadSemesterOptions(active?.semester?.id);
+        } catch {}
+      }
+
+      async function loadSemesterOptions(defaultSemId) {
+        const yearId = document.getElementById("f-year").value;
+        const sSel = document.getElementById("f-semester");
+        if (!yearId) { sSel.innerHTML = ""; loadExams(); return; }
+        try {
+          const sems = await API.get(`/api/guru/semesters?academic_year_id=${yearId}`);
+          sSel.innerHTML = (sems || [])
+            .map((s) => `<option value="${s.id}">${s.name}${s.is_active ? " (aktif)" : ""}</option>`)
+            .join("");
+          if (defaultSemId) sSel.value = defaultSemId;
+          loadExams();
+        } catch {}
+      }
+
       async function loadExams() {
         const status = document.getElementById("filter-status")?.value || "";
         const search =
           document.getElementById("search-exam")?.value.toLowerCase() || "";
+        const semId = document.getElementById("f-semester")?.value || "";
         try {
-          const res = await API.get("/api/exams?active_only=1");
+          const res = await API.get(`/api/exams${semId ? `?semester_id=${semId}` : ""}`);
           const exams = Array.isArray(res) ? res : res.exams || res.data || [];
           // Soal yang belum dijadwalkan (start_at masih kosong) ada di menu Bank Soal.
-          // Ujian dari semester yang sudah "Selesai" juga tidak tampil di sini lagi —
-          // lihat menu Nilai & Rekap untuk histori semester yang sudah lewat.
           allExams = exams.filter((e) => e.start_at);
           let filtered = allExams;
           if (status) filtered = filtered.filter((e) => e.status === status);

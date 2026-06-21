@@ -19,13 +19,14 @@ def _active_semester_id():
 @exams_bp.route('/api/exams', methods=['GET'])
 @require_guru
 def get_exams():
-    active_only = request.args.get('active_only') == '1'
+    sem_id = request.args.get('semester_id')
+    if not sem_id and request.args.get('active_only') == '1':
+        sem_id = _active_semester_id()
     params = [request.user_id]
     extra_where = ""
-    if active_only:
-        active_id = _active_semester_id()
-        extra_where = " AND (e.semester_id=%s OR e.semester_id IS NULL)"
-        params.append(active_id)
+    if sem_id:
+        extra_where = " AND e.semester_id=%s"
+        params.append(sem_id)
     rows = query(f"""
         SELECT e.*, s.name as subject_name,
                sem.name as semester_name, ay.name as academic_year_name
@@ -58,7 +59,7 @@ def get_exams_for_proctor():
         LEFT JOIN subjects s ON s.id=e.subject_id
         LEFT JOIN users u ON u.id=e.teacher_id
         WHERE e.status IN ('published','ongoing','finished')
-          AND (e.semester_id=%s OR e.semester_id IS NULL)
+          AND e.semester_id=%s
         ORDER BY e.start_at DESC
     """, (active_id,))
     return jsonify([dict(r) for r in rows])
