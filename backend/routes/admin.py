@@ -1217,7 +1217,21 @@ def list_academic_years():
         """)
         return jsonify([dict(r) for r in rows])
     except Exception:
-        return jsonify([])
+        # Fallback kalau kolom semester_id di rooms/exams belum ada (migrasi
+        # belum dijalankan) — tetap tampilkan data inti, jangan sampai
+        # tahun ajaran yang sudah ada terlihat hilang.
+        try:
+            rows = query("""
+                SELECT ay.*,
+                       COUNT(s.id) as semester_count,
+                       COUNT(s.id) FILTER (WHERE s.is_active) as active_semesters
+                FROM academic_years ay
+                LEFT JOIN semesters s ON s.academic_year_id = ay.id
+                GROUP BY ay.id ORDER BY ay.name DESC
+            """)
+            return jsonify([dict(r) for r in rows])
+        except Exception:
+            return jsonify([])
 
 
 @admin_bp.route('/api/admin/academic-years', methods=['POST'])
@@ -1284,7 +1298,23 @@ def list_semesters():
             """)
         return jsonify([dict(r) for r in rows])
     except Exception:
-        return jsonify([])
+        # Fallback kalau kolom semester_id di rooms/exams belum ada
+        try:
+            if year_id:
+                rows = query("""
+                    SELECT s.*, ay.name as year_name FROM semesters s
+                    JOIN academic_years ay ON ay.id = s.academic_year_id
+                    WHERE s.academic_year_id=%s ORDER BY s.start_date
+                """, (year_id,))
+            else:
+                rows = query("""
+                    SELECT s.*, ay.name as year_name FROM semesters s
+                    JOIN academic_years ay ON ay.id = s.academic_year_id
+                    ORDER BY ay.name DESC, s.start_date
+                """)
+            return jsonify([dict(r) for r in rows])
+        except Exception:
+            return jsonify([])
 
 
 @admin_bp.route('/api/admin/semesters', methods=['POST'])
