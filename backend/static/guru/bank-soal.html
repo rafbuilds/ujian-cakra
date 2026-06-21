@@ -1,0 +1,459 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+    <title>Bank Soal — Ujian Online</title>
+    <link rel="stylesheet" href="../style.css" />
+    <style>
+      .soal-row {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 1rem 1.25rem;
+        border-bottom: 0.5px solid var(--border);
+      }
+      .soal-row:last-child {
+        border-bottom: none;
+      }
+      .modal {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 200;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+        backdrop-filter: blur(4px);
+      }
+      .modal.show {
+        display: flex;
+      }
+      .modal-box {
+        background: #fff;
+        border-radius: 20px;
+        padding: 2rem;
+        max-width: 560px;
+        width: 100%;
+        max-height: 90vh;
+        overflow-y: auto;
+      }
+      .class-checkbox-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 7px;
+      }
+      .cls-chk {
+        padding: 8px 10px;
+        border: 1.5px solid var(--border2);
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.15s;
+      }
+      .cls-chk.checked {
+        border-color: var(--green3);
+        background: var(--green4);
+        color: #0f6e56;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-shell">
+      <nav class="sidebar">
+        <div class="sb-logo">
+          <div class="sb-logo-title">📋 Ujian Online</div>
+          <div class="sb-logo-sub">SMAN 1 Batangan</div>
+        </div>
+        <div class="sb-nav">
+          <div class="sb-section">Menu</div>
+          <a href="dashboard.html" class="sb-item" id="nav-dashboard">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" stroke-linecap="round" stroke-linejoin="round" />
+              <polyline points="9 22 9 12 15 12 15 22" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            Dashboard
+          </a>
+          <a href="ujian.html" class="sb-item" id="nav-ujian">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" stroke-linecap="round" />
+            </svg>
+            Daftar Ujian
+          </a>
+          <a href="bank-soal.html" class="sb-item active" id="nav-bank-soal">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M4 19.5A2.5 2.5 0 016.5 17H20" stroke-linecap="round" />
+              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z" stroke-linecap="round" />
+            </svg>
+            Bank Soal
+          </a>
+          <a href="rooms.html" class="sb-item" id="nav-rooms">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke-linecap="round" />
+              <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke-linecap="round" />
+            </svg>
+            Room Ujian
+          </a>
+          <a href="pengawas.html" class="sb-item" id="nav-pengawas">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M15 10l4.553-2.069A1 1 0 0121 8.82V15.18a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" stroke-linecap="round" />
+            </svg>
+            Pengawas Live
+          </a>
+          <a href="nilai.html" class="sb-item" id="nav-nilai">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <line x1="18" y1="20" x2="18" y2="10" stroke-linecap="round" />
+              <line x1="12" y1="20" x2="12" y2="4" stroke-linecap="round" />
+              <line x1="6" y1="20" x2="6" y2="14" stroke-linecap="round" />
+            </svg>
+            Nilai & Rekap
+          </a>
+          <a href="mapel.html" class="sb-item" id="nav-mapel">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" stroke-linecap="round" />
+            </svg>
+            Mata Pelajaran
+          </a>
+          <a href="siswa.html" class="sb-item" id="nav-siswa">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke-linecap="round" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke-linecap="round" />
+            </svg>
+            Data Siswa
+          </a>
+        </div>
+        <div class="sb-user">
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px">
+            <div class="sb-avatar" id="sb-avatar">G</div>
+            <div>
+              <div class="sb-user-name" id="sb-user-name">Guru</div>
+              <div class="sb-user-role">Guru Pengampu</div>
+            </div>
+          </div>
+          <button class="sb-logout" onclick="Auth.logout()">⏻ Keluar</button>
+        </div>
+      </nav>
+
+      <div class="main-wrap">
+        <div class="topbar">
+          <div class="topbar-title">Bank Soal</div>
+          <div class="topbar-right">
+            <button class="btn btn-primary" onclick="openCreateModal()">+ Buat Soal Baru</button>
+          </div>
+        </div>
+
+        <div class="page-main">
+          <div class="card" style="margin-bottom: 1rem; padding: 1rem 1.25rem; background: var(--green4); border: none">
+            <div style="font-size: 13px; color: var(--green); line-height: 1.6">
+              💡 Bank Soal adalah soal yang Anda buat <strong>tanpa harus langsung punya jadwal/kelas</strong> — bisa
+              disiapkan kapan saja. Saat sudah siap dipakai, klik <strong>"🚀 Terapkan ke Ujian"</strong> untuk
+              memberinya room, jenjang, kelas, tanggal & durasi — setelah itu otomatis muncul di menu Daftar Ujian.
+            </div>
+          </div>
+
+          <div class="card" style="padding: 0; overflow: hidden" id="soal-list-card">
+            <div style="padding: 2rem; text-align: center"><div class="loading-spinner"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL BUAT SOAL BARU -->
+    <div class="modal" id="modal-create">
+      <div class="modal-box">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem">
+          <div style="font-weight: 700; font-size: 18px; color: var(--green)">Buat Soal Baru</div>
+          <button onclick="closeCreateModal()" style="background: none; border: none; font-size: 22px; cursor: pointer; color: var(--muted)">✕</button>
+        </div>
+        <div class="form-group">
+          <label>Judul Soal *</label>
+          <input class="form-control" id="c-title" placeholder="Contoh: Bahasa Indonesia - Bab Teks Eksposisi" />
+        </div>
+        <div class="form-group">
+          <label>Mata Pelajaran</label>
+          <select class="form-control" id="c-subject">
+            <option value="">— Pilih Mapel —</option>
+          </select>
+        </div>
+        <div style="font-size: 11px; color: var(--muted); margin-bottom: 1rem">
+          Tidak perlu pilih jadwal/kelas dulu — atur nanti saat "Terapkan ke Ujian".
+        </div>
+        <div style="display: flex; gap: 10px">
+          <button class="btn btn-secondary" style="flex: 1" onclick="closeCreateModal()">Batal</button>
+          <button class="btn btn-primary" style="flex: 2" onclick="createSoal()" id="c-submit">Simpan & Tambah Soal</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL TERAPKAN KE UJIAN -->
+    <div class="modal" id="modal-apply">
+      <div class="modal-box">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem">
+          <div style="font-weight: 700; font-size: 18px; color: var(--green)">🚀 Terapkan ke Ujian</div>
+          <button onclick="closeApplyModal()" style="background: none; border: none; font-size: 22px; cursor: pointer; color: var(--muted)">✕</button>
+        </div>
+        <input type="hidden" id="a-id" />
+        <div class="form-row">
+          <div class="form-group">
+            <label>Room Ujian <span style="font-weight: 400; color: var(--muted)">(opsional)</span></label>
+            <select class="form-control" id="a-room" onchange="onApplyRoomChange()">
+              <option value="">— Tanpa room —</option>
+            </select>
+          </div>
+          <div class="form-group" id="a-grade-wrap" style="display: none">
+            <label>Jenjang</label>
+            <select class="form-control" id="a-grade">
+              <option value="10">Kelas X</option>
+              <option value="11">Kelas XI</option>
+              <option value="12">Kelas XII</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Tanggal & Jam Mulai *</label>
+            <input class="form-control" id="a-start" type="datetime-local" />
+          </div>
+          <div class="form-group">
+            <label>Durasi (menit)</label>
+            <input class="form-control" id="a-duration" type="number" min="10" max="300" value="90" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Kelas Peserta *</label>
+          <div class="class-checkbox-grid" id="a-class-grid"></div>
+        </div>
+        <div style="display: flex; gap: 10px; margin-top: 1rem">
+          <button class="btn btn-secondary" style="flex: 1" onclick="closeApplyModal()">Batal</button>
+          <button class="btn btn-primary" style="flex: 2" onclick="applyToExam()" id="a-submit">🚀 Terapkan</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="../config.js"></script>
+    <script src="../components/api.js"></script>
+    <script src="../components/auth.js"></script>
+    <script src="../components/common.js"></script>
+    <script>
+      if (!Auth.requireRole(["guru", "admin"])) throw new Error();
+      UI.initSidebar();
+
+      let allSoal = [],
+        allRooms = [],
+        allClasses = [];
+
+      async function init() {
+        [allClasses] = await Promise.all([API.get("/api/classes"), loadSoal(), loadRooms(), loadSubjects()]);
+      }
+
+      async function loadSubjects() {
+        try {
+          const subs = await API.get("/api/subjects");
+          document.getElementById("c-subject").innerHTML =
+            '<option value="">— Pilih Mapel —</option>' + subs.map((s) => `<option value="${s.id}">${s.name}</option>`).join("");
+        } catch {}
+      }
+
+      async function loadRooms() {
+        try {
+          allRooms = await API.get("/api/guru/rooms");
+          document.getElementById("a-room").innerHTML =
+            '<option value="">— Tanpa room —</option>' + allRooms.map((r) => `<option value="${r.id}">${r.name}</option>`).join("");
+        } catch {}
+      }
+
+      async function loadSoal() {
+        const card = document.getElementById("soal-list-card");
+        try {
+          const exams = await API.get("/api/exams");
+          allSoal = exams.filter((e) => !e.start_at);
+          renderSoal();
+        } catch {
+          UI.toast("Gagal memuat bank soal", "error");
+        }
+      }
+
+      function renderSoal() {
+        const card = document.getElementById("soal-list-card");
+        if (!allSoal.length) {
+          card.innerHTML = `<div class="empty-state" style="padding:3rem">
+            <div class="empty-icon">📚</div>
+            <div class="empty-text">Belum ada soal di bank soal. <button class="btn btn-primary btn-sm" onclick="openCreateModal()" style="margin-top:.75rem">+ Buat Soal Baru</button></div>
+          </div>`;
+          return;
+        }
+        card.innerHTML = allSoal
+          .map(
+            (e) => `
+      <div class="soal-row">
+        <div style="width:44px;height:44px;border-radius:12px;background:var(--light);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">📝</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;font-size:15px">${e.title}</div>
+          <div style="font-size:12px;color:var(--muted);display:flex;gap:10px;flex-wrap:wrap">
+            <span>📚 ${e.subject_name || "—"}</span>
+            <span>📝 ${e.question_count || 0} soal</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;flex-shrink:0">
+          <button class="btn btn-secondary btn-sm" onclick="goToSoal('${e.id}')">✏️ Edit Soal</button>
+          <button class="btn btn-primary btn-sm" onclick="openApplyModal('${e.id}')">🚀 Terapkan ke Ujian</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteSoal('${e.id}','${e.title.replace(/'/g, "\\'")}')">🗑</button>
+        </div>
+      </div>`,
+          )
+          .join("");
+      }
+
+      function goToSoal(id) {
+        location.href = `soal.html?id=${id}`;
+      }
+
+      function openCreateModal() {
+        document.getElementById("c-title").value = "";
+        document.getElementById("c-subject").value = "";
+        document.getElementById("modal-create").classList.add("show");
+      }
+      function closeCreateModal() {
+        document.getElementById("modal-create").classList.remove("show");
+      }
+
+      async function createSoal() {
+        const title = document.getElementById("c-title").value.trim();
+        if (!title) {
+          UI.toast("Judul soal wajib diisi", "warn");
+          return;
+        }
+        const btn = document.getElementById("c-submit");
+        btn.textContent = "Menyimpan...";
+        btn.disabled = true;
+        try {
+          const exam = await API.post("/api/exams", {
+            title,
+            subject_id: document.getElementById("c-subject").value || null,
+          });
+          UI.toast("✅ Soal dibuat, silakan tambahkan pertanyaan", "success");
+          closeCreateModal();
+          location.href = `soal.html?id=${exam.id}`;
+        } catch (e) {
+          UI.toast(e.error || "Gagal membuat soal", "error");
+        } finally {
+          btn.textContent = "Simpan & Tambah Soal";
+          btn.disabled = false;
+        }
+      }
+
+      let _applyingId = null;
+      function onApplyRoomChange() {
+        const rid = document.getElementById("a-room").value;
+        document.getElementById("a-grade-wrap").style.display = rid ? "" : "none";
+      }
+
+      function openApplyModal(id) {
+        _applyingId = id;
+        document.getElementById("a-id").value = id;
+        document.getElementById("a-room").value = "";
+        document.getElementById("a-grade").value = "10";
+        document.getElementById("a-grade-wrap").style.display = "none";
+        document.getElementById("a-start").value = "";
+        document.getElementById("a-duration").value = "90";
+
+        const gradeLabel = (cls) => {
+          if (cls.grade) return cls.grade;
+          const n = (cls.name || "").toUpperCase();
+          if (n.startsWith("XII")) return 12;
+          if (n.startsWith("XI")) return 11;
+          if (n.startsWith("X")) return 10;
+          return 0;
+        };
+        const byGrade = (g) => allClasses.filter((c) => gradeLabel(c) === g);
+        const ungrouped = allClasses.filter((c) => ![10, 11, 12].includes(gradeLabel(c)));
+        const gradeGroups = [10, 11, 12].filter((g) => byGrade(g).length > 0);
+        const groups =
+          ungrouped.length > 0
+            ? [...gradeGroups.map((g) => ({ label: `KELAS ${g}`, cls: byGrade(g) })), { label: "KELAS LAINNYA", cls: ungrouped }]
+            : gradeGroups.map((g) => ({ label: `KELAS ${g}`, cls: byGrade(g) }));
+        const renderGroups = groups.length > 0 ? groups : [{ label: "SEMUA KELAS", cls: allClasses }];
+        document.getElementById("a-class-grid").innerHTML = renderGroups
+          .map(
+            ({ label, cls }) => `
+    <div style="grid-column:1/-1;font-size:11px;font-weight:600;color:var(--muted);margin-top:.5rem">${label}</div>
+    ${cls
+      .map(
+        (c) => `<div class="cls-chk" onclick="toggleApplyClass(this,'${c.id}')" data-id="${c.id}"><span>☐</span> ${c.name}</div>`,
+      )
+      .join("")}`,
+          )
+          .join("");
+
+        document.getElementById("modal-apply").classList.add("show");
+      }
+
+      function toggleApplyClass(el, id) {
+        el.classList.toggle("checked");
+        el.querySelector("span").textContent = el.classList.contains("checked") ? "☑" : "☐";
+      }
+
+      function closeApplyModal() {
+        document.getElementById("modal-apply").classList.remove("show");
+        _applyingId = null;
+      }
+
+      async function applyToExam() {
+        const classIds = [...document.querySelectorAll("#a-class-grid .cls-chk.checked")].map((el) => el.dataset.id);
+        if (!classIds.length) {
+          UI.toast("Pilih minimal 1 kelas", "warn");
+          return;
+        }
+        const startAt = document.getElementById("a-start").value;
+        if (!startAt) {
+          UI.toast("Tanggal & jam mulai wajib diisi", "warn");
+          return;
+        }
+        const roomId = document.getElementById("a-room").value || null;
+        const body = {
+          class_ids: classIds,
+          start_at: new Date(startAt).toISOString(),
+          duration_minutes: parseInt(document.getElementById("a-duration").value) || 90,
+          room_id: roomId,
+          grade: roomId ? parseInt(document.getElementById("a-grade").value) : null,
+        };
+        const btn = document.getElementById("a-submit");
+        btn.textContent = "Menerapkan...";
+        btn.disabled = true;
+        try {
+          await API.patch(`/api/exams/${_applyingId}`, body);
+          UI.toast("✅ Soal diterapkan — cek menu Daftar Ujian", "success");
+          closeApplyModal();
+          allSoal = allSoal.filter((e) => e.id !== _applyingId);
+          renderSoal();
+        } catch (e) {
+          UI.toast(e.error || "Gagal menerapkan soal", "error");
+        } finally {
+          btn.textContent = "🚀 Terapkan";
+          btn.disabled = false;
+        }
+      }
+
+      async function deleteSoal(id, title) {
+        UI.confirm("Hapus Soal", `Hapus soal "<strong>${title}</strong>" dari Bank Soal?`, async () => {
+          try {
+            await API.del(`/api/exams/${id}`);
+            UI.toast("Soal dihapus", "success");
+            allSoal = allSoal.filter((e) => e.id !== id);
+            renderSoal();
+          } catch (e) {
+            UI.toast(e.error || "Gagal menghapus", "error");
+          }
+        });
+      }
+
+      init();
+    </script>
+  </body>
+</html>

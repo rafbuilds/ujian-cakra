@@ -106,6 +106,12 @@
               /></svg
             >Room Ujian</a
           >
+          <a href="bank-soal.html" class="sb-item"
+            ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M4 19.5A2.5 2.5 0 016.5 17H20" stroke-linecap="round" />
+              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z" stroke-linecap="round" /></svg
+            >Bank Soal</a
+          >
           <a href="settings.html" class="sb-item"
             ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <circle cx="12" cy="12" r="3" />
@@ -172,7 +178,7 @@
                 border-bottom: 2px solid transparent;
               "
             >
-              📚 Bank Soal
+              📋 Semua Ujian
             </button>
           </div>
           <div class="topbar-right">
@@ -527,6 +533,7 @@
             UJIAN DI ROOM INI
           </div>
         </div>
+        <div id="dp-exams-day-filter" style="margin-bottom: 6px"></div>
         <div id="dp-exams-filter" style="margin-bottom: 8px"></div>
         <div id="dp-exams"></div>
 
@@ -892,11 +899,35 @@
         finished:  '<span style="background:#faeeda;color:#854f0b;padding:1px 7px;border-radius:20px;font-size:10px;font-weight:600">Selesai</span>',
       };
 
-      function renderRoomExams(exams) {
-        window._roomExams      = exams;
-        window._activeFilter   = 'all';
+      function dayKey(e) {
+        return e.start_at ? new Date(e.start_at).toDateString() : null;
+      }
 
-        // Filter bar: Semua + per-status
+      function renderRoomExams(exams) {
+        window._roomExams        = exams;
+        window._activeStatus     = 'all';
+        window._activeDay        = 'all';
+
+        // Filter bar: Hari ke-1, ke-2, dst — diurutkan dari tanggal start_at
+        const dayKeys = [...new Set(exams.map(dayKey).filter(Boolean))]
+          .sort((a, b) => new Date(a) - new Date(b));
+        const hasNoDate = exams.some(e => !e.start_at);
+        document.getElementById('dp-exams-day-filter').innerHTML = (dayKeys.length > 1 || (dayKeys.length && hasNoDate))
+          ? `<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:6px">
+              <button onclick="filterDay('all')" id="ed-all" class="btn btn-primary btn-sm" style="font-size:11px;padding:3px 9px">Semua Hari</button>
+              ${dayKeys.map((dk, i) => {
+                const tgl = new Date(dk).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+                const cnt = exams.filter(e => dayKey(e) === dk).length;
+                return `<button onclick="filterDay('${dk}')" id="ed-${i}" class="btn btn-secondary btn-sm" style="font-size:11px;padding:3px 9px">Hari ${i + 1} · ${tgl} (${cnt})</button>`;
+              }).join('')}
+              ${hasNoDate ? `<button onclick="filterDay('no-date')" id="ed-nodate" class="btn btn-secondary btn-sm" style="font-size:11px;padding:3px 9px">Tanpa Tanggal (${exams.filter(e => !e.start_at).length})</button>` : ''}
+             </div>` : '';
+
+        renderStatusFilter(exams);
+        renderExamsByGrade(exams);
+      }
+
+      function renderStatusFilter(exams) {
         const statuses = [...new Set(exams.map(e => e.status))];
         document.getElementById('dp-exams-filter').innerHTML = exams.length > 1
           ? `<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px">
@@ -907,8 +938,32 @@
                   ${{ongoing:'🟢 Live',published:'Terbuka',finished:'Selesai',draft:'Draft'}[s]} (${exams.filter(e=>e.status===s).length})
                 </button>`).join('')}
              </div>` : '';
+      }
 
-        renderExamsByGrade(exams);
+      function applyRoomFilters() {
+        let byDay = window._roomExams;
+        if (window._activeDay !== 'all') {
+          byDay = window._activeDay === 'no-date'
+            ? byDay.filter(e => !e.start_at)
+            : byDay.filter(e => dayKey(e) === window._activeDay);
+        }
+        renderStatusFilter(byDay);
+        const filtered = window._activeStatus === 'all'
+          ? byDay
+          : byDay.filter(e => e.status === window._activeStatus);
+        renderExamsByGrade(filtered);
+      }
+
+      function filterDay(dayValue) {
+        window._activeDay = dayValue;
+        window._activeStatus = 'all';
+        document.querySelectorAll('[id^="ed-"]').forEach(b => {
+          b.className = 'btn btn-secondary btn-sm';
+          b.style.cssText = 'font-size:11px;padding:3px 9px';
+        });
+        const btn = document.getElementById(dayValue === 'all' ? 'ed-all' : dayValue === 'no-date' ? 'ed-nodate' : 'ed-' + [...new Set(window._roomExams.map(dayKey).filter(Boolean))].sort((a,b)=>new Date(a)-new Date(b)).indexOf(dayValue));
+        if (btn) { btn.className = 'btn btn-primary btn-sm'; btn.style.cssText = 'font-size:11px;padding:3px 9px'; }
+        applyRoomFilters();
       }
 
       const GRADE_LABEL = { 10: 'Kelas X', 11: 'Kelas XI', 12: 'Kelas XII' };
@@ -1007,13 +1062,20 @@
       }
 
       function filterExams(status) {
+        window._activeStatus = status;
         document.querySelectorAll('[id^="ef-"]').forEach(b => {
           b.className = 'btn btn-secondary btn-sm';
           b.style.cssText = 'font-size:11px;padding:3px 9px';
         });
         const btn = document.getElementById('ef-' + status);
         if (btn) { btn.className = 'btn btn-primary btn-sm'; btn.style.cssText = 'font-size:11px;padding:3px 9px'; }
-        const filtered = status === 'all' ? window._roomExams : window._roomExams.filter(e => e.status === status);
+        let byDay = window._roomExams;
+        if (window._activeDay !== 'all') {
+          byDay = window._activeDay === 'no-date'
+            ? byDay.filter(e => !e.start_at)
+            : byDay.filter(e => dayKey(e) === window._activeDay);
+        }
+        const filtered = status === 'all' ? byDay : byDay.filter(e => e.status === status);
         renderExamsByGrade(filtered);
       }
 
@@ -1382,15 +1444,16 @@
         try {
           if (!_examCache.length) {
             _examCache = await API.get("/api/admin/exams");
+            const scheduled = _examCache.filter((e) => e.start_at);
             document.getElementById("ust-total").textContent =
-              _examCache.length;
-            document.getElementById("ust-live").textContent = _examCache.filter(
+              scheduled.length;
+            document.getElementById("ust-live").textContent = scheduled.filter(
               (e) => e.status === "ongoing",
             ).length;
-            document.getElementById("ust-open").textContent = _examCache.filter(
+            document.getElementById("ust-open").textContent = scheduled.filter(
               (e) => e.status === "published",
             ).length;
-            document.getElementById("ust-done").textContent = _examCache.filter(
+            document.getElementById("ust-done").textContent = scheduled.filter(
               (e) => e.status === "finished",
             ).length;
             const rooms = [
@@ -1422,7 +1485,9 @@
                 )
                 .join("");
           }
-          let exams = _examCache;
+          // Hanya tampilkan ujian yang sudah dijadwalkan (punya start_at) —
+          // soal yang masih di Bank Soal (belum diterapkan) tidak ikut di sini.
+          let exams = _examCache.filter((e) => e.start_at);
           if (status) exams = exams.filter((e) => e.status === status);
           if (roomF) exams = exams.filter((e) => e.room_id === roomF);
           if (gradeF) exams = exams.filter((e) => String(e.grade) === gradeF);

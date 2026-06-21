@@ -557,7 +557,7 @@
       <div style="font-size:12px;color:var(--muted);margin-top:3px;display:flex;gap:10px;flex-wrap:wrap">
         <span>📚 ${exam.subject_name || "—"}</span>
         <span>⏱ ${exam.duration_minutes} menit</span>
-        <span>📅 ${UI.fmtDT(exam.start_at)}</span>
+        <span>📅 ${exam.start_at ? UI.fmtDT(exam.start_at) : "Belum dijadwalkan (Bank Soal)"}</span>
         <span>👥 ${exam.classes?.map((c) => c.name).join(", ") || "—"}</span>
       </div>
     </div>

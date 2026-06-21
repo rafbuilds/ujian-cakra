@@ -215,6 +215,14 @@ CREATE TABLE IF NOT EXISTS exam_proctors (
 );
 CREATE INDEX IF NOT EXISTS idx_exam_proctors_teacher ON exam_proctors(teacher_id);
 
+-- ── 21. Bank Soal — soal murni tanpa jadwal ──────────────────────
+-- exams.start_at dulu NOT NULL (lihat schema_ujian.sql). Sekarang dibuat
+-- nullable: ujian dengan start_at masih NULL = "Bank Soal" (belum
+-- dijadwalkan/diterapkan ke kelas & room). Begitu guru pilih room+jenjang+
+-- kelas+tanggal lewat "Terapkan ke Ujian", start_at terisi dan ujian itu
+-- otomatis pindah tampil di Daftar Ujian / Room Ujian.
+ALTER TABLE exams ALTER COLUMN start_at DROP NOT NULL;
+
 -- ── Selesai ───────────────────────────────────────────────────
 -- Verifikasi: SELECT table_name FROM information_schema.tables
 --             WHERE table_schema='public' ORDER BY table_name;

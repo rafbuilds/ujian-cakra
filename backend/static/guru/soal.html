@@ -230,6 +230,13 @@
             </svg>
             Daftar Ujian
           </a>
+          <a href="bank-soal.html" class="sb-item" id="nav-bank-soal">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M4 19.5A2.5 2.5 0 016.5 17H20" stroke-linecap="round" />
+              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z" stroke-linecap="round" />
+            </svg>
+            Bank Soal
+          </a>
           <a href="rooms.html" class="sb-item" id="nav-rooms">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke-linecap="round" />
@@ -552,7 +559,7 @@
       <div style="font-size:12px;color:var(--muted);margin-top:3px;display:flex;gap:10px;flex-wrap:wrap">
         <span>📚 ${exam.subject_name || "—"}</span>
         <span>⏱ ${exam.duration_minutes} menit</span>
-        <span>📅 ${UI.fmtDT(exam.start_at)}</span>
+        <span>📅 ${exam.start_at ? UI.fmtDT(exam.start_at) : "Belum dijadwalkan (Bank Soal)"}</span>
         <span>👥 ${exam.classes?.map((c) => c.name).join(", ") || "—"}</span>
       </div>
     </div>
