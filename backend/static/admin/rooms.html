@@ -172,7 +172,7 @@
                 border-bottom: 2px solid transparent;
               "
             >
-              📋 Semua Ujian
+              📚 Bank Soal
             </button>
           </div>
           <div class="topbar-right">
@@ -279,6 +279,25 @@
               >
                 <option value="">Semua Room</option>
               </select>
+              <select
+                id="uj-grade"
+                onchange="loadAllUjian()"
+                class="form-control"
+                style="width: auto"
+              >
+                <option value="">Semua Jenjang</option>
+                <option value="10">Kelas X</option>
+                <option value="11">Kelas XI</option>
+                <option value="12">Kelas XII</option>
+              </select>
+              <select
+                id="uj-teacher"
+                onchange="loadAllUjian()"
+                class="form-control"
+                style="width: auto"
+              >
+                <option value="">Semua Guru</option>
+              </select>
               <input
                 id="uj-search"
                 type="text"
@@ -311,6 +330,7 @@
                       <th>Judul Ujian</th>
                       <th>Guru</th>
                       <th>Room</th>
+                      <th>Jenjang</th>
                       <th>Kelas</th>
                       <th>Soal</th>
                       <th>Status</th>
@@ -888,44 +908,80 @@
                 </button>`).join('')}
              </div>` : '';
 
-        renderExamsByTeacher(exams);
+        renderExamsByGrade(exams);
       }
 
-      /* Kelompokkan ujian per guru lalu render */
-      function renderExamsByTeacher(exams) {
+      const GRADE_LABEL = { 10: 'Kelas X', 11: 'Kelas XI', 12: 'Kelas XII' };
+
+      /* Kelompokkan ujian per Jenjang (X/XI/XII) lalu per Guru di dalamnya */
+      function renderExamsByGrade(exams) {
         const el = document.getElementById('dp-exams');
         if (!exams.length) {
           el.innerHTML = '<div style="font-size:13px;color:var(--muted);padding:.75rem 0">Belum ada ujian di room ini</div>';
           return;
         }
 
-        // Grup: { teacherName -> [exam, ...] }
-        const groups = {};
+        // Grup: { gradeKey -> [exam, ...] }, urut X, XI, XII, lalu tanpa jenjang
+        const gradeOrder = [10, 11, 12, null];
+        const gradeGroups = {};
         exams.forEach(e => {
-          const key = e.teacher_name || '—';
-          if (!groups[key]) groups[key] = [];
-          groups[key].push(e);
+          const key = e.grade && GRADE_LABEL[e.grade] ? e.grade : null;
+          if (!gradeGroups[key]) gradeGroups[key] = [];
+          gradeGroups[key].push(e);
         });
 
-        el.innerHTML = Object.entries(groups).map(([teacher, list]) => {
-          const live    = list.filter(e => e.status === 'ongoing').length;
-          const initial = (teacher.trim()[0] || '?').toUpperCase();
-          return `
-            <div style="margin-bottom:1rem;border:.5px solid var(--border);border-radius:12px;overflow:hidden">
-              <!-- Header guru -->
-              <div style="background:var(--light);padding:.625rem .875rem;display:flex;align-items:center;gap:10px;border-bottom:.5px solid var(--border)">
-                <div style="width:32px;height:32px;border-radius:50%;background:var(--green);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:13px;flex-shrink:0">${initial}</div>
-                <div style="flex:1;min-width:0">
-                  <div style="font-size:13px;font-weight:700">${teacher}</div>
-                  <div style="font-size:10px;color:var(--muted)">${list.length} ujian${live ? ` · <span style="color:#3b6d11;font-weight:600">🟢 ${live} live</span>` : ''}</div>
-                </div>
+        el.innerHTML = gradeOrder
+          .filter(g => gradeGroups[g] && gradeGroups[g].length)
+          .map(g => renderGradeFolder(g, gradeGroups[g]))
+          .join('');
+      }
+
+      function renderGradeFolder(grade, exams) {
+        const label = grade ? GRADE_LABEL[grade] : 'Tanpa Jenjang';
+        const live  = exams.filter(e => e.status === 'ongoing').length;
+
+        // Grup per guru di dalam jenjang ini
+        const byTeacher = {};
+        exams.forEach(e => {
+          const key = e.teacher_name || '—';
+          if (!byTeacher[key]) byTeacher[key] = [];
+          byTeacher[key].push(e);
+        });
+
+        return `
+          <div style="margin-bottom:1.25rem;border:.5px solid var(--border2);border-radius:14px;overflow:hidden">
+            <!-- Header jenjang (folder) -->
+            <div style="background:linear-gradient(135deg,#0f4c35,#1a6b4a);padding:.75rem 1rem;display:flex;align-items:center;gap:10px">
+              <div style="font-size:18px">📁</div>
+              <div style="flex:1">
+                <div style="font-size:13px;font-weight:700;color:#fff">${label}</div>
+                <div style="font-size:10px;color:rgba(255,255,255,.65)">${exams.length} ujian · ${Object.keys(byTeacher).length} guru${live ? ` · 🟢 ${live} live` : ''}</div>
               </div>
-              <!-- Daftar ujian guru ini -->
-              <div style="padding:.5rem .75rem">
-                ${list.map(e => renderOneExam(e)).join('')}
+            </div>
+            <div style="padding:.625rem .875rem">
+              ${Object.entries(byTeacher).map(([teacher, list]) => renderTeacherFolder(teacher, list)).join('')}
+            </div>
+          </div>`;
+      }
+
+      function renderTeacherFolder(teacher, list) {
+        const live    = list.filter(e => e.status === 'ongoing').length;
+        const initial = (teacher.trim()[0] || '?').toUpperCase();
+        return `
+          <div style="margin-bottom:.75rem;border:.5px solid var(--border);border-radius:12px;overflow:hidden">
+            <!-- Header guru -->
+            <div style="background:var(--light);padding:.625rem .875rem;display:flex;align-items:center;gap:10px;border-bottom:.5px solid var(--border)">
+              <div style="width:32px;height:32px;border-radius:50%;background:var(--green);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:13px;flex-shrink:0">${initial}</div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:13px;font-weight:700">${teacher}</div>
+                <div style="font-size:10px;color:var(--muted)">${list.length} ujian${live ? ` · <span style="color:#3b6d11;font-weight:600">🟢 ${live} live</span>` : ''}</div>
               </div>
-            </div>`;
-        }).join('');
+            </div>
+            <!-- Daftar ujian guru ini -->
+            <div style="padding:.5rem .75rem">
+              ${list.map(e => renderOneExam(e)).join('')}
+            </div>
+          </div>`;
       }
 
       function renderOneExam(e) {
@@ -940,6 +996,7 @@
               ${SB[e.status] || e.status}
             </div>
             <div style="display:flex;gap:4px;flex-wrap:wrap">
+              <button class="btn btn-secondary btn-sm" onclick="viewSoal('${e.id}')"     style="font-size:11px;padding:3px 8px">📄 Soal</button>
               <button class="btn btn-secondary btn-sm" onclick="viewNilai('${e.id}')"   style="font-size:11px;padding:3px 8px">📊 Nilai</button>
               <button class="btn btn-secondary btn-sm" onclick="viewMonitor('${e.id}')" style="font-size:11px;padding:3px 8px">🖥 Monitor</button>
               ${e.status === 'draft' ? `<button class="btn btn-primary btn-sm" onclick="publishExam('${e.id}')" style="font-size:11px;padding:3px 8px">✅ Publish</button>` : ''}
@@ -957,7 +1014,7 @@
         const btn = document.getElementById('ef-' + status);
         if (btn) { btn.className = 'btn btn-primary btn-sm'; btn.style.cssText = 'font-size:11px;padding:3px 9px'; }
         const filtered = status === 'all' ? window._roomExams : window._roomExams.filter(e => e.status === status);
-        renderExamsByTeacher(filtered);
+        renderExamsByGrade(filtered);
       }
 
       function closeDetail() {
@@ -1311,13 +1368,17 @@
       };
       let _examCache = [];
 
+      const GRADE_LABEL_FLAT = { 10: "Kelas X", 11: "Kelas XI", 12: "Kelas XII" };
+
       async function loadAllUjian() {
         const status = document.getElementById("uj-status").value;
         const roomF = document.getElementById("uj-room").value;
+        const gradeF = document.getElementById("uj-grade").value;
+        const teacherF = document.getElementById("uj-teacher").value;
         const q = document.getElementById("uj-search").value.toLowerCase();
         const tbody = document.getElementById("allujian-tbody");
         tbody.innerHTML =
-          '<tr><td colspan="7" style="text-align:center;padding:2rem"><div class="loading-spinner" style="margin:auto"></div></td></tr>';
+          '<tr><td colspan="8" style="text-align:center;padding:2rem"><div class="loading-spinner" style="margin:auto"></div></td></tr>';
         try {
           if (!_examCache.length) {
             _examCache = await API.get("/api/admin/exams");
@@ -1346,10 +1407,26 @@
                   (e) => `<option value="${e.room_id}">${e.room_name}</option>`,
                 )
                 .join("");
+            const teachers = [
+              ...new Map(
+                _examCache
+                  .filter((e) => e.teacher_name)
+                  .map((e) => [e.teacher_id, e]),
+              ).values(),
+            ];
+            document.getElementById("uj-teacher").innerHTML =
+              '<option value="">Semua Guru</option>' +
+              teachers
+                .map(
+                  (e) => `<option value="${e.teacher_id}">${e.teacher_name}</option>`,
+                )
+                .join("");
           }
           let exams = _examCache;
           if (status) exams = exams.filter((e) => e.status === status);
           if (roomF) exams = exams.filter((e) => e.room_id === roomF);
+          if (gradeF) exams = exams.filter((e) => String(e.grade) === gradeF);
+          if (teacherF) exams = exams.filter((e) => e.teacher_id === teacherF);
           if (q)
             exams = exams.filter(
               (e) =>
@@ -1360,7 +1437,7 @@
             exams.length + " ujian";
           if (!exams.length) {
             tbody.innerHTML =
-              '<tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--muted)">Belum ada ujian</td></tr>';
+              '<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--muted)">Belum ada ujian</td></tr>';
             return;
           }
           tbody.innerHTML = exams
@@ -1369,10 +1446,12 @@
       <td><div style="font-weight:500;font-size:13px">${e.title || ""}</div><div style="font-size:11px;color:var(--muted)">${e.start_at ? UI.fmtDT(e.start_at) : ""}</div></td>
       <td style="font-size:13px">${e.teacher_name || "—"}</td>
       <td style="font-size:12px;color:var(--muted)">${e.room_name || "—"}</td>
+      <td style="font-size:12px;color:var(--muted)">${GRADE_LABEL_FLAT[e.grade] || "—"}</td>
       <td style="font-size:12px;color:var(--muted)">${e.class_names || "—"}</td>
       <td style="text-align:center"><span style="background:var(--green4);color:var(--green);padding:2px 8px;border-radius:6px;font-size:12px;font-weight:700">${e.question_count || 0}</span></td>
       <td>${STATUS_BADGE[e.status] || e.status}</td>
       <td><div class="action-btns">
+        <button class="btn btn-secondary btn-sm" onclick="viewSoal('${e.id}')">📄 Soal</button>
         <button class="btn btn-secondary btn-sm" onclick="viewNilai('${e.id}')">📊 Nilai</button>
         ${["published", "ongoing"].includes(e.status) ? `<button class="btn btn-secondary btn-sm" onclick="viewMonitor('${e.id}')">🖥 Monitor</button>` : ""}
         ${e.status === "draft" ? `<button class="btn btn-primary btn-sm" onclick="pubUjian('${e.id}')">✅ Publish</button>` : ""}

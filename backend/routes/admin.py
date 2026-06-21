@@ -342,12 +342,13 @@ def admin_del_guru_class(guru_id, class_id):
 @require_admin
 def admin_get_exams():
     rows = query("""
-        SELECT e.*, u.name as teacher_name, s.name as subject_name,
+        SELECT e.*, u.name as teacher_name, s.name as subject_name, r.name as room_name,
                (SELECT COUNT(*) FROM questions q WHERE q.exam_id=e.id) as question_count,
                (SELECT STRING_AGG(c.name, ', ') FROM exam_classes ec JOIN classes c ON c.id=ec.class_id WHERE ec.exam_id=e.id) as class_names
         FROM exams e
         LEFT JOIN users u ON u.id=e.teacher_id
         LEFT JOIN subjects s ON s.id=e.subject_id
+        LEFT JOIN rooms r ON r.id=e.room_id
         ORDER BY e.created_at DESC
     """)
     return jsonify([dict(r) for r in rows])
