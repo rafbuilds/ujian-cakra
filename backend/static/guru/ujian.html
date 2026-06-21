@@ -620,6 +620,7 @@
           <span>👥 ${e.classes?.map((c) => c.name).join(", ") || "Belum ada kelas"}</span>
           <span>📅 ${UI.fmtDT(e.start_at)}</span>
           ${e.room_id ? `<span>📁 Room${e.grade ? " · Kelas " + { 10: "X", 11: "XI", 12: "XII" }[e.grade] : ""}</span>` : ""}
+          ${e.semester_name ? `<span>📅 ${e.semester_name}${e.academic_year_name ? " " + e.academic_year_name : ""}</span>` : ""}
         </div>
       </div>
       <div style="display:flex;align-items:center;gap:8px;flex-shrink:0" onclick="event.stopPropagation()">

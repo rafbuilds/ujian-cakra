@@ -84,6 +84,9 @@
             <select id="bs-subject" onchange="renderBankSoal()" class="form-control" style="width: auto">
               <option value="">Semua Mapel</option>
             </select>
+            <select id="bs-semester" onchange="renderBankSoal()" class="form-control" style="width: auto">
+              <option value="">Semua Semester</option>
+            </select>
             <input
               id="bs-search"
               type="text"
@@ -102,13 +105,14 @@
                     <th>Judul Soal</th>
                     <th>Guru</th>
                     <th>Mapel</th>
+                    <th>Semester</th>
                     <th>Soal</th>
                     <th>Dibuat</th>
                     <th>Aksi</th>
                   </tr>
                 </thead>
                 <tbody id="bs-tbody">
-                  <tr><td colspan="6" style="text-align:center;padding:2rem"><div class="loading-spinner" style="margin:auto"></div></td></tr>
+                  <tr><td colspan="7" style="text-align:center;padding:2rem"><div class="loading-spinner" style="margin:auto"></div></td></tr>
                 </tbody>
               </table>
             </div>
@@ -142,6 +146,17 @@
             '<option value="">Semua Mapel</option>' +
             subjects.map((s) => `<option value="${s}">${s}</option>`).join("");
 
+          const semesters = [
+            ...new Map(
+              _bankSoal
+                .filter((e) => e.semester_id)
+                .map((e) => [e.semester_id, `${e.semester_name || ""}${e.academic_year_name ? " " + e.academic_year_name : ""}`]),
+            ).entries(),
+          ];
+          document.getElementById("bs-semester").innerHTML =
+            '<option value="">Semua Semester</option>' +
+            semesters.map(([id, label]) => `<option value="${id}">${label}</option>`).join("");
+
           renderBankSoal();
         } catch (e) {
           console.error(e);
@@ -152,17 +167,19 @@
       function renderBankSoal() {
         const teacherF = document.getElementById("bs-teacher").value;
         const subjectF = document.getElementById("bs-subject").value;
+        const semesterF = document.getElementById("bs-semester").value;
         const q = document.getElementById("bs-search").value.toLowerCase();
 
         let list = _bankSoal;
         if (teacherF) list = list.filter((e) => e.teacher_id === teacherF);
         if (subjectF) list = list.filter((e) => e.subject_name === subjectF);
+        if (semesterF) list = list.filter((e) => e.semester_id === semesterF);
         if (q) list = list.filter((e) => (e.title || "").toLowerCase().includes(q));
 
         document.getElementById("bs-count").textContent = list.length + " soal";
         const tbody = document.getElementById("bs-tbody");
         if (!list.length) {
-          tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--muted)">Belum ada soal di bank soal</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--muted)">Belum ada soal di bank soal</td></tr>';
           return;
         }
         tbody.innerHTML = list
@@ -171,6 +188,7 @@
       <td style="font-weight:500;font-size:13px">${e.title || "—"}</td>
       <td style="font-size:13px">${e.teacher_name || "—"}</td>
       <td style="font-size:12px;color:var(--muted)">${e.subject_name || "—"}</td>
+      <td style="font-size:12px;color:var(--muted)">${e.semester_name ? e.semester_name + (e.academic_year_name ? " " + e.academic_year_name : "") : "—"}</td>
       <td style="text-align:center"><span style="background:var(--green4);color:var(--green);padding:2px 8px;border-radius:6px;font-size:12px;font-weight:700">${e.question_count || 0}</span></td>
       <td style="font-size:11px;color:var(--muted)">${e.created_at ? UI.fmtDT(e.created_at) : "—"}</td>
       <td><div class="action-btns">

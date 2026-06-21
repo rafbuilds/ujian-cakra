@@ -343,12 +343,15 @@ def admin_del_guru_class(guru_id, class_id):
 def admin_get_exams():
     rows = query("""
         SELECT e.*, u.name as teacher_name, s.name as subject_name, r.name as room_name,
+               sem.name as semester_name, ay.name as academic_year_name,
                (SELECT COUNT(*) FROM questions q WHERE q.exam_id=e.id) as question_count,
                (SELECT STRING_AGG(c.name, ', ') FROM exam_classes ec JOIN classes c ON c.id=ec.class_id WHERE ec.exam_id=e.id) as class_names
         FROM exams e
         LEFT JOIN users u ON u.id=e.teacher_id
         LEFT JOIN subjects s ON s.id=e.subject_id
         LEFT JOIN rooms r ON r.id=e.room_id
+        LEFT JOIN semesters sem ON sem.id=e.semester_id
+        LEFT JOIN academic_years ay ON ay.id=sem.academic_year_id
         ORDER BY e.created_at DESC
     """)
     return jsonify([dict(r) for r in rows])
@@ -493,6 +496,7 @@ def get_room_detail(room_id):
     # masih di Bank Soal (belum diterapkan, room_id NULL) tidak ikut muncul.
     exams = query("""
         SELECT e.*, u.name as teacher_name, s.name as subject_name,
+               sem.name as semester_name, ay.name as academic_year_name,
                (SELECT COUNT(*) FROM questions q WHERE q.exam_id=e.id) as question_count,
                (SELECT STRING_AGG(c.name, ', ' ORDER BY c.name)
                 FROM exam_classes ec JOIN classes c ON c.id=ec.class_id
@@ -500,6 +504,8 @@ def get_room_detail(room_id):
         FROM exams e
         JOIN users u ON u.id=e.teacher_id
         LEFT JOIN subjects s ON s.id=e.subject_id
+        LEFT JOIN semesters sem ON sem.id=e.semester_id
+        LEFT JOIN academic_years ay ON ay.id=sem.academic_year_id
         WHERE e.room_id=%s
         ORDER BY e.start_at, u.name, e.created_at DESC
     """, (room_id,))
@@ -641,12 +647,15 @@ def guru_room_exams(room_id):
     rows = query("""
         SELECT e.id, e.title, e.grade, e.status, e.teacher_id,
                s.name as subject_name, u.name as teacher_name,
+               sem.name as semester_name, ay.name as academic_year_name,
                (SELECT COUNT(*) FROM questions q WHERE q.exam_id=e.id) as question_count,
                (SELECT STRING_AGG(c.name,', ') FROM exam_classes ec
                 JOIN classes c ON c.id=ec.class_id WHERE ec.exam_id=e.id) as class_names
         FROM exams e
         LEFT JOIN subjects s ON s.id=e.subject_id
         LEFT JOIN users u ON u.id=e.teacher_id
+        LEFT JOIN semesters sem ON sem.id=e.semester_id
+        LEFT JOIN academic_years ay ON ay.id=sem.academic_year_id
         WHERE e.room_id=%s
         ORDER BY e.grade, u.name
     """, (room_id,))

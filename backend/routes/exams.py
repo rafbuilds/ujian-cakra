@@ -12,11 +12,14 @@ exams_bp = Blueprint('exams', __name__)
 def get_exams():
     rows = query("""
         SELECT e.*, s.name as subject_name,
+               sem.name as semester_name, ay.name as academic_year_name,
                (SELECT COUNT(*) FROM questions q WHERE q.exam_id=e.id) as question_count,
                (SELECT STRING_AGG(c.name,', ') FROM exam_classes ec
                 JOIN classes c ON c.id=ec.class_id WHERE ec.exam_id=e.id) as class_names
         FROM exams e
         LEFT JOIN subjects s ON s.id=e.subject_id
+        LEFT JOIN semesters sem ON sem.id=e.semester_id
+        LEFT JOIN academic_years ay ON ay.id=sem.academic_year_id
         WHERE e.teacher_id=%s
         ORDER BY e.created_at DESC
     """, (request.user_id,))
@@ -55,11 +58,16 @@ def create_exam():
         if not rm:
             return jsonify({'error': 'Anda belum join room ujian ini'}), 403
 
+    # Tandai otomatis sesuai semester yang sedang aktif (kalau ada) — frozen
+    # di waktu pembuatan, tidak ikut berubah kalau admin ganti semester aktif.
+    active_sem = query("SELECT id FROM semesters WHERE is_active=true LIMIT 1", fetch='one')
+    semester_id = active_sem['id'] if active_sem else None
+
     query("""INSERT INTO exams
              (id, teacher_id, subject_id, title, instructions, duration_minutes,
               start_at, status, randomize_questions, randomize_options,
-              show_result_after, show_key_after, score_per_correct, room_id, grade)
-             VALUES (%s,%s,%s,%s,%s,%s,%s,'draft',%s,%s,%s,%s,%s,%s,%s)""",
+              show_result_after, show_key_after, score_per_correct, room_id, grade, semester_id)
+             VALUES (%s,%s,%s,%s,%s,%s,%s,'draft',%s,%s,%s,%s,%s,%s,%s,%s)""",
           (exam_id, request.user_id,
            data.get('subject_id') or None,
            data.get('title','Ujian Baru'),
@@ -71,7 +79,7 @@ def create_exam():
            data.get('show_result_after', True),
            data.get('show_key_after', False),
            data.get('score_per_correct') or None,
-           room_id, data.get('grade') or None), fetch='none')
+           room_id, data.get('grade') or None, semester_id), fetch='none')
     # Assign classes
     for cls in (data.get('class_ids') or []):
         query("INSERT INTO exam_classes (exam_id, class_id) VALUES (%s,%s) ON CONFLICT DO NOTHING",

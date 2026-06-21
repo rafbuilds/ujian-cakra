@@ -304,6 +304,14 @@
               >
                 <option value="">Semua Guru</option>
               </select>
+              <select
+                id="uj-semester"
+                onchange="loadAllUjian()"
+                class="form-control"
+                style="width: auto"
+              >
+                <option value="">Semua Semester</option>
+              </select>
               <input
                 id="uj-search"
                 type="text"
@@ -1047,6 +1055,7 @@
                 <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${e.title || '—'}</div>
                 <div style="font-size:11px;color:var(--muted);margin-top:1px">${e.subject_name || '—'} · ${e.duration_minutes || 90} menit · ${e.question_count || 0} soal</div>
                 ${e.class_names ? `<div style="font-size:10px;color:var(--muted)">Kelas: ${e.class_names}</div>` : ''}
+                ${e.semester_name ? `<div style="font-size:10px;color:var(--muted)">📅 ${e.semester_name}${e.academic_year_name ? ' ' + e.academic_year_name : ''}</div>` : ''}
               </div>
               ${SB[e.status] || e.status}
             </div>
@@ -1437,6 +1446,7 @@
         const roomF = document.getElementById("uj-room").value;
         const gradeF = document.getElementById("uj-grade").value;
         const teacherF = document.getElementById("uj-teacher").value;
+        const semesterF = document.getElementById("uj-semester").value;
         const q = document.getElementById("uj-search").value.toLowerCase();
         const tbody = document.getElementById("allujian-tbody");
         tbody.innerHTML =
@@ -1484,6 +1494,21 @@
                   (e) => `<option value="${e.teacher_id}">${e.teacher_name}</option>`,
                 )
                 .join("");
+            const semesters = [
+              ...new Map(
+                _examCache
+                  .filter((e) => e.semester_id)
+                  .map((e) => [
+                    e.semester_id,
+                    `${e.semester_name || ""}${e.academic_year_name ? " " + e.academic_year_name : ""}`,
+                  ]),
+              ).entries(),
+            ];
+            document.getElementById("uj-semester").innerHTML =
+              '<option value="">Semua Semester</option>' +
+              semesters
+                .map(([id, label]) => `<option value="${id}">${label}</option>`)
+                .join("");
           }
           // Hanya tampilkan ujian yang sudah dijadwalkan (punya start_at) —
           // soal yang masih di Bank Soal (belum diterapkan) tidak ikut di sini.
@@ -1492,6 +1517,7 @@
           if (roomF) exams = exams.filter((e) => e.room_id === roomF);
           if (gradeF) exams = exams.filter((e) => String(e.grade) === gradeF);
           if (teacherF) exams = exams.filter((e) => e.teacher_id === teacherF);
+          if (semesterF) exams = exams.filter((e) => e.semester_id === semesterF);
           if (q)
             exams = exams.filter(
               (e) =>
@@ -1508,7 +1534,7 @@
           tbody.innerHTML = exams
             .map(
               (e) => `<tr>
-      <td><div style="font-weight:500;font-size:13px">${e.title || ""}</div><div style="font-size:11px;color:var(--muted)">${e.start_at ? UI.fmtDT(e.start_at) : ""}</div></td>
+      <td><div style="font-weight:500;font-size:13px">${e.title || ""}</div><div style="font-size:11px;color:var(--muted)">${e.start_at ? UI.fmtDT(e.start_at) : ""}${e.semester_name ? " · 📅 " + e.semester_name + (e.academic_year_name ? " " + e.academic_year_name : "") : ""}</div></td>
       <td style="font-size:13px">${e.teacher_name || "—"}</td>
       <td style="font-size:12px;color:var(--muted)">${e.room_name || "—"}</td>
       <td style="font-size:12px;color:var(--muted)">${GRADE_LABEL_FLAT[e.grade] || "—"}</td>

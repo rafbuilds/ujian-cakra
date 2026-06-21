@@ -298,6 +298,7 @@
           <div style="font-size:12px;color:var(--muted);display:flex;gap:10px;flex-wrap:wrap">
             <span>📚 ${e.subject_name || "—"}</span>
             <span>📝 ${e.question_count || 0} soal</span>
+            ${e.semester_name ? `<span>📅 ${e.semester_name}${e.academic_year_name ? " " + e.academic_year_name : ""}</span>` : ""}
           </div>
         </div>
         <div style="display:flex;gap:8px;flex-shrink:0">

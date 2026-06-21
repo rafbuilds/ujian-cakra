@@ -223,6 +223,12 @@ CREATE INDEX IF NOT EXISTS idx_exam_proctors_teacher ON exam_proctors(teacher_id
 -- otomatis pindah tampil di Daftar Ujian / Room Ujian.
 ALTER TABLE exams ALTER COLUMN start_at DROP NOT NULL;
 
+-- ── 22. Ujian otomatis ditandai semester aktif ───────────────────
+-- Saat dibuat, ujian/soal otomatis disangkutkan ke semester yang admin
+-- tandai aktif (tabel semesters.is_active) — frozen di waktu pembuatan,
+-- tidak ikut berubah kalau admin ganti semester aktif belakangan.
+ALTER TABLE exams ADD COLUMN IF NOT EXISTS semester_id UUID REFERENCES semesters(id) ON DELETE SET NULL;
+
 -- ── Selesai ───────────────────────────────────────────────────
 -- Verifikasi: SELECT table_name FROM information_schema.tables
 --             WHERE table_schema='public' ORDER BY table_name;
