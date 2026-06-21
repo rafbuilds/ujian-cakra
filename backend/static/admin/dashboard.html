@@ -550,20 +550,24 @@
                   <div style="border:.5px solid var(--border);border-radius:8px;padding:.625rem .875rem;margin-bottom:.5rem">
                     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
                       <span style="font-weight:700;font-size:13px">${y.name}</span>
-                      ${y.is_active ? '<span class="badge badge-green">Aktif</span>' : ''}
+                      ${y.is_active ? '<span class="badge badge-green">Aktif</span>' : '<span class="badge" style="background:var(--light);color:var(--muted)">Selesai</span>'}
                       <span style="font-size:11px;color:var(--muted)">${fmtDate(y.start_date)} – ${fmtDate(y.end_date)}</span>
                       <div style="margin-left:auto;display:flex;gap:4px">
-                        ${!y.is_active ? `<button class="btn btn-primary btn-sm" onclick="setActiveYear('${y.id}')">Aktifkan</button>` : ''}
+                        ${!y.is_active ? `<button class="btn btn-primary btn-sm" onclick="setActiveYear('${y.id}')">Aktifkan</button>` : `<button class="btn btn-secondary btn-sm" onclick="finishYear('${y.id}')">✓ Selesai</button>`}
                         <button class="btn btn-danger btn-sm" onclick="deleteYear('${y.id}','${y.name}')">Hapus</button>
                       </div>
+                    </div>
+                    <div style="font-size:11px;color:var(--muted);margin-top:4px">
+                      🏠 ${y.room_count || 0} room · 📋 ${y.exam_count || 0} ujian${y.avg_score ? ` · 📊 rata-rata nilai ${y.avg_score}` : ''}
                     </div>
                     <div style="margin-top:.5rem;display:flex;gap:6px;flex-wrap:wrap">
                       ${ySems.map(s => `
                         <div style="background:var(--light);border-radius:6px;padding:3px 8px;font-size:11px;display:flex;align-items:center;gap:5px">
-                          ${s.is_active ? '<span class="badge badge-green" style="padding:1px 5px;font-size:9px">Aktif</span>' : ''}
+                          ${s.is_active ? '<span class="badge badge-green" style="padding:1px 5px;font-size:9px">Aktif</span>' : '<span class="badge" style="padding:1px 5px;font-size:9px;background:var(--border);color:var(--muted)">Selesai</span>'}
                           <span>${s.name}</span>
                           <span style="color:var(--muted)">${fmtDate(s.start_date)}–${fmtDate(s.end_date)}</span>
-                          ${!s.is_active ? `<button style="background:none;border:none;color:var(--green);cursor:pointer;font-size:10px;padding:0" onclick="setActiveSem('${s.id}')">Aktifkan</button>` : ''}
+                          <span style="color:var(--muted)">· ${s.exam_count || 0} ujian${s.avg_score ? ` · rata ${s.avg_score}` : ''}</span>
+                          ${!s.is_active ? `<button style="background:none;border:none;color:var(--green);cursor:pointer;font-size:10px;padding:0" onclick="setActiveSem('${s.id}')">Aktifkan</button>` : `<button style="background:none;border:none;color:var(--green);cursor:pointer;font-size:10px;padding:0;font-weight:600" onclick="finishSem('${s.id}')">✓ Selesai</button>`}
                           <button style="background:none;border:none;color:#ef4444;cursor:pointer;font-size:11px;padding:0;line-height:1" onclick="deleteSem('${s.id}')">✗</button>
                         </div>`).join('')}
                       ${!ySems.length ? '<span style="font-size:11px;color:var(--muted)">Belum ada semester</span>' : ''}
@@ -623,6 +627,20 @@
         await API.patch('/api/admin/academic-years/' + id, {is_active: true});
         UI.toast('Tahun ajaran diaktifkan','success');
         loadYears(); loadPeriod();
+      }
+      async function finishYear(id) {
+        UI.confirm('Selesaikan Tahun Ajaran', 'Tahun ajaran ini akan ditandai selesai. Room/ujian yang sudah dibuat tetap tersimpan sebagai histori.', async () => {
+          await API.patch('/api/admin/academic-years/' + id, {is_active: false});
+          UI.toast('Tahun ajaran ditandai selesai','success');
+          loadYears(); loadPeriod();
+        });
+      }
+      async function finishSem(id) {
+        UI.confirm('Selesaikan Semester', 'Semester ini akan ditandai selesai. Room/ujian yang sudah dibuat tetap tersimpan sebagai histori.', async () => {
+          await API.patch('/api/admin/semesters/' + id, {is_active: false});
+          UI.toast('Semester ditandai selesai','success');
+          loadYears(); loadPeriod();
+        });
       }
       async function deleteYear(id, name) {
         UI.confirm('Hapus Tahun Ajaran', `Hapus "${name}"? Semua semesternya ikut terhapus.`, async () => {

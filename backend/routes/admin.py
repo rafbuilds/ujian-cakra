@@ -1203,7 +1203,14 @@ def list_academic_years():
         rows = query("""
             SELECT ay.*,
                    COUNT(s.id) as semester_count,
-                   COUNT(s.id) FILTER (WHERE s.is_active) as active_semesters
+                   COUNT(s.id) FILTER (WHERE s.is_active) as active_semesters,
+                   (SELECT COUNT(*) FROM rooms r WHERE r.semester_id IN
+                       (SELECT id FROM semesters WHERE academic_year_id=ay.id)) as room_count,
+                   (SELECT COUNT(*) FROM exams e WHERE e.semester_id IN
+                       (SELECT id FROM semesters WHERE academic_year_id=ay.id)) as exam_count,
+                   (SELECT ROUND(AVG(res.score)::numeric, 1) FROM results res
+                    JOIN exams e2 ON e2.id=res.exam_id
+                    WHERE e2.semester_id IN (SELECT id FROM semesters WHERE academic_year_id=ay.id)) as avg_score
             FROM academic_years ay
             LEFT JOIN semesters s ON s.academic_year_id = ay.id
             GROUP BY ay.id ORDER BY ay.name DESC
@@ -1257,16 +1264,21 @@ def delete_academic_year(year_id):
 @require_admin
 def list_semesters():
     year_id = request.args.get('year_id', '')
+    stats_select = """,
+                   (SELECT COUNT(*) FROM rooms r WHERE r.semester_id=s.id) as room_count,
+                   (SELECT COUNT(*) FROM exams e WHERE e.semester_id=s.id) as exam_count,
+                   (SELECT ROUND(AVG(res.score)::numeric, 1) FROM results res
+                    JOIN exams e2 ON e2.id=res.exam_id WHERE e2.semester_id=s.id) as avg_score"""
     try:
         if year_id:
-            rows = query("""
-                SELECT s.*, ay.name as year_name FROM semesters s
+            rows = query(f"""
+                SELECT s.*, ay.name as year_name{stats_select} FROM semesters s
                 JOIN academic_years ay ON ay.id = s.academic_year_id
                 WHERE s.academic_year_id=%s ORDER BY s.start_date
             """, (year_id,))
         else:
-            rows = query("""
-                SELECT s.*, ay.name as year_name FROM semesters s
+            rows = query(f"""
+                SELECT s.*, ay.name as year_name{stats_select} FROM semesters s
                 JOIN academic_years ay ON ay.id = s.academic_year_id
                 ORDER BY ay.name DESC, s.start_date
             """)
