@@ -148,6 +148,27 @@ def delete_exam(exam_id):
     return jsonify({'ok': True})
 
 # ── Questions ──────────────────────────────────────────────────
+@exams_bp.route('/api/questions/check-similar', methods=['POST'])
+@require_guru
+def check_similar_questions():
+    """Ingatkan guru kalau pernah membuat soal dengan isi mirip (di soal
+    miliknya sendiri saja — guru tidak boleh lihat isi soal guru lain)."""
+    content = (request.json or {}).get('content', '').strip()
+    if len(content) < 10:
+        return jsonify([])
+    try:
+        rows = query("""
+            SELECT q.id as question_id, q.content, q.exam_id, e.title as exam_title,
+                   similarity(q.content, %s) as score
+            FROM questions q
+            JOIN exams e ON e.id = q.exam_id
+            WHERE e.teacher_id = %s AND similarity(q.content, %s) > 0.35
+            ORDER BY score DESC LIMIT 5
+        """, (content, request.user_id, content))
+        return jsonify([dict(r) for r in rows])
+    except Exception:
+        return jsonify([])
+
 @exams_bp.route('/api/exams/<exam_id>/questions', methods=['POST'])
 @require_guru
 def add_question(exam_id):

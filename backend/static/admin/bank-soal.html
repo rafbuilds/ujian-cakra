@@ -77,6 +77,24 @@
             </div>
           </div>
 
+          <div class="card" style="margin-bottom: 0.875rem; padding: 1rem 1.25rem">
+            <div style="font-weight: 600; font-size: 14px; margin-bottom: 0.625rem">🔍 Cek Soal Serupa</div>
+            <div style="font-size: 12px; color: var(--muted); margin-bottom: 0.75rem">
+              Tempel/ketik isi soal untuk mengecek apakah guru lain pernah membuat soal dengan isi yang mirip (lintas semua guru).
+            </div>
+            <div style="display: flex; gap: 8px">
+              <textarea
+                id="cek-similar-input"
+                class="form-control"
+                rows="2"
+                placeholder="Ketik atau tempel isi soal di sini..."
+                style="flex: 1"
+              ></textarea>
+              <button class="btn btn-primary btn-sm" style="align-self: flex-start" onclick="cekSoalSerupa()">Cek</button>
+            </div>
+            <div id="cek-similar-result" style="display: none; margin-top: 0.75rem"></div>
+          </div>
+
           <div style="display: flex; gap: 8px; margin-bottom: 0.875rem; flex-wrap: wrap">
             <select id="bs-teacher" onchange="renderBankSoal()" class="form-control" style="width: auto">
               <option value="">Semua Guru</option>
@@ -202,6 +220,37 @@
 
       function viewSoal(id) {
         window.open("admin_soal.html?id=" + id, "_blank");
+      }
+
+      async function cekSoalSerupa() {
+        const text = document.getElementById("cek-similar-input").value.trim();
+        const box = document.getElementById("cek-similar-result");
+        if (text.length < 10) {
+          UI.toast("Ketik minimal 10 karakter", "warn");
+          return;
+        }
+        box.style.display = "block";
+        box.innerHTML = '<div style="font-size:12px;color:var(--muted)">Mencari...</div>';
+        try {
+          const matches = await API.post("/api/admin/questions/check-similar", { content: text });
+          if (!matches.length) {
+            box.innerHTML = '<div style="font-size:12px;color:var(--muted)">Tidak ditemukan soal yang mirip.</div>';
+            return;
+          }
+          box.innerHTML = matches
+            .map(
+              (m) => `
+        <div style="padding:.5rem 0;border-bottom:.5px solid var(--border);font-size:12px">
+          <span style="font-weight:600;color:var(--green)">${Math.round(m.score * 100)}% mirip</span>
+          · ${m.teacher_name || "—"} ·
+          <a href="admin_soal.html?id=${m.exam_id}" target="_blank">${m.exam_title}</a>
+          <div style="color:var(--muted);margin-top:2px">"${m.content.slice(0, 120)}${m.content.length > 120 ? "..." : ""}"</div>
+        </div>`,
+            )
+            .join("");
+        } catch {
+          box.innerHTML = '<div style="font-size:12px;color:var(--muted)">Gagal mengecek soal serupa.</div>';
+        }
       }
 
       async function hapusSoal(id, title) {

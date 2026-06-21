@@ -238,6 +238,13 @@ ALTER TABLE exams ADD COLUMN IF NOT EXISTS semester_id UUID REFERENCES semesters
 -- mengaktifkan semester yang berbeda.
 ALTER TABLE rooms ADD COLUMN IF NOT EXISTS semester_id UUID REFERENCES semesters(id) ON DELETE SET NULL;
 
+-- ── 24. Deteksi Soal Serupa ───────────────────────────────────────
+-- pg_trgm untuk fuzzy text similarity (sudah tersedia bawaan di Supabase).
+-- Dipakai untuk mengingatkan guru/admin kalau pernah membuat soal dengan
+-- isi yang mirip, supaya tidak dobel bikin soal yang sama.
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE INDEX IF NOT EXISTS idx_questions_content_trgm ON questions USING gin (content gin_trgm_ops);
+
 -- ── Selesai ───────────────────────────────────────────────────
 -- Verifikasi: SELECT table_name FROM information_schema.tables
 --             WHERE table_schema='public' ORDER BY table_name;

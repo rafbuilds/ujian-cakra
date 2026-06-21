@@ -338,6 +338,28 @@ def admin_del_guru_class(guru_id, class_id):
     return jsonify({'ok': True})
 
 # ── Exams (admin view) ─────────────────────────────────────────
+@admin_bp.route('/api/admin/questions/check-similar', methods=['POST'])
+@require_admin
+def admin_check_similar_questions():
+    """Admin bisa cek soal serupa lintas semua guru (admin sudah punya akses
+    penuh ke semua soal)."""
+    content = (request.json or {}).get('content', '').strip()
+    if len(content) < 10:
+        return jsonify([])
+    try:
+        rows = query("""
+            SELECT q.id as question_id, q.content, q.exam_id, e.title as exam_title,
+                   u.name as teacher_name, similarity(q.content, %s) as score
+            FROM questions q
+            JOIN exams e ON e.id = q.exam_id
+            JOIN users u ON u.id = e.teacher_id
+            WHERE similarity(q.content, %s) > 0.3
+            ORDER BY score DESC LIMIT 10
+        """, (content, content))
+        return jsonify([dict(r) for r in rows])
+    except Exception:
+        return jsonify([])
+
 @admin_bp.route('/api/admin/exams', methods=['GET'])
 @require_admin
 def admin_get_exams():
