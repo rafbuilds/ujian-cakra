@@ -24,7 +24,7 @@ app.register_blueprint(siswa_bp)
 app.register_blueprint(exams_bp)
 
 # ── Auth Routes ────────────────────────────────────────────────
-from auth import require_auth, require_admin, create_token
+from auth import require_auth, require_admin, require_guru, create_token
 from werkzeug.security import generate_password_hash, check_password_hash
 
 FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:8080')
