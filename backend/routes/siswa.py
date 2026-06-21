@@ -1,6 +1,6 @@
 # backend/routes/siswa.py
 from flask import Blueprint, request, jsonify
-import uuid
+import uuid, random
 from datetime import datetime, timezone, timedelta
 from db import query, count_correct_wrong
 from auth import require_auth
@@ -97,10 +97,29 @@ def start_exam(exam_id):
         WHERE q.exam_id=%s {order_clause}
     """, (exam_id,))
 
+    # Jawaban esai & multi-jawaban yang sudah tersimpan — supaya bisa
+    # direstore di frontend kalau siswa reload/buka ulang halaman ujian.
+    saved_essays = query("SELECT question_id, essay_text FROM essay_answers WHERE session_id=%s", (session_id,))
+    essay_map = {str(r['question_id']): r['essay_text'] for r in saved_essays}
+    saved_multi = query("SELECT question_id, option_id FROM multi_answers WHERE session_id=%s", (session_id,))
+    multi_map = {}
+    for r in saved_multi:
+        multi_map.setdefault(str(r['question_id']), []).append(str(r['option_id']))
+
+    # Ambil semua opsi sekaligus (satu query, bukan per-soal) lalu kelompokkan.
+    all_opts = query("""SELECT o.id, o.label, o.content, o.question_id FROM options o
+                        JOIN questions q ON q.id=o.question_id WHERE q.exam_id=%s ORDER BY o.label""",
+                     (exam_id,))
+    opts_by_question = {}
+    for o in all_opts:
+        opts_by_question.setdefault(str(o['question_id']), []).append(dict(o))
+    if randomize_o:
+        for opts in opts_by_question.values():
+            random.shuffle(opts)
+
     result_questions = []
     for q in questions:
-        opt_order = "ORDER BY RANDOM()" if randomize_o else "ORDER BY o.label"
-        options = query(f"SELECT id, label, content FROM options o WHERE o.question_id=%s {opt_order}", (q['id'],))
+        options = opts_by_question.get(str(q['id']), [])
         q_dict = dict(q)
         opt_count     = q_dict.pop('opt_count', 0) or 0
         correct_count = q_dict.pop('correct_count', 0) or 0
@@ -116,7 +135,9 @@ def start_exam(exam_id):
                 q_dict['type'] = 'multiple_choice'
         if q_dict['type'] == 'multiple_answer' and not q_dict.get('max_choices'):
             q_dict['max_choices'] = correct_count or 1
-        result_questions.append({**q_dict, 'options': [dict(o) for o in options]})
+        q_dict['essay_text'] = essay_map.get(str(q['id']))
+        q_dict['saved_option_ids'] = multi_map.get(str(q['id']), [])
+        result_questions.append({**q_dict, 'options': options})
 
     # Ambil jawaban tersimpan
     saved = query("""SELECT question_id, option_id FROM answers WHERE session_id=%s""", (session_id,))

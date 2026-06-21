@@ -812,7 +812,7 @@
       <div class="exam-meta">
         <span>📚 ${e.subject_name || "—"}</span>
         <span>⏱ ${e.duration_minutes} menit</span>
-        <span>📅 ${new Date(e.start_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}</span>
+        <span>📅 ${e.start_at ? new Date(e.start_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : "—"}</span>
       </div>
     </div>
     <div style="text-align:right">

@@ -154,9 +154,14 @@ def _ext(filename):
     return filename.rsplit('.', 1)[-1].lower() if '.' in filename else ''
 
 @app.route('/api/exams/<exam_id>/upload-media', methods=['POST'])
-@require_auth
+@require_guru
 def upload_media(exam_id):
     from db import query as dbq
+    owner = dbq("SELECT teacher_id FROM exams WHERE id=%s", (exam_id,), fetch='one')
+    if not owner:
+        return jsonify({'error': 'Ujian tidak ditemukan'}), 404
+    if request.user_role != 'admin' and str(owner['teacher_id']) != request.user_id:
+        return jsonify({'error': 'Akses ditolak'}), 403
     file = request.files.get('file')
     ftype = request.form.get('type', 'attachment')  # 'attachment' | 'audio'
     if not file or not file.filename:

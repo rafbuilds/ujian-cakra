@@ -99,10 +99,12 @@ def get_exam(exam_id):
     if request.user_role != 'admin' and str(exam['teacher_id']) != request.user_id:
         return jsonify({'error': 'Akses ditolak'}), 403
     questions = query("SELECT * FROM questions WHERE exam_id=%s ORDER BY order_num", (exam_id,))
-    q_list = []
-    for q in questions:
-        opts = query("SELECT * FROM options WHERE question_id=%s ORDER BY label", (q['id'],))
-        q_list.append({**dict(q), 'options': [dict(o) for o in opts]})
+    all_opts = query("""SELECT o.* FROM options o JOIN questions q ON q.id=o.question_id
+                        WHERE q.exam_id=%s ORDER BY o.label""", (exam_id,))
+    opts_by_question = {}
+    for o in all_opts:
+        opts_by_question.setdefault(str(o['question_id']), []).append(dict(o))
+    q_list = [{**dict(q), 'options': opts_by_question.get(str(q['id']), [])} for q in questions]
     classes = query("""SELECT c.* FROM classes c JOIN exam_classes ec ON ec.class_id=c.id
                        WHERE ec.exam_id=%s ORDER BY c.name""", (exam_id,))
     return jsonify({**dict(exam), 'questions': q_list, 'classes': [dict(c) for c in classes]})
@@ -383,10 +385,25 @@ def monitor_exam(exam_id):
                         LEFT JOIN classes c ON c.id=u.class_id
                         WHERE es.exam_id=%s ORDER BY u.name""", (exam_id,))
     total_q = query("SELECT COUNT(*) as n FROM questions WHERE exam_id=%s", (exam_id,), fetch='one')['n']
+    answered_map = {}
+    if sessions:
+        session_ids = [str(s['id']) for s in sessions]
+        # Gabungkan jawaban single-choice, esai, dan multi-jawaban — supaya
+        # progress siswa yang menjawab soal esai/multi tidak terhitung 0.
+        answered_rows = query("""
+            SELECT session_id, COUNT(DISTINCT question_id) as n FROM (
+                SELECT session_id, question_id FROM answers WHERE session_id=ANY(%s::uuid[]) AND option_id IS NOT NULL
+                UNION ALL
+                SELECT session_id, question_id FROM essay_answers WHERE session_id=ANY(%s::uuid[])
+                UNION ALL
+                SELECT session_id, question_id FROM multi_answers WHERE session_id=ANY(%s::uuid[])
+            ) ans
+            GROUP BY session_id
+        """, (session_ids, session_ids, session_ids))
+        answered_map = {str(r['session_id']): r['n'] for r in answered_rows}
     students = []
     for s in sessions:
-        answered = query("SELECT COUNT(*) as n FROM answers WHERE session_id=%s AND option_id IS NOT NULL",
-                         (s['id'],), fetch='one')['n']
+        answered = answered_map.get(str(s['id']), 0)
         students.append({
             'session_id': str(s['id']),
             'student_id': str(s['student_id']),
