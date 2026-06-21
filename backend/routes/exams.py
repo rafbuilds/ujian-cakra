@@ -7,29 +7,48 @@ from auth import require_guru, require_auth, require_admin
 exams_bp = Blueprint('exams', __name__)
 
 # ── CRUD Ujian ─────────────────────────────────────────────────
+def _active_semester_id():
+    """Semester yang sedang aktif (tahun ajaran aktif + semester aktif). None kalau tidak ada."""
+    row = query("""
+        SELECT s.id FROM semesters s
+        JOIN academic_years ay ON ay.id = s.academic_year_id
+        WHERE s.is_active=true AND ay.is_active=true LIMIT 1
+    """, fetch='one')
+    return row['id'] if row else None
+
 @exams_bp.route('/api/exams', methods=['GET'])
 @require_guru
 def get_exams():
-    rows = query("""
+    active_only = request.args.get('active_only') == '1'
+    params = [request.user_id]
+    extra_where = ""
+    if active_only:
+        active_id = _active_semester_id()
+        extra_where = " AND (e.semester_id=%s OR e.semester_id IS NULL)"
+        params.append(active_id)
+    rows = query(f"""
         SELECT e.*, s.name as subject_name,
-               sem.name as semester_name, ay.name as academic_year_name,
-               (SELECT COUNT(*) FROM questions q WHERE q.exam_id=e.id) as question_count,
+               sem.name as semester_name, ay.name as academic_year_name
+               , (SELECT COUNT(*) FROM questions q WHERE q.exam_id=e.id) as question_count,
                (SELECT STRING_AGG(c.name,', ') FROM exam_classes ec
                 JOIN classes c ON c.id=ec.class_id WHERE ec.exam_id=e.id) as class_names
         FROM exams e
         LEFT JOIN subjects s ON s.id=e.subject_id
         LEFT JOIN semesters sem ON sem.id=e.semester_id
         LEFT JOIN academic_years ay ON ay.id=sem.academic_year_id
-        WHERE e.teacher_id=%s
+        WHERE e.teacher_id=%s{extra_where}
         ORDER BY e.created_at DESC
-    """, (request.user_id,))
+    """, tuple(params))
     return jsonify([dict(r) for r in rows])
 
 @exams_bp.route('/api/exams/all-for-proctor', methods=['GET'])
 @require_guru
 def get_exams_for_proctor():
-    """Semua ujian dari semua guru — untuk dropdown Pengawas Live universal.
+    """Semua ujian dari semua guru pada periode (tahun ajaran/semester) yang sedang aktif saja —
+    untuk dropdown Pengawas Live universal. Ujian dari semester yang sudah 'Selesai' tidak tampil
+    di sini lagi (tetap jadi jejak/record, hanya tidak aktif untuk pengawasan live).
     Hanya metadata, TIDAK termasuk soal/kunci jawaban."""
+    active_id = _active_semester_id()
     rows = query("""
         SELECT e.id, e.title, e.status, e.start_at, e.teacher_id,
                s.name as subject_name, u.name as teacher_name,
@@ -39,8 +58,9 @@ def get_exams_for_proctor():
         LEFT JOIN subjects s ON s.id=e.subject_id
         LEFT JOIN users u ON u.id=e.teacher_id
         WHERE e.status IN ('published','ongoing','finished')
+          AND (e.semester_id=%s OR e.semester_id IS NULL)
         ORDER BY e.start_at DESC
-    """, ())
+    """, (active_id,))
     return jsonify([dict(r) for r in rows])
 
 @exams_bp.route('/api/exams', methods=['POST'])

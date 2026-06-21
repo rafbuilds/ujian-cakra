@@ -219,3 +219,30 @@ def template_siswa():
 def allow_exit(session_id):
     query("UPDATE exam_sessions SET exit_allowed=true WHERE id=%s", (session_id,), fetch='none')
     return jsonify({'ok': True})
+# ── Tahun Ajaran / Semester (read-only, untuk navigasi Room Ujian) ──
+@guru_bp.route('/api/guru/academic-years', methods=['GET'])
+@require_guru
+def guru_list_academic_years():
+    rows = query("SELECT id, name, is_active FROM academic_years ORDER BY name DESC")
+    return jsonify([dict(r) for r in rows])
+
+@guru_bp.route('/api/guru/semesters', methods=['GET'])
+@require_guru
+def guru_list_semesters():
+    year_id = request.args.get('academic_year_id')
+    if year_id:
+        rows = query("SELECT id, name, is_active, academic_year_id FROM semesters WHERE academic_year_id=%s ORDER BY name",
+                     (year_id,))
+    else:
+        rows = query("SELECT id, name, is_active, academic_year_id FROM semesters ORDER BY name")
+    return jsonify([dict(r) for r in rows])
+
+@guru_bp.route('/api/guru/active-period', methods=['GET'])
+@require_guru
+def guru_active_period():
+    year = query("SELECT id, name FROM academic_years WHERE is_active=true LIMIT 1", fetch='one')
+    sem  = query("SELECT id, name, academic_year_id FROM semesters WHERE is_active=true LIMIT 1", fetch='one')
+    return jsonify({
+        'academic_year': dict(year) if year else None,
+        'semester': dict(sem) if sem else None,
+    })

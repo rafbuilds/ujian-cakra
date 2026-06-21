@@ -123,6 +123,17 @@
             </div>
           </div>
 
+          <div class="card" style="padding: 0.875rem 1.25rem; margin-bottom: 1rem; display: flex; gap: .75rem; flex-wrap: wrap; align-items: end">
+            <div>
+              <label style="font-size: 11px; color: var(--muted); display: block; margin-bottom: 4px">Tahun Ajaran</label>
+              <select id="f-year" class="form-control" style="min-width: 160px"></select>
+            </div>
+            <div>
+              <label style="font-size: 11px; color: var(--muted); display: block; margin-bottom: 4px">Semester</label>
+              <select id="f-semester" class="form-control" style="min-width: 160px"></select>
+            </div>
+          </div>
+
           <div class="card" style="padding: 0; overflow: hidden">
             <div style="padding: 0.875rem 1.25rem; border-bottom: 0.5px solid var(--border); font-weight: 600; font-size: 14px">
               Room yang Tersedia
@@ -143,10 +154,48 @@
       if (!Auth.requireRole(["guru", "admin"])) throw new Error();
       UI.initSidebar();
 
+      let allYears = [];
+      let allSemesters = [];
+
+      async function loadYearSemesterFilter() {
+        try {
+          const [years, active] = await Promise.all([
+            API.get("/api/guru/academic-years"),
+            API.get("/api/guru/active-period").catch(() => ({})),
+          ]);
+          allYears = years || [];
+          const ySel = document.getElementById("f-year");
+          ySel.innerHTML = allYears
+            .map((y) => `<option value="${y.id}">${y.name}${y.is_active ? " (aktif)" : ""}</option>`)
+            .join("");
+          const defaultYearId = active?.academic_year?.id || allYears[0]?.id || "";
+          if (defaultYearId) ySel.value = defaultYearId;
+          await loadSemesterOptions(active?.semester?.id);
+          ySel.onchange = () => loadSemesterOptions();
+          document.getElementById("f-semester").onchange = load;
+        } catch {}
+      }
+
+      async function loadSemesterOptions(defaultSemId) {
+        const yearId = document.getElementById("f-year").value;
+        if (!yearId) { document.getElementById("f-semester").innerHTML = ""; load(); return; }
+        try {
+          const sems = await API.get(`/api/guru/semesters?academic_year_id=${yearId}`);
+          allSemesters = sems || [];
+          const sSel = document.getElementById("f-semester");
+          sSel.innerHTML =
+            '<option value="">— Semua semester —</option>' +
+            allSemesters.map((s) => `<option value="${s.id}">${s.name}${s.is_active ? " (aktif)" : ""}</option>`).join("");
+          if (defaultSemId) sSel.value = defaultSemId;
+          load();
+        } catch {}
+      }
+
       async function load() {
         const el = document.getElementById("room-list");
+        const semId = document.getElementById("f-semester")?.value || "";
         try {
-          const rooms = await API.get("/api/guru/rooms/all");
+          const rooms = await API.get(`/api/guru/rooms/all${semId ? `?semester_id=${semId}` : ""}`);
           if (!rooms.length) {
             el.innerHTML =
               '<div class="empty-state" style="padding:3rem"><div class="empty-icon">🏠</div><div class="empty-text">Belum ada room ujian dari admin</div></div>';
@@ -255,7 +304,7 @@
         });
       }
 
-      load();
+      loadYearSemesterFilter();
     </script>
   </body>
 </html>

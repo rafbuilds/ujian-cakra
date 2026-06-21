@@ -569,9 +569,11 @@
         const search =
           document.getElementById("search-exam")?.value.toLowerCase() || "";
         try {
-          const res = await API.get("/api/exams");
+          const res = await API.get("/api/exams?active_only=1");
           const exams = Array.isArray(res) ? res : res.exams || res.data || [];
-          // Soal yang belum dijadwalkan (start_at masih kosong) ada di menu Bank Soal
+          // Soal yang belum dijadwalkan (start_at masih kosong) ada di menu Bank Soal.
+          // Ujian dari semester yang sudah "Selesai" juga tidak tampil di sini lagi —
+          // lihat menu Nilai & Rekap untuk histori semester yang sudah lewat.
           allExams = exams.filter((e) => e.start_at);
           let filtered = allExams;
           if (status) filtered = filtered.filter((e) => e.status === status);

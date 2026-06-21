@@ -584,7 +584,10 @@ def remove_room_class(room_id, class_id):
 @admin_bp.route('/api/guru/rooms', methods=['GET'])
 @require_guru
 def get_guru_rooms():
-    rows = query("""
+    sem_id = request.args.get('semester_id')
+    extra = " AND r.semester_id=%s" if sem_id else ""
+    params = [request.user_id, request.user_id] + ([sem_id] if sem_id else [])
+    rows = query(f"""
         SELECT r.*, sem.name as semester_name, ay.name as academic_year_name,
                COUNT(DISTINCT rc.class_id) as class_count,
                COUNT(DISTINCT e.id) as exam_count
@@ -594,16 +597,21 @@ def get_guru_rooms():
         LEFT JOIN exams e ON e.room_id=r.id AND e.teacher_id=%s
         LEFT JOIN semesters sem ON sem.id=r.semester_id
         LEFT JOIN academic_years ay ON ay.id=sem.academic_year_id
-        WHERE r.is_active=true
+        WHERE r.is_active=true{extra}
         GROUP BY r.id, sem.name, ay.name ORDER BY r.created_at DESC
-    """, (request.user_id, request.user_id))
+    """, tuple(params))
     return jsonify([dict(r) for r in rows])
 
 @admin_bp.route('/api/guru/rooms/all', methods=['GET'])
 @require_guru
 def get_all_rooms_for_guru():
-    """Semua rooms aktif + flag is_member untuk guru yang login."""
-    rows = query("""
+    """Semua rooms aktif + flag is_member untuk guru yang login.
+    Filter opsional ?semester_id= agar room dari semester lama tidak tercampur
+    dengan room semester yang sedang berjalan."""
+    sem_id = request.args.get('semester_id')
+    extra = " AND r.semester_id=%s" if sem_id else ""
+    params = [request.user_id] + ([sem_id] if sem_id else [])
+    rows = query(f"""
         SELECT r.*,
                u.name as created_by_name,
                sem.name as semester_name, ay.name as academic_year_name,
@@ -617,10 +625,10 @@ def get_all_rooms_for_guru():
         LEFT JOIN exams e ON e.room_id=r.id
         LEFT JOIN semesters sem ON sem.id=r.semester_id
         LEFT JOIN academic_years ay ON ay.id=sem.academic_year_id
-        WHERE r.is_active=true
+        WHERE r.is_active=true{extra}
         GROUP BY r.id, u.name, sem.name, ay.name
         ORDER BY r.created_at DESC
-    """, (request.user_id,))
+    """, tuple(params))
     return jsonify([dict(r) for r in rows])
 
 @admin_bp.route('/api/guru/rooms/<room_id>/join', methods=['POST'])
