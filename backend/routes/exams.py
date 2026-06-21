@@ -52,16 +52,19 @@ def create_exam():
 
     # Room ujian (misal "TTS 2026/2027") murni struktur organisasi —
     # tidak mengunci jadwal. Cukup pastikan guru memang sudah join room ini.
+    semester_id = None
     if room_id:
-        rm = query("SELECT 1 FROM room_teachers WHERE room_id=%s AND teacher_id=%s",
-                   (room_id, request.user_id), fetch='one')
-        if not rm:
+        room = query("SELECT semester_id FROM room_teachers rt JOIN rooms r ON r.id=rt.room_id "
+                     "WHERE rt.room_id=%s AND rt.teacher_id=%s", (room_id, request.user_id), fetch='one')
+        if not room:
             return jsonify({'error': 'Anda belum join room ujian ini'}), 403
+        semester_id = room.get('semester_id')
 
-    # Tandai otomatis sesuai semester yang sedang aktif (kalau ada) — frozen
-    # di waktu pembuatan, tidak ikut berubah kalau admin ganti semester aktif.
-    active_sem = query("SELECT id FROM semesters WHERE is_active=true LIMIT 1", fetch='one')
-    semester_id = active_sem['id'] if active_sem else None
+    # Kalau tidak ada room, atau room-nya belum diset semester, fallback ke
+    # semester yang sedang aktif — frozen di waktu pembuatan.
+    if not semester_id:
+        active_sem = query("SELECT id FROM semesters WHERE is_active=true LIMIT 1", fetch='one')
+        semester_id = active_sem['id'] if active_sem else None
 
     query("""INSERT INTO exams
              (id, teacher_id, subject_id, title, instructions, duration_minutes,
@@ -115,12 +118,17 @@ def update_exam(exam_id):
     data = request.json or {}
     if 'room_id' in data:
         room_id = data['room_id'] or None
+        semester_id = None
         if room_id:
-            rm = query("SELECT 1 FROM room_teachers WHERE room_id=%s AND teacher_id=%s",
-                      (room_id, request.user_id), fetch='one')
-            if not rm:
+            room = query("SELECT semester_id FROM room_teachers rt JOIN rooms r ON r.id=rt.room_id "
+                        "WHERE rt.room_id=%s AND rt.teacher_id=%s", (room_id, request.user_id), fetch='one')
+            if not room:
                 return jsonify({'error': 'Anda belum join room ujian ini'}), 403
-        query("UPDATE exams SET room_id=%s WHERE id=%s", (room_id, exam_id), fetch='none')
+            semester_id = room.get('semester_id')
+        if not semester_id:
+            active_sem = query("SELECT id FROM semesters WHERE is_active=true LIMIT 1", fetch='one')
+            semester_id = active_sem['id'] if active_sem else None
+        query("UPDATE exams SET room_id=%s, semester_id=%s WHERE id=%s", (room_id, semester_id, exam_id), fetch='none')
     allowed = ['title','instructions','duration_minutes','start_at','status',
                'randomize_questions','randomize_options','show_result_after',
                'show_key_after','subject_id','score_per_correct','grade']

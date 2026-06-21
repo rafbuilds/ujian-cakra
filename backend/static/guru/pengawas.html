@@ -303,6 +303,14 @@
             </select>
           </div>
 
+          <!-- Banner kepemilikan — muncul kalau ujian yang dipilih buatan sendiri -->
+          <div
+            id="own-exam-banner"
+            style="display: none; background: #eaf3de; color: #3b6d11; border-radius: 10px; padding: 0.75rem 1rem; margin-bottom: 1.25rem; font-size: 13px; font-weight: 600"
+          >
+            ✅ Anda pembuat soal ujian ini — sudah otomatis bisa mengawasi tanpa kode
+          </div>
+
           <!-- Prompt kode — muncul kalau pilih ujian guru lain yang belum dibuka -->
           <div class="select-exam" id="code-prompt" style="display: none">
             <div
@@ -566,18 +574,25 @@
       function onExamSelect(id) {
         currentExamId = id;
         clearInterval(autoRefresh);
+        // Selalu reset dulu — banner kepemilikan dan prompt kode tidak boleh
+        // tampil bersamaan, jadi default-kan keduanya tersembunyi setiap ganti pilihan.
         document.getElementById("code-prompt").style.display = "none";
+        document.getElementById("own-exam-banner").style.display = "none";
         if (!id) {
           document.getElementById("monitor-content").style.display = "none";
           return;
         }
         const exam = allExamsForProctor.find((e) => e.id === id);
-        const needsCode = exam && exam.teacher_id !== myUserId && !unlockedIds.has(id);
+        const isMine = exam && exam.teacher_id === myUserId;
+        const needsCode = exam && !isMine && !unlockedIds.has(id);
         if (needsCode) {
           document.getElementById("monitor-content").style.display = "none";
           document.getElementById("code-prompt").style.display = "block";
           document.getElementById("proctor-code-input").value = "";
           return;
+        }
+        if (isMine) {
+          document.getElementById("own-exam-banner").style.display = "block";
         }
         document.getElementById("monitor-content").style.display = "block";
         loadMonitor();

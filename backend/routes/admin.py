@@ -428,13 +428,16 @@ def get_rooms():
     rows = query("""
         SELECT r.*,
                u.name as created_by_name,
+               sem.name as semester_name, ay.name as academic_year_name,
                COUNT(DISTINCT rt.teacher_id) as teacher_count,
                COUNT(DISTINCT rc.class_id) as class_count
         FROM rooms r
         LEFT JOIN users u ON u.id=r.created_by
         LEFT JOIN room_teachers rt ON rt.room_id=r.id
         LEFT JOIN room_classes rc ON rc.room_id=r.id
-        GROUP BY r.id, u.name
+        LEFT JOIN semesters sem ON sem.id=r.semester_id
+        LEFT JOIN academic_years ay ON ay.id=sem.academic_year_id
+        GROUP BY r.id, u.name, sem.name, ay.name
         ORDER BY r.created_at DESC
     """)
     return jsonify([dict(r) for r in rows])
@@ -446,9 +449,10 @@ def create_room():
     name = data.get('name','').strip()
     if not name: return jsonify({'error': 'Nama room wajib'}), 400
     room = query("""
-        INSERT INTO rooms (id, name, description, created_by)
-        VALUES (%s,%s,%s,%s) RETURNING *
-    """, (str(uuid.uuid4()), name, data.get('description',''), request.user_id), fetch='one')
+        INSERT INTO rooms (id, name, description, created_by, semester_id)
+        VALUES (%s,%s,%s,%s,%s) RETURNING *
+    """, (str(uuid.uuid4()), name, data.get('description',''), request.user_id,
+          data.get('semester_id') or None), fetch='one')
     # Assign classes
     for cls in (data.get('class_ids') or []):
         query("INSERT INTO room_classes (room_id,class_id) VALUES (%s,%s) ON CONFLICT DO NOTHING",
@@ -469,6 +473,8 @@ def update_room(room_id):
         query("UPDATE rooms SET description=%s WHERE id=%s", (data['description'], room_id), fetch='none')
     if 'is_active' in data:
         query("UPDATE rooms SET is_active=%s WHERE id=%s", (data['is_active'], room_id), fetch='none')
+    if 'semester_id' in data:
+        query("UPDATE rooms SET semester_id=%s WHERE id=%s", (data['semester_id'] or None, room_id), fetch='none')
     return jsonify({'ok': True})
 
 @admin_bp.route('/api/admin/rooms/<room_id>', methods=['DELETE'])
@@ -480,7 +486,13 @@ def delete_room(room_id):
 @admin_bp.route('/api/admin/rooms/<room_id>', methods=['GET'])
 @require_admin
 def get_room_detail(room_id):
-    room = query("SELECT * FROM rooms WHERE id=%s", (room_id,), fetch='one')
+    room = query("""
+        SELECT r.*, sem.name as semester_name, ay.name as academic_year_name
+        FROM rooms r
+        LEFT JOIN semesters sem ON sem.id=r.semester_id
+        LEFT JOIN academic_years ay ON ay.id=sem.academic_year_id
+        WHERE r.id=%s
+    """, (room_id,), fetch='one')
     if not room: return jsonify({'error': 'Tidak ditemukan'}), 404
     teachers = query("""
         SELECT u.id, u.name, u.email, u.avatar_url FROM users u
@@ -551,14 +563,17 @@ def remove_room_class(room_id, class_id):
 @require_guru
 def get_guru_rooms():
     rows = query("""
-        SELECT r.*, COUNT(DISTINCT rc.class_id) as class_count,
+        SELECT r.*, sem.name as semester_name, ay.name as academic_year_name,
+               COUNT(DISTINCT rc.class_id) as class_count,
                COUNT(DISTINCT e.id) as exam_count
         FROM rooms r
         JOIN room_teachers rt ON rt.room_id=r.id AND rt.teacher_id=%s
         LEFT JOIN room_classes rc ON rc.room_id=r.id
         LEFT JOIN exams e ON e.room_id=r.id AND e.teacher_id=%s
+        LEFT JOIN semesters sem ON sem.id=r.semester_id
+        LEFT JOIN academic_years ay ON ay.id=sem.academic_year_id
         WHERE r.is_active=true
-        GROUP BY r.id ORDER BY r.created_at DESC
+        GROUP BY r.id, sem.name, ay.name ORDER BY r.created_at DESC
     """, (request.user_id, request.user_id))
     return jsonify([dict(r) for r in rows])
 
@@ -569,6 +584,7 @@ def get_all_rooms_for_guru():
     rows = query("""
         SELECT r.*,
                u.name as created_by_name,
+               sem.name as semester_name, ay.name as academic_year_name,
                COUNT(DISTINCT rc.class_id) as class_count,
                COUNT(DISTINCT e.id) as exam_count,
                BOOL_OR(rt2.teacher_id = %s) as is_member
@@ -577,8 +593,10 @@ def get_all_rooms_for_guru():
         LEFT JOIN room_teachers rt2 ON rt2.room_id=r.id
         LEFT JOIN room_classes rc ON rc.room_id=r.id
         LEFT JOIN exams e ON e.room_id=r.id
+        LEFT JOIN semesters sem ON sem.id=r.semester_id
+        LEFT JOIN academic_years ay ON ay.id=sem.academic_year_id
         WHERE r.is_active=true
-        GROUP BY r.id, u.name
+        GROUP BY r.id, u.name, sem.name, ay.name
         ORDER BY r.created_at DESC
     """, (request.user_id,))
     return jsonify([dict(r) for r in rows])

@@ -223,11 +223,20 @@ CREATE INDEX IF NOT EXISTS idx_exam_proctors_teacher ON exam_proctors(teacher_id
 -- otomatis pindah tampil di Daftar Ujian / Room Ujian.
 ALTER TABLE exams ALTER COLUMN start_at DROP NOT NULL;
 
--- ── 22. Ujian otomatis ditandai semester aktif ───────────────────
--- Saat dibuat, ujian/soal otomatis disangkutkan ke semester yang admin
+-- ── 22. Ujian otomatis ditandai semester ─────────────────────────
+-- Diutamakan ikut semester Room-nya (lihat #23). Kalau ujian tidak punya
+-- room (misal soal lepas di Bank Soal), fallback ke semester yang admin
 -- tandai aktif (tabel semesters.is_active) — frozen di waktu pembuatan,
 -- tidak ikut berubah kalau admin ganti semester aktif belakangan.
 ALTER TABLE exams ADD COLUMN IF NOT EXISTS semester_id UUID REFERENCES semesters(id) ON DELETE SET NULL;
+
+-- ── 23. Room Ujian terikat Tahun Ajaran & Semester ────────────────
+-- Admin pilih tahun ajaran+semester saat membuat/edit Room (misal
+-- "TTS 2026/2027" -> Semester Genap 2026/2027). Semua ujian yang dibuat
+-- guru di dalam room ini otomatis ikut semester room tersebut, sehingga
+-- rekap histori per tahun ajaran/semester tetap akurat walau admin nanti
+-- mengaktifkan semester yang berbeda.
+ALTER TABLE rooms ADD COLUMN IF NOT EXISTS semester_id UUID REFERENCES semesters(id) ON DELETE SET NULL;
 
 -- ── Selesai ───────────────────────────────────────────────────
 -- Verifikasi: SELECT table_name FROM information_schema.tables

@@ -396,6 +396,10 @@
               "
               id="dp-desc"
             ></div>
+            <div
+              style="font-size: 12px; color: #d4af37; margin-top: 4px; font-weight: 600"
+              id="dp-semester"
+            ></div>
           </div>
           <button
             onclick="closeDetail()"
@@ -724,6 +728,23 @@
             placeholder="Deskripsi singkat..."
           ></textarea>
         </div>
+        <div class="form-row" style="display: flex; gap: 10px">
+          <div class="form-group" style="flex: 1">
+            <label
+              >Tahun Ajaran
+              <span style="font-weight: 400; color: var(--muted)">(opsional, untuk rekap histori)</span></label
+            >
+            <select class="form-control" id="mr-year" onchange="onYearChangeInModal()">
+              <option value="">— Tidak diset —</option>
+            </select>
+          </div>
+          <div class="form-group" style="flex: 1">
+            <label>Semester</label>
+            <select class="form-control" id="mr-semester">
+              <option value="">— Pilih tahun dulu —</option>
+            </select>
+          </div>
+        </div>
         <div style="display: flex; gap: 10px; margin-top: 1rem">
           <button
             class="btn btn-secondary"
@@ -750,17 +771,24 @@
       let currentRoomId = null,
         currentRoom = null,
         allTeachers = [],
-        allKelas = [];
+        allKelas = [],
+        allYears = [],
+        allSemesters = [];
 
       // ── Init ──────────────────────────────────────────────────────
       (async function init() {
         try {
-          [allTeachers, allKelas] = await Promise.all([
+          [allTeachers, allKelas, allYears, allSemesters] = await Promise.all([
             API.get("/api/admin/users").then((u) =>
               u.filter((x) => x.role === "guru" || x.role === "admin"),
             ),
             API.get("/api/classes"),
+            API.get("/api/admin/academic-years").catch(() => []),
+            API.get("/api/admin/semesters").catch(() => []),
           ]);
+          document.getElementById("mr-year").innerHTML =
+            '<option value="">— Tidak diset —</option>' +
+            allYears.map((y) => `<option value="${y.id}">${y.name}</option>`).join("");
           await loadRooms();
           if (location.hash === "#allujian") switchTab("allujian");
         } catch (e) {
@@ -768,6 +796,16 @@
           UI.toast("Gagal inisialisasi", "error");
         }
       })();
+
+      function onYearChangeInModal(selectedSemesterId) {
+        const yearId = document.getElementById("mr-year").value;
+        const sems = allSemesters.filter((s) => s.academic_year_id === yearId);
+        document.getElementById("mr-semester").innerHTML = yearId
+          ? '<option value="">— Pilih semester —</option>' +
+            sems.map((s) => `<option value="${s.id}">${s.name}</option>`).join("")
+          : '<option value="">— Pilih tahun dulu —</option>';
+        if (selectedSemesterId) document.getElementById("mr-semester").value = selectedSemesterId;
+      }
 
       // ── Tab switching ────────────────────────────────────────────
       function switchTab(tab) {
@@ -812,6 +850,7 @@
           <span style="background:${r.is_active ? "#eaf3de" : "var(--light)"};color:${r.is_active ? "#3b6d11" : "var(--muted)"};padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;flex-shrink:0">${r.is_active ? "Aktif" : "Nonaktif"}</span>
         </div>
         ${r.description ? `<div style="font-size:12px;color:var(--muted)">${r.description}</div>` : ""}
+        ${r.semester_name ? `<div style="font-size:12px;color:var(--green);font-weight:600">📅 ${r.semester_name}${r.academic_year_name ? " " + r.academic_year_name : ""}</div>` : ""}
         <div style="display:flex;gap:10px;margin-top:4px">
           <span style="font-size:12px;color:var(--muted)">👨‍🏫 ${r.teacher_count || 0} guru</span>
           <span style="font-size:12px;color:var(--muted)">🏫 ${r.class_count || 0} kelas</span>
@@ -842,6 +881,9 @@
           document.getElementById("dp-name").textContent = room.name;
           document.getElementById("dp-desc").textContent =
             room.description || "";
+          document.getElementById("dp-semester").textContent = room.semester_name
+            ? `📅 ${room.semester_name}${room.academic_year_name ? " " + room.academic_year_name : ""}`
+            : "";
           document.getElementById("dp-teacher-count").textContent =
             room.teachers.length;
           document.getElementById("dp-class-count").textContent =
@@ -1100,6 +1142,8 @@
         document.getElementById("mr-id").value = "";
         document.getElementById("mr-name").value = "";
         document.getElementById("mr-desc").value = "";
+        document.getElementById("mr-year").value = "";
+        onYearChangeInModal();
         document.getElementById("modal-room-title").textContent =
           "Buat Room Ujian";
         document.getElementById("modal-room").style.display = "flex";
@@ -1110,6 +1154,9 @@
         document.getElementById("mr-name").value = currentRoom.name;
         document.getElementById("mr-desc").value =
           currentRoom.description || "";
+        const sem = allSemesters.find((s) => s.id === currentRoom.semester_id);
+        document.getElementById("mr-year").value = sem ? sem.academic_year_id : "";
+        onYearChangeInModal(currentRoom.semester_id || "");
         document.getElementById("modal-room-title").textContent = "Edit Room";
         document.getElementById("modal-room").style.display = "flex";
       }
@@ -1121,6 +1168,7 @@
         const id = document.getElementById("mr-id").value;
         const name = document.getElementById("mr-name").value.trim();
         const desc = document.getElementById("mr-desc").value.trim();
+        const semesterId = document.getElementById("mr-semester").value || null;
         if (!name) {
           UI.toast("Nama room wajib", "warn");
           return;
@@ -1129,6 +1177,7 @@
           await API.patch("/api/admin/rooms/" + id, {
             name,
             description: desc,
+            semester_id: semesterId,
           });
           UI.toast("✅ Room diperbarui", "success");
           closeModal();
@@ -1138,6 +1187,7 @@
           const r = await API.post("/api/admin/rooms", {
             name,
             description: desc,
+            semester_id: semesterId,
           });
           UI.toast("✅ Room dibuat", "success");
           closeModal();
