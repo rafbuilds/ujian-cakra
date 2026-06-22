@@ -157,6 +157,20 @@
             </div>
           </div>
 
+          <div style="display: flex; gap: 8px; margin-bottom: 0.875rem; flex-wrap: wrap">
+            <select id="bs-subject" onchange="renderSoal()" class="form-control" style="width: auto">
+              <option value="">Semua Mapel</option>
+            </select>
+            <input
+              id="bs-search"
+              type="text"
+              placeholder="🔍 Cari judul soal..."
+              oninput="renderSoal()"
+              style="flex: 1; max-width: 280px; padding: 8px 12px; border: 1px solid var(--border2); border-radius: 8px; font-size: 13px"
+            />
+            <div style="margin-left: auto; align-self: center; font-size: 13px; color: var(--muted)" id="bs-count"></div>
+          </div>
+
           <div class="card" style="padding: 0; overflow: hidden" id="soal-list-card">
             <div style="padding: 2rem; text-align: center"><div class="loading-spinner"></div></div>
           </div>
@@ -273,6 +287,11 @@
         try {
           const exams = await API.get("/api/exams");
           allSoal = exams.filter((e) => !e.start_at);
+
+          const subjects = [...new Set(allSoal.filter((e) => e.subject_name).map((e) => e.subject_name))];
+          document.getElementById("bs-subject").innerHTML =
+            '<option value="">Semua Mapel</option>' + subjects.map((s) => `<option value="${s}">${s}</option>`).join("");
+
           renderSoal();
         } catch {
           UI.toast("Gagal memuat bank soal", "error");
@@ -281,14 +300,23 @@
 
       function renderSoal() {
         const card = document.getElementById("soal-list-card");
-        if (!allSoal.length) {
+        const subjectF = document.getElementById("bs-subject")?.value || "";
+        const q = document.getElementById("bs-search")?.value.toLowerCase() || "";
+        let list = allSoal;
+        if (subjectF) list = list.filter((e) => e.subject_name === subjectF);
+        if (q) list = list.filter((e) => (e.title || "").toLowerCase().includes(q));
+
+        const countEl = document.getElementById("bs-count");
+        if (countEl) countEl.textContent = list.length + " soal";
+
+        if (!list.length) {
           card.innerHTML = `<div class="empty-state" style="padding:3rem">
             <div class="empty-icon">📚</div>
-            <div class="empty-text">Belum ada soal di bank soal. <button class="btn btn-primary btn-sm" onclick="openCreateModal()" style="margin-top:.75rem">+ Buat Soal Baru</button></div>
+            <div class="empty-text">${allSoal.length ? "Tidak ada soal yang cocok dengan filter." : "Belum ada soal di bank soal."} <button class="btn btn-primary btn-sm" onclick="openCreateModal()" style="margin-top:.75rem">+ Buat Soal Baru</button></div>
           </div>`;
           return;
         }
-        card.innerHTML = allSoal
+        card.innerHTML = list
           .map(
             (e) => `
       <div class="soal-row">

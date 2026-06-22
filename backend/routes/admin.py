@@ -637,7 +637,7 @@ def guru_join_room(room_id):
     """Guru bergabung ke room ujian."""
     room = query("SELECT id, name FROM rooms WHERE id=%s AND is_active=true", (room_id,), fetch='one')
     if not room: return jsonify({'error': 'Room tidak ditemukan'}), 404
-    existing = query("SELECT id FROM room_teachers WHERE room_id=%s AND teacher_id=%s",
+    existing = query("SELECT 1 FROM room_teachers WHERE room_id=%s AND teacher_id=%s",
                      (room_id, request.user_id), fetch='one')
     if existing: return jsonify({'error': 'Sudah bergabung di room ini'}), 409
     query("INSERT INTO room_teachers (room_id, teacher_id) VALUES (%s,%s) ON CONFLICT DO NOTHING",
