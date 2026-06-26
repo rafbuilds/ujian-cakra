@@ -38,6 +38,34 @@
         font-size: 12px;
         color: var(--muted);
       }
+      .cls-chk-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 6px;
+        max-height: 200px;
+        overflow-y: auto;
+        border: 0.5px solid var(--border);
+        border-radius: 10px;
+        padding: 8px;
+      }
+      .cls-chk {
+        padding: 6px 8px;
+        border: 1.5px solid var(--border2);
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        transition: all 0.15s;
+        user-select: none;
+      }
+      .cls-chk.checked {
+        border-color: var(--green3);
+        background: var(--green4);
+        color: #0f6e56;
+      }
       .detail-panel {
         position: fixed;
         top: 0;
@@ -513,16 +541,10 @@
           KELAS DALAM ROOM
         </div>
         <div id="dp-classes" style="margin-bottom: 0.75rem"></div>
+        <div id="dp-add-class" class="cls-chk-grid" style="margin-bottom: 8px"></div>
         <div style="display: flex; gap: 8px; margin-bottom: 1.25rem">
-          <select
-            id="dp-add-class"
-            class="form-control"
-            style="flex: 1; font-size: 13px"
-          >
-            <option value="">+ Pilih kelas...</option>
-          </select>
-          <button class="btn btn-primary btn-sm" onclick="addRoomClass()">
-            Tambah
+          <button class="btn btn-primary btn-sm" style="flex: 1" onclick="addRoomClass()">
+            + Tambah Kelas Terpilih
           </button>
         </div>
 
@@ -927,12 +949,15 @@
               .filter((t) => !existTeacherIds.includes(t.id))
               .map((t) => `<option value="${t.id}">${t.name}</option>`)
               .join("");
-          document.getElementById("dp-add-class").innerHTML =
-            '<option value="">+ Pilih kelas...</option>' +
-            allKelas
-              .filter((c) => !existClassIds.includes(c.id))
-              .map((c) => `<option value="${c.id}">${c.name}</option>`)
-              .join("");
+          const availableClasses = allKelas.filter((c) => !existClassIds.includes(c.id));
+          document.getElementById("dp-add-class").innerHTML = availableClasses.length
+            ? availableClasses
+                .map(
+                  (c) =>
+                    `<div class="cls-chk" onclick="toggleAddClass(this,'${c.id}')" data-id="${c.id}"><span>☐</span> ${c.name}</div>`,
+                )
+                .join("")
+            : '<div style="grid-column:1/-1;font-size:12px;color:var(--muted)">Semua kelas sudah masuk room ini</div>';
 
           // Ujian
           renderRoomExams(room.exams);
@@ -1228,16 +1253,20 @@
         UI.toast("Guru dihapus", "success");
         openDetail(currentRoomId);
       }
+      function toggleAddClass(el) {
+        el.classList.toggle("checked");
+        el.querySelector("span").textContent = el.classList.contains("checked") ? "☑" : "☐";
+      }
       async function addRoomClass() {
-        const id = document.getElementById("dp-add-class").value;
-        if (!id) {
-          UI.toast("Pilih kelas dulu", "warn");
+        const ids = [...document.querySelectorAll("#dp-add-class .cls-chk.checked")].map((el) => el.dataset.id);
+        if (!ids.length) {
+          UI.toast("Pilih minimal 1 kelas dulu", "warn");
           return;
         }
         await API.post("/api/admin/rooms/" + currentRoomId + "/classes", {
-          class_id: id,
+          class_ids: ids,
         });
-        UI.toast("✅ Kelas ditambahkan", "success");
+        UI.toast(`✅ ${ids.length} kelas ditambahkan`, "success");
         openDetail(currentRoomId);
       }
       async function removeRoomClass(cid) {

@@ -568,9 +568,15 @@ def remove_room_teacher(room_id, teacher_id):
 @admin_bp.route('/api/admin/rooms/<room_id>/classes', methods=['POST'])
 @require_admin
 def add_room_class(room_id):
-    class_id = (request.json or {}).get('class_id','')
-    query("INSERT INTO room_classes (room_id,class_id) VALUES (%s,%s) ON CONFLICT DO NOTHING",
-          (room_id, class_id), fetch='none')
+    data = request.json or {}
+    class_ids = data.get('class_ids') or ([data['class_id']] if data.get('class_id') else [])
+    if not class_ids:
+        return jsonify({'error': 'class_id/class_ids wajib'}), 400
+    query("""
+        INSERT INTO room_classes (room_id, class_id)
+        SELECT %s, c.id FROM UNNEST(%s::text[]) AS c(id)
+        ON CONFLICT DO NOTHING
+    """, (room_id, class_ids), fetch='none')
     return jsonify({'ok': True})
 
 @admin_bp.route('/api/admin/rooms/<room_id>/classes/<class_id>', methods=['DELETE'])
