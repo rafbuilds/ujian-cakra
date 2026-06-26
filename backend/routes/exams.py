@@ -211,8 +211,8 @@ def add_question(exam_id):
            total+1, data.get('score',1), max_choices), fetch='none')
 
     for opt in (data.get('options') or []):
-        query("INSERT INTO options (id, question_id, label, content, is_correct) VALUES (%s,%s,%s,%s,%s)",
-              (str(uuid.uuid4()), q_id, opt['label'], opt['content'], opt.get('is_correct',False)), fetch='none')
+        query("INSERT INTO options (id, question_id, label, content, image_url, is_correct) VALUES (%s,%s,%s,%s,%s,%s)",
+              (str(uuid.uuid4()), q_id, opt['label'], opt.get('content',''), opt.get('image_url'), opt.get('is_correct',False)), fetch='none')
 
     q    = query("SELECT * FROM questions WHERE id=%s", (q_id,), fetch='one')
     opts = query("SELECT * FROM options WHERE question_id=%s ORDER BY label", (q_id,))
@@ -235,8 +235,8 @@ def update_question(question_id):
     if 'options' in data:
         query("DELETE FROM options WHERE question_id=%s", (question_id,), fetch='none')
         for opt in data['options']:
-            query("INSERT INTO options (id, question_id, label, content, is_correct) VALUES (%s,%s,%s,%s,%s)",
-                  (str(uuid.uuid4()), question_id, opt['label'], opt['content'], opt.get('is_correct',False)), fetch='none')
+            query("INSERT INTO options (id, question_id, label, content, image_url, is_correct) VALUES (%s,%s,%s,%s,%s,%s)",
+                  (str(uuid.uuid4()), question_id, opt['label'], opt.get('content',''), opt.get('image_url'), opt.get('is_correct',False)), fetch='none')
     return jsonify({'ok': True})
 
 @exams_bp.route('/api/questions/<question_id>', methods=['DELETE'])

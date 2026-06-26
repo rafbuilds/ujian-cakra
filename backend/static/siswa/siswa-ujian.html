@@ -929,7 +929,8 @@
           `<button class="opt-btn ${answers[q.id] === o.id ? 'selected' : ''}" data-qid="${q.id}" data-oid="${o.id}">
             <div class="opt-circle"></div>
             <div class="opt-label-box">${labels[i] || o.label}</div>
-            <div class="opt-text">${o.content}</div>
+            ${o.image_url ? `<img src="${o.image_url}" style="max-width:140px;max-height:100px;border-radius:8px;object-fit:cover;margin-right:8px"/>` : ""}
+            <div class="opt-text">${o.content || ""}</div>
           </button>`).join('')}</div>`;
       }
 
@@ -964,7 +965,8 @@
             `<button class="opt-btn ${answers[q.id] === o.id ? 'selected' : ''}" data-qid="${q.id}" data-oid="${o.id}">
               <div class="opt-circle"></div>
               <div class="opt-label-box">${labels[i] || o.label}</div>
-              <div class="opt-text">${o.content}</div>
+              ${o.image_url ? `<img src="${o.image_url}" style="max-width:140px;max-height:100px;border-radius:8px;object-fit:cover;margin-right:8px"/>` : ""}
+              <div class="opt-text">${o.content || ""}</div>
             </button>`).join('')}
           </div>`;
       }
@@ -980,7 +982,8 @@
           `<button class="opt-btn ${sel.has(o.id) ? 'multi-selected' : ''}" data-multi-qid="${q.id}" data-multi-oid="${o.id}">
             <div class="opt-checkbox"></div>
             <div class="opt-label-box">${labels[i] || o.label}</div>
-            <div class="opt-text">${o.content}</div>
+            ${o.image_url ? `<img src="${o.image_url}" style="max-width:140px;max-height:100px;border-radius:8px;object-fit:cover;margin-right:8px"/>` : ""}
+            <div class="opt-text">${o.content || ""}</div>
           </button>`).join('')}</div>`;
       }
 

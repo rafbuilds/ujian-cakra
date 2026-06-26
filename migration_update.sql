@@ -245,6 +245,13 @@ ALTER TABLE rooms ADD COLUMN IF NOT EXISTS semester_id UUID REFERENCES semesters
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 CREATE INDEX IF NOT EXISTS idx_questions_content_trgm ON questions USING gin (content gin_trgm_ops);
 
+-- ── 25. Pilihan jawaban bergambar ─────────────────────────────────
+-- Guru minta agar Pilihan A/B/C/D/E bisa diisi gambar, tidak harus teks
+-- (misal soal not musik/simbol yang sulit dideskripsikan dalam teks).
+-- content dibuat nullable karena sekarang pilihan boleh isi gambar saja.
+ALTER TABLE options ADD COLUMN IF NOT EXISTS image_url TEXT;
+ALTER TABLE options ALTER COLUMN content DROP NOT NULL;
+
 -- ── Selesai ───────────────────────────────────────────────────
 -- Verifikasi: SELECT table_name FROM information_schema.tables
 --             WHERE table_schema='public' ORDER BY table_name;

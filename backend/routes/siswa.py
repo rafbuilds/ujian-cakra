@@ -107,7 +107,7 @@ def start_exam(exam_id):
         multi_map.setdefault(str(r['question_id']), []).append(str(r['option_id']))
 
     # Ambil semua opsi sekaligus (satu query, bukan per-soal) lalu kelompokkan.
-    all_opts = query("""SELECT o.id, o.label, o.content, o.question_id FROM options o
+    all_opts = query("""SELECT o.id, o.label, o.content, o.image_url, o.question_id FROM options o
                         JOIN questions q ON q.id=o.question_id WHERE q.exam_id=%s ORDER BY o.label""",
                      (exam_id,))
     opts_by_question = {}

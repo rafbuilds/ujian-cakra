@@ -629,7 +629,8 @@
             (o) => `
     <div class="opt-row ${o.is_correct ? "correct" : ""}">
       <div class="opt-label ${o.is_correct ? "correct" : "wrong"}">${o.label}</div>
-      <div>${o.content}</div>
+      ${o.image_url ? `<img src="${o.image_url}" style="max-width:80px;max-height:60px;border-radius:6px;object-fit:cover"/>` : ""}
+      <div>${o.content || ""}</div>
       ${o.is_correct ? '<span style="font-size:11px;color:var(--green3);font-weight:600;margin-left:auto">✓ Kunci</span>' : ""}
     </div>
   `,
@@ -645,7 +646,8 @@
             const selected = isDraft || isSaved;
             return `<button class="opt-kunci-btn ${selected ? "selected" : ""}" onclick="pickKunci('${q.id}','${o.id}')">
       <div class="opt-kunci-letter ${selected ? "selected" : "nosel"}">${o.label}</div>
-      <div style="font-size:14px;flex:1;text-align:left">${o.content}</div>
+      ${o.image_url ? `<img src="${o.image_url}" style="max-width:60px;max-height:46px;border-radius:6px;object-fit:cover"/>` : ""}
+      <div style="font-size:14px;flex:1;text-align:left">${o.content || ""}</div>
       ${isDraft ? '<span style="font-size:11px;background:#d4edda;color:var(--green);padding:2px 8px;border-radius:6px;font-weight:600">✓ Dipilih</span>' : ""}
     </button>`;
           })
@@ -706,6 +708,7 @@
               options: q.options.map((o) => ({
                 label: o.label,
                 content: o.content,
+                image_url: o.image_url,
                 is_correct: o.id === oid,
               })),
             });

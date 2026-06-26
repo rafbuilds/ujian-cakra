@@ -132,6 +132,31 @@
         background: var(--light);
         color: var(--muted);
       }
+      .opt-img-btn {
+        flex-shrink: 0;
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        border: 1.5px solid var(--border2);
+        background: #fff;
+        cursor: pointer;
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+      }
+      .opt-img-btn.has-img {
+        border-color: var(--green3);
+        background: var(--green4);
+      }
+      .opt-img-thumb {
+        width: 32px;
+        height: 32px;
+        object-fit: cover;
+        border-radius: 8px;
+        flex-shrink: 0;
+      }
       .exam-info-bar {
         background: var(--white);
         border: 0.5px solid var(--border);
@@ -469,13 +494,13 @@
                     <span id="options-hint" style="color:var(--muted);font-weight:400">(klik huruf = set kunci)</span>
                   </label>
                   <div id="opt-inputs">
-                    <div class="opt-input-row" data-label="A"><div class="opt-letter key" onclick="setKey('A')">A</div><input class="form-control" placeholder="Pilihan A..." style="flex:1"/><span style="font-size:11px;color:var(--green);font-weight:600;white-space:nowrap">✓ Kunci</span></div>
-                    <div class="opt-input-row" data-label="B"><div class="opt-letter nokey" onclick="setKey('B')">B</div><input class="form-control" placeholder="Pilihan B..." style="flex:1"/><span style="font-size:11px;color:transparent">✓ Kunci</span></div>
-                    <div class="opt-input-row" data-label="C"><div class="opt-letter nokey" onclick="setKey('C')">C</div><input class="form-control" placeholder="Pilihan C..." style="flex:1"/><span style="font-size:11px;color:transparent">✓ Kunci</span></div>
-                    <div class="opt-input-row" data-label="D"><div class="opt-letter nokey" onclick="setKey('D')">D</div><input class="form-control" placeholder="Pilihan D..." style="flex:1"/><span style="font-size:11px;color:transparent">✓ Kunci</span></div>
-                    <div class="opt-input-row" data-label="E"><div class="opt-letter nokey" onclick="setKey('E')">E</div><input class="form-control" placeholder="Pilihan E (opsional)..." style="flex:1"/><span style="font-size:11px;color:transparent">✓ Kunci</span></div>
+                    <div class="opt-input-row" data-label="A"><div class="opt-letter key" onclick="setKey('A')">A</div><input class="form-control" placeholder="Pilihan A... (opsional kalau pakai gambar)" style="flex:1"/><button type="button" class="opt-img-btn" onclick="document.getElementById('opt-img-A').click()" title="Upload gambar pilihan">🖼️</button><input type="file" id="opt-img-A" accept="image/*" style="display:none" onchange="previewOptImg(this,'A')"/><span style="font-size:11px;color:var(--green);font-weight:600;white-space:nowrap">✓ Kunci</span></div>
+                    <div class="opt-input-row" data-label="B"><div class="opt-letter nokey" onclick="setKey('B')">B</div><input class="form-control" placeholder="Pilihan B... (opsional kalau pakai gambar)" style="flex:1"/><button type="button" class="opt-img-btn" onclick="document.getElementById('opt-img-B').click()" title="Upload gambar pilihan">🖼️</button><input type="file" id="opt-img-B" accept="image/*" style="display:none" onchange="previewOptImg(this,'B')"/><span style="font-size:11px;color:transparent">✓ Kunci</span></div>
+                    <div class="opt-input-row" data-label="C"><div class="opt-letter nokey" onclick="setKey('C')">C</div><input class="form-control" placeholder="Pilihan C... (opsional kalau pakai gambar)" style="flex:1"/><button type="button" class="opt-img-btn" onclick="document.getElementById('opt-img-C').click()" title="Upload gambar pilihan">🖼️</button><input type="file" id="opt-img-C" accept="image/*" style="display:none" onchange="previewOptImg(this,'C')"/><span style="font-size:11px;color:transparent">✓ Kunci</span></div>
+                    <div class="opt-input-row" data-label="D"><div class="opt-letter nokey" onclick="setKey('D')">D</div><input class="form-control" placeholder="Pilihan D... (opsional kalau pakai gambar)" style="flex:1"/><button type="button" class="opt-img-btn" onclick="document.getElementById('opt-img-D').click()" title="Upload gambar pilihan">🖼️</button><input type="file" id="opt-img-D" accept="image/*" style="display:none" onchange="previewOptImg(this,'D')"/><span style="font-size:11px;color:transparent">✓ Kunci</span></div>
+                    <div class="opt-input-row" data-label="E"><div class="opt-letter nokey" onclick="setKey('E')">E</div><input class="form-control" placeholder="Pilihan E (opsional)..." style="flex:1"/><button type="button" class="opt-img-btn" onclick="document.getElementById('opt-img-E').click()" title="Upload gambar pilihan">🖼️</button><input type="file" id="opt-img-E" accept="image/*" style="display:none" onchange="previewOptImg(this,'E')"/><span style="font-size:11px;color:transparent">✓ Kunci</span></div>
                   </div>
-                  <div style="font-size:11px;color:var(--muted);margin-top:4px" id="options-tip">Klik huruf A/B/C/D/E untuk set kunci jawaban</div>
+                  <div style="font-size:11px;color:var(--muted);margin-top:4px" id="options-tip">Klik huruf A/B/C/D/E untuk set kunci jawaban. Klik 🖼️ untuk upload gambar sebagai isi pilihan (boleh ganti teks, atau keduanya).</div>
                 </div>
 
                 <!-- Batas maksimal pilihan siswa (multiple_answer) -->
@@ -632,7 +657,8 @@
             (o) => `
     <div class="opt-row ${o.is_correct ? "correct" : ""}">
       <div class="opt-label ${o.is_correct ? "correct" : "wrong"}">${o.label}</div>
-      <div>${o.content}</div>
+      ${o.image_url ? `<img src="${o.image_url}" style="max-width:80px;max-height:60px;border-radius:6px;object-fit:cover"/>` : ""}
+      <div>${o.content || ""}</div>
       ${o.is_correct ? '<span style="font-size:11px;color:var(--green3);font-weight:600;margin-left:auto">✓ Kunci</span>' : ""}
     </div>
   `,
@@ -648,7 +674,8 @@
             const selected = isDraft || isSaved;
             return `<button class="opt-kunci-btn ${selected ? "selected" : ""}" onclick="pickKunci('${q.id}','${o.id}')">
       <div class="opt-kunci-letter ${selected ? "selected" : "nosel"}">${o.label}</div>
-      <div style="font-size:14px;flex:1;text-align:left">${o.content}</div>
+      ${o.image_url ? `<img src="${o.image_url}" style="max-width:60px;max-height:46px;border-radius:6px;object-fit:cover"/>` : ""}
+      <div style="font-size:14px;flex:1;text-align:left">${o.content || ""}</div>
       ${isDraft ? '<span style="font-size:11px;background:#d4edda;color:var(--green);padding:2px 8px;border-radius:6px;font-weight:600">✓ Dipilih</span>' : ""}
     </button>`;
           })
@@ -709,6 +736,7 @@
               options: q.options.map((o) => ({
                 label: o.label,
                 content: o.content,
+                image_url: o.image_url,
                 is_correct: o.id === oid,
               })),
             });
@@ -746,12 +774,40 @@
           document.getElementById("nq-text").value = "";
           document.getElementById("similar-warning").style.display = "none";
           document
-            .querySelectorAll("#opt-inputs input")
+            .querySelectorAll("#opt-inputs input[type=text], #opt-inputs input:not([type])")
             .forEach((i) => (i.value = ""));
+          ["A", "B", "C", "D", "E"].forEach((l) => clearOptImg(l));
           setKey("A");
           multiCorrectKeys = new Set(['A']);
           maxChoicesEdited = false;
           document.getElementById('nq-max-choices').value = 1;
+        }
+      }
+
+      // ── Gambar pilihan jawaban (opsional, per huruf A-E) ───────────
+      let optImages = {}; // { A: 'data:image/...', ... }
+      function previewOptImg(input, label) {
+        const file = input.files[0];
+        if (!file) return;
+        const row = input.closest(".opt-input-row");
+        const btn = row.querySelector(".opt-img-btn");
+        const reader = new FileReader();
+        reader.onload = () => {
+          optImages[label] = reader.result;
+          btn.classList.add("has-img");
+          btn.innerHTML = `<img src="${optImages[label]}" class="opt-img-thumb"/>`;
+        };
+        reader.readAsDataURL(file);
+      }
+      function clearOptImg(label) {
+        delete optImages[label];
+        const fileInput = document.getElementById(`opt-img-${label}`);
+        if (fileInput) fileInput.value = "";
+        const row = fileInput?.closest(".opt-input-row");
+        const btn = row?.querySelector(".opt-img-btn");
+        if (btn) {
+          btn.classList.remove("has-img");
+          btn.innerHTML = "🖼️";
         }
       }
       // ── Tipe soal state ─────────────────────────────────
@@ -941,18 +997,20 @@
           if (currentType === 'multiple_choice' || currentType === 'audio') {
             document.querySelectorAll("#opt-inputs .opt-input-row").forEach(row => {
               const val = row.querySelector("input").value.trim();
-              if (val) options.push({ label: row.dataset.label, content: val, is_correct: row.dataset.label === currentKey });
+              const img = optImages[row.dataset.label];
+              if (val || img) options.push({ label: row.dataset.label, content: val, image_url: img || null, is_correct: row.dataset.label === currentKey });
             });
-            if (options.length < 2) { UI.toast("Minimal 2 pilihan jawaban", "warn"); return; }
+            if (options.length < 2) { UI.toast("Minimal 2 pilihan jawaban (teks atau gambar)", "warn"); return; }
             if (!options.some(o => o.is_correct)) { UI.toast("Set kunci jawaban dulu", "warn"); return; }
             payload.options = options;
 
           } else if (currentType === 'multiple_answer') {
             document.querySelectorAll("#opt-inputs .opt-input-row").forEach(row => {
               const val = row.querySelector("input").value.trim();
-              if (val) options.push({ label: row.dataset.label, content: val, is_correct: multiCorrectKeys.has(row.dataset.label) });
+              const img = optImages[row.dataset.label];
+              if (val || img) options.push({ label: row.dataset.label, content: val, image_url: img || null, is_correct: multiCorrectKeys.has(row.dataset.label) });
             });
-            if (options.length < 2) { UI.toast("Minimal 2 pilihan jawaban", "warn"); return; }
+            if (options.length < 2) { UI.toast("Minimal 2 pilihan jawaban (teks atau gambar)", "warn"); return; }
             if (!options.some(o => o.is_correct)) { UI.toast("Centang minimal 1 kunci jawaban", "warn"); return; }
             payload.options = options;
             payload.max_choices = Math.max(1, parseInt(document.getElementById('nq-max-choices').value) || multiCorrectKeys.size);
