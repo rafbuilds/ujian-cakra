@@ -499,12 +499,15 @@
         autoRefresh = null,
         soundOn = true,
         myUserId = null,
+        isAdminUser = false,
         allExamsForProctor = [],
         unlockedIds = new Set();
       const prevViolations = {};
 
       async function init() {
-        myUserId = Auth.getUser()?.id;
+        const me = Auth.getUser();
+        myUserId = me?.id;
+        isAdminUser = me?.role === "admin";
         try {
           const [all, unlocked] = await Promise.all([
             API.get("/api/exams/all-for-proctor"),
@@ -543,7 +546,7 @@
             ? `<optgroup label="Ujian Guru Lain">${others
                 .map(
                   (e) =>
-                    `<option value="${e.id}">${unlockedIds.has(e.id) ? "🔓" : "🔒"} ${e.title} (${e.teacher_name || "—"}) — ${statusLabel(e)}</option>`,
+                    `<option value="${e.id}">${isAdminUser || unlockedIds.has(e.id) ? "🔓" : "🔒"} ${e.title} (${e.teacher_name || "—"}) — ${statusLabel(e)}</option>`,
                 )
                 .join("")}</optgroup>`
             : "");
@@ -584,15 +587,22 @@
         }
         const exam = allExamsForProctor.find((e) => e.id === id);
         const isMine = exam && exam.teacher_id === myUserId;
-        const needsCode = exam && !isMine && !unlockedIds.has(id);
+        // Admin selalu bisa mengawasi semua ujian tanpa kode (backend juga
+        // membolehkan ini di /monitor) — jangan paksa admin masukkan kode.
+        const needsCode = exam && !isMine && !isAdminUser && !unlockedIds.has(id);
         if (needsCode) {
           document.getElementById("monitor-content").style.display = "none";
           document.getElementById("code-prompt").style.display = "block";
           document.getElementById("proctor-code-input").value = "";
           return;
         }
+        const banner = document.getElementById("own-exam-banner");
         if (isMine) {
-          document.getElementById("own-exam-banner").style.display = "block";
+          banner.textContent = "✅ Anda pembuat soal ujian ini — sudah otomatis bisa mengawasi tanpa kode";
+          banner.style.display = "block";
+        } else if (isAdminUser) {
+          banner.textContent = "👮 Anda login sebagai admin — bisa mengawasi semua ujian tanpa kode";
+          banner.style.display = "block";
         }
         document.getElementById("monitor-content").style.display = "block";
         loadMonitor();
