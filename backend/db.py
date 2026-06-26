@@ -2,12 +2,23 @@
 db.py — Database connection dengan support DATABASE_URL (Supabase/Render)
 """
 import os
+import time
 import psycopg2
 import psycopg2.extras
 from psycopg2 import pool as pg_pool
 from urllib.parse import urlparse
 
 _pool = None
+
+# TCP keepalive supaya koneksi idle ke Supabase tidak diam-diam mati di tengah
+# jalan (penyebab "could not send data to server: Connection timed out").
+_KEEPALIVE_KW = dict(
+    connect_timeout=10,
+    keepalives=1,
+    keepalives_idle=30,
+    keepalives_interval=10,
+    keepalives_count=5,
+)
 
 def get_pool():
     global _pool
@@ -25,7 +36,8 @@ def get_pool():
                 user     = r.username,
                 password = r.password,
                 sslmode  = 'require',
-                cursor_factory = psycopg2.extras.RealDictCursor
+                cursor_factory = psycopg2.extras.RealDictCursor,
+                **_KEEPALIVE_KW
             )
         else:
             # Local development fallback
@@ -37,30 +49,43 @@ def get_pool():
                 dbname   = os.environ.get("DB_NAME", "ujian_smaba"),
                 user     = os.environ.get("DB_USER", "postgres"),
                 password = os.environ.get("DB_PASSWORD", "postgres"),
-                cursor_factory = psycopg2.extras.RealDictCursor
+                cursor_factory = psycopg2.extras.RealDictCursor,
+                **_KEEPALIVE_KW
             )
     return _pool
 
 def get_db():
     return get_pool().getconn()
 
-def release_db(conn):
-    get_pool().putconn(conn)
+def release_db(conn, close=False):
+    """close=True membuang koneksi dari pool sama sekali (dipakai kalau koneksi
+    diketahui sudah rusak/putus) supaya request berikutnya tidak kebagian
+    koneksi mati yang sama dari pool."""
+    get_pool().putconn(conn, close=close)
 
-def query(sql, params=None, fetch="all"):
+def query(sql, params=None, fetch="all", _retry=True):
     conn = get_db()
     try:
         cur = conn.cursor()
         cur.execute(sql, params or ())
         conn.commit()
-        if fetch == "one":  return cur.fetchone()
-        if fetch == "none": return None
-        return cur.fetchall()
+        if fetch == "one":  result = cur.fetchone()
+        elif fetch == "none": result = None
+        else: result = cur.fetchall()
+        release_db(conn)
+        return result
+    except (psycopg2.OperationalError, psycopg2.InterfaceError):
+        # Koneksi putus di tengah jalan (timeout/reset) — buang dari pool,
+        # jangan dikembalikan, lalu coba sekali lagi dengan koneksi baru.
+        release_db(conn, close=True)
+        if _retry:
+            time.sleep(0.3)
+            return query(sql, params, fetch, _retry=False)
+        raise
     except Exception:
         conn.rollback()
-        raise
-    finally:
         release_db(conn)
+        raise
 
 def count_correct_wrong(session_id, exam_id):
     """Hitung correct/wrong untuk soal single-choice (answers) + multiple_answer (multi_answers).
