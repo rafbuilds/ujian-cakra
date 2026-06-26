@@ -688,6 +688,12 @@
   <body>
     <div id="root"></div>
 
+    <!-- Lightbox zoom gambar (lampiran soal & pilihan jawaban) -->
+    <div id="img-zoom-overlay" onclick="closeZoom()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;align-items:center;justify-content:center;padding:2rem;cursor:zoom-out">
+      <img id="img-zoom-target" src="" style="max-width:95vw;max-height:95vh;border-radius:8px;box-shadow:0 10px 50px rgba(0,0,0,.5)"/>
+      <button onclick="closeZoom()" style="position:fixed;top:16px;right:20px;background:rgba(255,255,255,.15);color:#fff;border:none;border-radius:50%;width:40px;height:40px;font-size:22px;cursor:pointer;line-height:1">×</button>
+    </div>
+
     <script src="../config.js"></script>
     <script src="../components/api.js"></script>
     <script src="../components/auth.js"></script>
@@ -712,6 +718,14 @@
         devMode = false;
       let timerInterval = null,
         saveInterval = null;
+
+      function zoomImage(src) {
+        document.getElementById("img-zoom-target").src = src;
+        document.getElementById("img-zoom-overlay").style.display = "flex";
+      }
+      function closeZoom() {
+        document.getElementById("img-zoom-overlay").style.display = "none";
+      }
 
       const API_BASE =
         typeof CONFIG !== "undefined"
@@ -855,7 +869,7 @@
           <div class="q-card">
             <div class="q-num-badge">Soal ${current + 1} dari ${total}</div>
             ${renderTypeChip(q)}
-            ${q.attachment_url ? `<img src="${q.attachment_url}" style="max-width:100%;border-radius:10px;margin-bottom:1rem">` : ''}
+            ${q.attachment_url ? `<img src="${q.attachment_url}" style="max-width:100%;border-radius:10px;margin-bottom:1rem;cursor:zoom-in" onclick="event.stopPropagation();zoomImage('${q.attachment_url}')">` : ''}
             <div class="q-text">${q.content}</div>
             ${renderQuestionBody(q)}
           </div>
@@ -929,7 +943,7 @@
           `<button class="opt-btn ${answers[q.id] === o.id ? 'selected' : ''}" data-qid="${q.id}" data-oid="${o.id}">
             <div class="opt-circle"></div>
             <div class="opt-label-box">${labels[i] || o.label}</div>
-            ${o.image_url ? `<img src="${o.image_url}" style="max-width:140px;max-height:100px;border-radius:8px;object-fit:cover;margin-right:8px"/>` : ""}
+            ${o.image_url ? `<img src="${o.image_url}" style="max-width:140px;max-height:100px;border-radius:8px;object-fit:cover;margin-right:8px;cursor:zoom-in" onclick="event.stopPropagation();zoomImage('${o.image_url}')"/>` : ""}
             <div class="opt-text">${o.content || ""}</div>
           </button>`).join('')}</div>`;
       }
@@ -965,7 +979,7 @@
             `<button class="opt-btn ${answers[q.id] === o.id ? 'selected' : ''}" data-qid="${q.id}" data-oid="${o.id}">
               <div class="opt-circle"></div>
               <div class="opt-label-box">${labels[i] || o.label}</div>
-              ${o.image_url ? `<img src="${o.image_url}" style="max-width:140px;max-height:100px;border-radius:8px;object-fit:cover;margin-right:8px"/>` : ""}
+              ${o.image_url ? `<img src="${o.image_url}" style="max-width:140px;max-height:100px;border-radius:8px;object-fit:cover;margin-right:8px;cursor:zoom-in" onclick="event.stopPropagation();zoomImage('${o.image_url}')"/>` : ""}
               <div class="opt-text">${o.content || ""}</div>
             </button>`).join('')}
           </div>`;
@@ -982,7 +996,7 @@
           `<button class="opt-btn ${sel.has(o.id) ? 'multi-selected' : ''}" data-multi-qid="${q.id}" data-multi-oid="${o.id}">
             <div class="opt-checkbox"></div>
             <div class="opt-label-box">${labels[i] || o.label}</div>
-            ${o.image_url ? `<img src="${o.image_url}" style="max-width:140px;max-height:100px;border-radius:8px;object-fit:cover;margin-right:8px"/>` : ""}
+            ${o.image_url ? `<img src="${o.image_url}" style="max-width:140px;max-height:100px;border-radius:8px;object-fit:cover;margin-right:8px;cursor:zoom-in" onclick="event.stopPropagation();zoomImage('${o.image_url}')"/>` : ""}
             <div class="opt-text">${o.content || ""}</div>
           </button>`).join('')}</div>`;
       }
