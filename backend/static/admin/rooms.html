@@ -74,7 +74,7 @@
         height: 100vh;
         background: #fff;
         box-shadow: -8px 0 40px rgba(0, 0, 0, 0.15);
-        z-index: 200;
+        z-index: 300;
         transition: right 0.3s;
         overflow-y: auto;
         display: flex;
@@ -87,12 +87,19 @@
         position: fixed;
         inset: 0;
         background: rgba(0, 0, 0, 0.3);
-        z-index: 199;
+        z-index: 299;
         display: none;
         backdrop-filter: blur(2px);
       }
       .detail-overlay.show {
         display: block;
+      }
+      /* Mobile: panel detail penuh layar, jangan tumpang-tindih dgn sidebar drawer */
+      @media (max-width: 768px) {
+        .detail-panel {
+          right: -100%;
+          width: 100%;
+        }
       }
     </style>
   </head>
@@ -371,10 +378,10 @@
                     <tr>
                       <th>Judul Ujian</th>
                       <th>Guru</th>
-                      <th>Room</th>
-                      <th>Jenjang</th>
+                      <th class="hide-mobile">Room</th>
+                      <th class="hide-mobile">Jenjang</th>
                       <th>Kelas</th>
-                      <th>Soal</th>
+                      <th class="hide-mobile">Soal</th>
                       <th>Status</th>
                       <th>Aksi</th>
                     </tr>
@@ -891,6 +898,11 @@
       // ── Room Detail ──────────────────────────────────────────────
       async function openDetail(roomId) {
         currentRoomId = roomId;
+        // Tutup drawer sidebar mobile dulu kalau masih terbuka, supaya tidak
+        // ada 2 overlay/blur menumpuk bersamaan dengan panel detail room.
+        document.querySelector(".sidebar")?.classList.remove("open");
+        document.getElementById("_sb_overlay")?.classList.remove("show");
+        document.body.style.overflow = "";
         document.getElementById("overlay").classList.add("show");
         document.getElementById("detail-panel").classList.add("open");
         document.getElementById("dp-exams").innerHTML =
@@ -1615,10 +1627,10 @@
               (e) => `<tr>
       <td><div style="font-weight:500;font-size:13px">${e.title || ""}</div><div style="font-size:11px;color:var(--muted)">${e.start_at ? UI.fmtDT(e.start_at) : ""}${e.semester_name ? " · 📅 " + e.semester_name + (e.academic_year_name ? " " + e.academic_year_name : "") : ""}</div></td>
       <td style="font-size:13px">${e.teacher_name || "—"}</td>
-      <td style="font-size:12px;color:var(--muted)">${e.room_name || "—"}</td>
-      <td style="font-size:12px;color:var(--muted)">${GRADE_LABEL_FLAT[e.grade] || "—"}</td>
+      <td class="hide-mobile" style="font-size:12px;color:var(--muted)">${e.room_name || "—"}</td>
+      <td class="hide-mobile" style="font-size:12px;color:var(--muted)">${GRADE_LABEL_FLAT[e.grade] || "—"}</td>
       <td style="font-size:12px;color:var(--muted)">${e.class_names || "—"}</td>
-      <td style="text-align:center"><span style="background:var(--green4);color:var(--green);padding:2px 8px;border-radius:6px;font-size:12px;font-weight:700">${e.question_count || 0}</span></td>
+      <td class="hide-mobile" style="text-align:center"><span style="background:var(--green4);color:var(--green);padding:2px 8px;border-radius:6px;font-size:12px;font-weight:700">${e.question_count || 0}</span></td>
       <td>${STATUS_BADGE[e.status] || e.status}</td>
       <td><div class="action-btns">
         <button class="btn btn-secondary btn-sm" onclick="viewSoal('${e.id}')">📄 Soal</button>

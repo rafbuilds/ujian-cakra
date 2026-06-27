@@ -130,9 +130,8 @@ img { max-width: 100%; }
   display: none;
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,.45);
+  background: rgba(0,0,0,.55);
   z-index: 199;
-  backdrop-filter: blur(2px);
 }
 .sidebar-overlay.show { display: block; }
 
