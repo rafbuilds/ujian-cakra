@@ -895,6 +895,12 @@
           async () => {
             await API.post(`/api/exams/${currentExamId}/finish`);
             UI.toast("Ujian diselesaikan", "success");
+            // Update status lokal supaya dropdown ujian langsung berubah dari
+            // "Berlangsung" jadi "Selesai" tanpa perlu reload halaman.
+            const exam = allExamsForProctor.find((e) => e.id === currentExamId);
+            if (exam) exam.status = "finished";
+            renderExamSelect();
+            document.getElementById("exam-select").value = currentExamId;
             loadMonitor();
           },
         );
