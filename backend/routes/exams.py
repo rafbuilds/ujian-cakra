@@ -451,6 +451,7 @@ def monitor_exam(exam_id):
             'tab_violations': s.get('tab_violations',0),
             'submitted_at': s['submitted_at'].isoformat() if s.get('submitted_at') else None,
             'exit_allowed': bool(s.get('exit_allowed')),
+            'exit_code': s.get('exit_code'),
         })
     submitted = sum(1 for s in students if s['status']=='submitted')
     return jsonify({'exam': dict(exam), 'students': students,
