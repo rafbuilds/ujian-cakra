@@ -1213,30 +1213,40 @@
         }, 1000);
       }
 
+      // Jawaban yang BELUM dikonfirmasi tersimpan ke server (baru diklik tapi
+      // request masih jalan / gagal karena offline). Setiap klik sudah langsung
+      // dikirim saat itu juga — syncAllAnswers() di bawah HANYA me-retry yang
+      // gagal, bukan mengirim ulang SEMUA jawaban tiap 30 detik (dulu begini,
+      // boros: untuk 1000 siswa x banyak soal jadi puluhan ribu request sia-sia
+      // setiap 30 detik walau jawabannya sudah berhasil tersimpan).
+      let pendingSync = new Set();
+
       function syncAllAnswers() {
-        if (!sessionData) return;
+        if (!sessionData || !pendingSync.size) return;
         const sid = sessionData.session_id;
-        Object.entries(answers).forEach(([qid, oid]) => {
+        [...pendingSync].forEach((qid) => {
+          const oid = answers[qid];
+          if (!oid) {
+            pendingSync.delete(qid); // jawaban sudah dihapus, tidak perlu sync
+            return;
+          }
           if (oid === 'essay') {
-            // Sync essay text
             const text = essayTexts[qid] || '';
             apiFetch(`/api/student/sessions/${sid}/answer-essay`, {
               method: "POST",
               body: JSON.stringify({ question_id: qid, essay_text: text, photo_b64: '' }),
-            }).catch(() => {});
+            }).then(() => pendingSync.delete(qid)).catch(() => {});
           } else if (oid === 'multi') {
-            // Sync multi answer
             const opts = multiAnswers[qid] ? [...multiAnswers[qid]] : [];
             apiFetch(`/api/student/sessions/${sid}/answer-multi`, {
               method: "POST",
               body: JSON.stringify({ question_id: qid, option_ids: opts }),
-            }).catch(() => {});
+            }).then(() => pendingSync.delete(qid)).catch(() => {});
           } else {
-            // Sync regular single answer
             apiFetch(`/api/student/sessions/${sid}/answer`, {
               method: "POST",
               body: JSON.stringify({ question_id: qid, option_id: oid }),
-            }).catch(() => {});
+            }).then(() => pendingSync.delete(qid)).catch(() => {});
           }
         });
       }
@@ -1308,10 +1318,11 @@
 
       function selectAnswer(qid, oid) {
         answers[qid] = oid;
+        pendingSync.add(qid);
         apiFetch(`/api/student/sessions/${sessionData.session_id}/answer`, {
           method: "POST",
           body: JSON.stringify({ question_id: qid, option_id: oid }),
-        }).catch(() => {});
+        }).then(() => pendingSync.delete(qid)).catch(() => {});
         render();
       }
 
@@ -1330,10 +1341,11 @@
         }
         if (multiAnswers[qid].size > 0) answers[qid] = 'multi';
         else                            delete answers[qid];
+        pendingSync.add(qid);
         apiFetch(`/api/student/sessions/${sessionData.session_id}/answer-multi`, {
           method: "POST",
           body: JSON.stringify({ question_id: qid, option_ids: [...multiAnswers[qid]] }),
-        }).catch(() => {});
+        }).then(() => pendingSync.delete(qid)).catch(() => {});
         render();
       }
 
@@ -1347,12 +1359,13 @@
           ?.closest('.essay-wrap')?.querySelector('div:last-child');
         if (charEl) charEl.textContent = text.length + ' karakter';
         // Debounce save 1 detik
+        pendingSync.add(qid);
         clearTimeout(_essayTimer[qid]);
         _essayTimer[qid] = setTimeout(() => {
           apiFetch(`/api/student/sessions/${sessionData.session_id}/answer-essay`, {
             method: "POST",
             body: JSON.stringify({ question_id: qid, essay_text: text, photo_b64: '' }),
-          }).catch(() => {});
+          }).then(() => pendingSync.delete(qid)).catch(() => {});
         }, 1000);
         // Update progress bar dan navigasi soal tanpa full render
         const prog = document.querySelector('.q-progress-bar');

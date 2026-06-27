@@ -27,9 +27,16 @@ def get_pool():
         if database_url:
             # Parse DATABASE_URL dari Supabase/Render
             r = urlparse(database_url)
+            # maxconn dulu di-hardcode 5 — terlalu kecil untuk ujian serentak
+            # (tiap proses gunicorn punya pool sendiri-sendiri, jadi total
+            # koneksi DB = maxconn x jumlah worker). Sekarang configurable lewat
+            # env DB_POOL_MAX supaya bisa disesuaikan ke jumlah worker & limit
+            # koneksi paket Supabase tanpa ubah kode. Kalau pakai connection
+            # string PgBouncer Supabase (port 6543, mode "Transaction"), nilai
+            # ini bisa lebih besar lagi karena koneksi di-multiplex di sisi DB.
             _pool = pg_pool.ThreadedConnectionPool(
-                minconn=1,
-                maxconn=5,
+                minconn=int(os.environ.get("DB_POOL_MIN", "2")),
+                maxconn=int(os.environ.get("DB_POOL_MAX", "20")),
                 host     = r.hostname,
                 port     = r.port or 5432,
                 dbname   = r.path.lstrip('/'),
