@@ -203,29 +203,39 @@ from flask import send_from_directory, send_file
 
 STATIC_DIR = pathlib.Path(__file__).parent / 'static'
 
+def _no_cache_if_html(response, path):
+    # Semua logic guru/admin/siswa ditulis inline di dalam <script> pada file
+    # .html itu sendiri (bukan file .js terpisah) — kalau browser cache file
+    # .html-nya, SELURUH logic ikut basi (bug yang sudah diperbaiki di backend
+    # bisa terasa belum jalan padahal sudah dideploy). Paksa revalidate setiap
+    # request untuk halaman .html, biarkan aset lain (css/js/gambar) tetap cache.
+    if path.endswith('.html') or path == '':
+        response.headers['Cache-Control'] = 'no-cache, must-revalidate'
+    return response
+
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
 def serve_frontend(path):
     # Jangan intercept API routes
     if path.startswith('api/'):
         return jsonify({'error': 'Not found'}), 404
-    
+
     # Coba serve file langsung
     target = STATIC_DIR / path
     if target.is_file():
-        return send_from_directory(str(STATIC_DIR), path)
-    
+        return _no_cache_if_html(send_from_directory(str(STATIC_DIR), path), path)
+
     # Coba tambahkan .html
     if not path.endswith('.html'):
         html_target = STATIC_DIR / (path + '.html')
         if html_target.is_file():
-            return send_from_directory(str(STATIC_DIR), path + '.html')
-    
+            return _no_cache_if_html(send_from_directory(str(STATIC_DIR), path + '.html'), path + '.html')
+
     # Fallback ke index.html (SPA behavior)
     index = STATIC_DIR / 'index.html'
     if index.is_file():
-        return send_file(str(index))
-    
+        return _no_cache_if_html(send_file(str(index)), 'index.html')
+
     return jsonify({'error': 'Not found'}), 404
 
 if __name__ == '__main__':
