@@ -784,6 +784,33 @@
         }
       }
 
+      // Foto langsung dari kamera/galeri HP biasanya beberapa MB — kalau
+      // dikirim mentah sebagai base64 (apalagi sampai 5 pilihan sekaligus),
+      // payload-nya jadi puluhan MB dan terasa "lama sekali" saat simpan.
+      // Diperkecil dulu lewat canvas (maks 900px, JPEG ~70%) sebelum jadi
+      // data URL — ukurannya turun drastis (biasanya jadi puluhan-ratusan KB).
+      function compressImageToDataURL(file, maxDim = 900, quality = 0.72) {
+        return new Promise((resolve, reject) => {
+          const url = URL.createObjectURL(file);
+          const img = new Image();
+          img.onload = () => {
+            let { width, height } = img;
+            if (width > maxDim || height > maxDim) {
+              const scale = maxDim / Math.max(width, height);
+              width = Math.round(width * scale);
+              height = Math.round(height * scale);
+            }
+            const canvas = document.createElement("canvas");
+            canvas.width = width; canvas.height = height;
+            canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+            URL.revokeObjectURL(url);
+            resolve(canvas.toDataURL("image/jpeg", quality));
+          };
+          img.onerror = () => { URL.revokeObjectURL(url); reject({ error: "Gagal memuat gambar" }); };
+          img.src = url;
+        });
+      }
+
       // ── Gambar pilihan jawaban (opsional, per huruf A-E) ───────────
       let optImages = {}; // { A: 'data:image/...', ... }
       function previewOptImg(input, label) {
@@ -791,13 +818,13 @@
         if (!file) return;
         const row = input.closest(".opt-input-row");
         const btn = row.querySelector(".opt-img-btn");
-        const reader = new FileReader();
-        reader.onload = () => {
-          optImages[label] = reader.result;
-          btn.classList.add("has-img");
-          btn.innerHTML = `<img src="${optImages[label]}" class="opt-img-thumb"/>`;
-        };
-        reader.readAsDataURL(file);
+        compressImageToDataURL(file)
+          .then((dataUrl) => {
+            optImages[label] = dataUrl;
+            btn.classList.add("has-img");
+            btn.innerHTML = `<img src="${dataUrl}" class="opt-img-thumb"/>`;
+          })
+          .catch(() => UI.toast("Gagal memproses gambar", "error"));
       }
       function clearOptImg(label) {
         delete optImages[label];
@@ -935,6 +962,12 @@
       }
 
       async function uploadFile(file, type='attachment') {
+        // Lampiran berupa GAMBAR ikut dikompres (sama seperti gambar pilihan
+        // jawaban) — PDF & audio dibiarkan apa adanya (tidak bisa dikecilkan
+        // lewat canvas).
+        if (type === 'attachment' && file.type.startsWith('image/')) {
+          return await compressImageToDataURL(file);
+        }
         return await fileToBase64(file);
       }
 
