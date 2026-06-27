@@ -498,16 +498,13 @@
         monitorData = null,
         autoRefresh = null,
         soundOn = true,
-        myUserId = null,
         isAdminUser = false,
         allExamsForProctor = [],
         unlockedIds = new Set();
       const prevViolations = {};
 
       async function init() {
-        const me = Auth.getUser();
-        myUserId = me?.id;
-        isAdminUser = me?.role === "admin";
+        isAdminUser = Auth.getUser()?.role === "admin";
         try {
           const [all, unlocked] = await Promise.all([
             API.get("/api/exams/all-for-proctor"),
@@ -531,8 +528,8 @@
       function renderExamSelect() {
         const statusLabel = (e) =>
           e.status === "ongoing" ? "🟢 Berlangsung" : e.status === "published" ? "📋 Terbuka" : "✅ Selesai";
-        const mine = allExamsForProctor.filter((e) => e.teacher_id === myUserId);
-        const others = allExamsForProctor.filter((e) => e.teacher_id !== myUserId);
+        const mine = allExamsForProctor.filter((e) => e.is_mine);
+        const others = allExamsForProctor.filter((e) => !e.is_mine);
         const sel = document.getElementById("exam-select");
         const prevValue = sel.value;
         sel.innerHTML =
@@ -586,7 +583,7 @@
           return;
         }
         const exam = allExamsForProctor.find((e) => e.id === id);
-        const isMine = exam && exam.teacher_id === myUserId;
+        const isMine = exam && !!exam.is_mine;
         // Admin selalu bisa mengawasi semua ujian tanpa kode (backend juga
         // membolehkan ini di /monitor) — jangan paksa admin masukkan kode.
         const needsCode = exam && !isMine && !isAdminUser && !unlockedIds.has(id);

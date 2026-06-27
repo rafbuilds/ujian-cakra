@@ -52,6 +52,7 @@ def get_exams_for_proctor():
     active_id = _active_semester_id()
     rows = query("""
         SELECT e.id, e.title, e.status, e.start_at, e.teacher_id,
+               (e.teacher_id = %s) as is_mine,
                s.name as subject_name, u.name as teacher_name,
                (SELECT STRING_AGG(c.name,', ') FROM exam_classes ec
                 JOIN classes c ON c.id=ec.class_id WHERE ec.exam_id=e.id) as class_names
@@ -61,7 +62,7 @@ def get_exams_for_proctor():
         WHERE e.status IN ('published','ongoing','finished')
           AND e.semester_id=%s
         ORDER BY e.start_at DESC
-    """, (active_id,))
+    """, (request.user_id, active_id))
     return jsonify([dict(r) for r in rows])
 
 @exams_bp.route('/api/exams', methods=['POST'])
