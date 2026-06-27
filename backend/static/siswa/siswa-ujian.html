@@ -704,7 +704,8 @@
         user = null,
         exams = [],
         examData = null,
-        sessionData = null;
+        sessionData = null,
+        _myFingerprint = null;
       let current = 0,
         answers = {},       // { qid: optionId | 'essay' | 'multi' }
         essayTexts = {},    // { qid: text }
@@ -757,10 +758,99 @@
         const root = document.getElementById("root");
         if (page === "loading") root.innerHTML = renderLoading("Memuat...");
         else if (page === "login") root.innerHTML = renderLogin();
+        else if (page === "device-locked") root.innerHTML = renderDeviceLocked();
         else if (page === "list") root.innerHTML = renderList();
         else if (page === "exam") root.innerHTML = renderExam();
         else if (page === "result") root.innerHTML = renderResult();
         attachEvents();
+      }
+
+      // ── DEVICE TERKUNCI — HP lama mati/kuota habis, minta kode dari guru ──
+      function renderDeviceLocked() {
+        return `<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:1.5rem;background:var(--bg)">
+          <div style="max-width:420px;width:100%;background:#fff;border-radius:20px;padding:2rem 1.75rem;box-shadow:0 10px 40px rgba(0,0,0,.08);text-align:center">
+            <div style="font-size:44px;margin-bottom:.5rem">🔒</div>
+            <div style="font-size:18px;font-weight:700;color:var(--green);margin-bottom:.5rem">Perangkat Ini Belum Dikenali</div>
+            <div style="font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:1.5rem">
+              Kemungkinan Anda biasa ujian di HP lain (HP lama mati/kuota habis?). Jawaban Anda
+              <strong>tidak hilang</strong> — minta guru pengawas membuka akses untuk perangkat ini.
+            </div>
+            <div style="text-align:left;margin-bottom:1rem">
+              <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:6px">Kode dari Guru</label>
+              <input id="dl-code" placeholder="Contoh: 4F8K2X"
+                style="width:100%;padding:12px 14px;border:1.5px solid var(--border);border-radius:12px;font-size:18px;font-weight:700;letter-spacing:2px;text-transform:uppercase;text-align:center;outline:none;box-sizing:border-box"
+                onkeydown="if(event.key==='Enter')retryUnlock()" />
+            </div>
+            <button onclick="retryUnlock()" id="dl-submit-btn"
+              style="width:100%;padding:13px;background:var(--green);color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer">Masuk dengan Kode Ini</button>
+            <div id="dl-err" style="display:none;color:var(--red2);font-size:12px;margin-top:.75rem"></div>
+            <div style="margin-top:1.25rem;padding-top:1.25rem;border-top:.5px solid var(--border)">
+              <div style="font-size:12px;color:var(--muted);margin-bottom:.5rem">Atau tunjukkan kode/barcode tetap Anda ke guru:</div>
+              <button class="logout-btn" style="background:var(--light);color:var(--green);width:100%" onclick="showMyCode()">🆔 Tampilkan Kode Saya</button>
+            </div>
+            <button class="logout-btn" style="margin-top:.75rem;width:100%" onclick="Auth.logout()">⏻ Keluar</button>
+          </div>
+        </div>`;
+      }
+
+      async function retryUnlock() {
+        const input = document.getElementById("dl-code");
+        const errEl = document.getElementById("dl-err");
+        const code = (input?.value || "").trim();
+        errEl.style.display = "none";
+        if (!code) {
+          errEl.textContent = "Masukkan kode dari guru dulu";
+          errEl.style.display = "block";
+          return;
+        }
+        const btn = document.getElementById("dl-submit-btn");
+        btn.textContent = "Memeriksa..."; btn.disabled = true;
+        try {
+          await apiFetch("/api/student/register-device", {
+            method: "POST",
+            body: JSON.stringify({
+              device_id: _myFingerprint,
+              device_info: navigator.userAgent.substring(0, 250),
+              transfer_code: code,
+            }),
+          });
+          page = "loading";
+          render();
+          await loadExams();
+          page = "list";
+          render();
+        } catch (err) {
+          errEl.textContent = err.error || "Kode salah atau sudah kedaluwarsa";
+          errEl.style.display = "block";
+          btn.textContent = "Masuk dengan Kode Ini"; btn.disabled = false;
+        }
+      }
+
+      // ── Kode/barcode tetap milik siswa — bisa dilihat kapan saja ──────
+      async function showMyCode() {
+        let modal = document.getElementById("_my-code-modal");
+        if (!modal) {
+          modal = document.createElement("div");
+          modal.id = "_my-code-modal";
+          modal.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem";
+          modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+          document.body.appendChild(modal);
+        }
+        modal.innerHTML = `<div style="background:#fff;border-radius:20px;padding:1.75rem;max-width:320px;width:100%;text-align:center">
+          <div style="font-weight:700;color:var(--green);margin-bottom:.75rem">🆔 Kode Saya</div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:1rem">Tunjukkan ke guru pengawas — scan barcode atau bacakan kodenya untuk membuka device baru ini.</div>
+          <div id="_my-code-body"><div class="spin" style="margin:1.5rem auto"></div></div>
+          <button class="logout-btn" style="margin-top:1rem;width:100%" onclick="document.getElementById('_my-code-modal').remove()">Tutup</button>
+        </div>`;
+        try {
+          const r = await apiFetch("/api/student/my-unlock-code");
+          document.getElementById("_my-code-body").innerHTML = `
+            <img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(r.unlock_code)}" style="border-radius:10px;margin-bottom:.75rem" />
+            <div style="font-size:22px;font-weight:800;letter-spacing:3px;color:var(--green)">${r.unlock_code}</div>
+          `;
+        } catch {
+          document.getElementById("_my-code-body").innerHTML = '<div style="color:var(--red2);font-size:13px">Gagal memuat kode</div>';
+        }
       }
 
       // ── LOADING ──────────────────────────────────────────────────
@@ -797,7 +887,10 @@
         <div class="user-av">${(user?.name || "S")[0]}</div>
         <div><div class="user-name">${user?.name || "Siswa"}</div><div class="user-class">${user?.class_id?.replace(/_/g, " ").toUpperCase() || "Siswa"}</div></div>
       </div>
-      <button class="logout-btn" id="btn-logout">Keluar</button>
+      <div style="display:flex;gap:8px">
+        <button class="logout-btn" onclick="showMyCode()">🆔 Kode Saya</button>
+        <button class="logout-btn" id="btn-logout">Keluar</button>
+      </div>
     </div>
     <div class="list-body">
       <div class="list-welcome">
@@ -1454,16 +1547,23 @@
             localStorage.setItem("ujian_user", JSON.stringify(user));
 
             // Daftarkan device otomatis saat login
+            _myFingerprint = _deviceFingerprint();
             try {
-              const fp = _deviceFingerprint();
               await apiFetch("/api/student/register-device", {
                 method: "POST",
                 body: JSON.stringify({
-                  device_id: fp,
+                  device_id: _myFingerprint,
                   device_info: navigator.userAgent.substring(0, 250),
                 }),
               });
-            } catch (_) { /* silent — device berbeda, server tolak */ }
+            } catch (err) {
+              // Device baru tidak dikenali — tampilkan layar minta kode dari
+              // guru, jangan diam-diam diteruskan (dulu begini, bikin siswa
+              // bingung kalau ternyata device-nya memang belum dibuka).
+              page = "device-locked";
+              render();
+              return;
+            }
 
             await loadExams();
             page = "list";

@@ -390,17 +390,73 @@ def list_proctoring_exams():
     rows = query("SELECT exam_id FROM exam_proctors WHERE teacher_id=%s", (request.user_id,))
     return jsonify([str(r['exam_id']) for r in rows])
 
+def _is_exam_proctor(exam, user_id, role):
+    """Pemilik soal, admin, atau guru yang sudah unlock kode pengawas — sama
+    seperti otorisasi monitor_exam, dipakai juga untuk fitur pindah device."""
+    if role == 'admin' or str(exam['teacher_id']) == user_id:
+        return True
+    return bool(query("SELECT 1 FROM exam_proctors WHERE exam_id=%s AND teacher_id=%s",
+                       (exam['id'], user_id), fetch='one'))
+
+def _student_ongoing_exam_for(student_id):
+    """Cari ujian yang sedang dikerjakan (belum submit) oleh siswa ini —
+    dipakai untuk verifikasi sebelum guru boleh membuka device baru siswa."""
+    return query("""
+        SELECT e.* FROM exam_sessions es
+        JOIN exams e ON e.id = es.exam_id
+        WHERE es.student_id=%s AND es.submitted_at IS NULL
+        ORDER BY es.started_at DESC LIMIT 1
+    """, (student_id,), fetch='one')
+
+# ── Pindah Device Darurat (HP siswa mati/kuota habis) ───────────
+@exams_bp.route('/api/guru/unlock-by-code', methods=['POST'])
+@require_guru
+def unlock_device_by_code():
+    """Guru scan/ketik kode tetap (unlock_code) milik siswa — kalau guru ini
+    memang sedang mengawasi ujian yang sedang dikerjakan siswa tersebut,
+    device_id siswa direset sehingga bisa login di device baru."""
+    code = (request.json or {}).get('code', '').strip().upper()
+    if not code:
+        return jsonify({'error': 'Kode wajib diisi'}), 400
+    student = query("SELECT id, name FROM users WHERE unlock_code=%s AND role='siswa'", (code,), fetch='one')
+    if not student:
+        return jsonify({'error': 'Kode tidak ditemukan'}), 404
+    exam = _student_ongoing_exam_for(student['id'])
+    if not exam:
+        return jsonify({'error': f"{student['name']} tidak sedang mengerjakan ujian apa pun"}), 404
+    if not _is_exam_proctor(exam, request.user_id, request.user_role):
+        return jsonify({'error': 'Anda bukan pengawas ujian yang sedang dikerjakan siswa ini'}), 403
+    query("UPDATE users SET device_id=NULL, device_info=NULL WHERE id=%s", (student['id'],), fetch='none')
+    return jsonify({'ok': True, 'student_name': student['name'], 'exam_title': exam['title']})
+
+@exams_bp.route('/api/exams/<exam_id>/students/<student_id>/transfer-code', methods=['POST'])
+@require_guru
+def generate_transfer_code(exam_id, student_id):
+    """Kode SEKALI PAKAI baru per ujian per siswa — fallback kalau kode tetap
+    (barcode) tidak bisa di-scan (misal kamera siswa/guru rusak). Guru ketik
+    manual kode ini di device baru siswa, berlaku 10 menit."""
+    exam = query("SELECT * FROM exams WHERE id=%s", (exam_id,), fetch='one')
+    if not exam: return jsonify({'error': 'Ujian tidak ditemukan'}), 404
+    if not _is_exam_proctor(exam, request.user_id, request.user_role):
+        return jsonify({'error': 'Anda bukan pengawas ujian ini'}), 403
+    student = query("SELECT id, name FROM users WHERE id=%s AND role='siswa'", (student_id,), fetch='one')
+    if not student: return jsonify({'error': 'Siswa tidak ditemukan'}), 404
+
+    import random as _r, string as _s
+    code = ''.join(_r.choices(_s.ascii_uppercase.replace('O','').replace('I','') + '23456789', k=6))
+    query("""INSERT INTO device_transfer_codes (id, student_id, exam_id, code, created_by, expires_at)
+              VALUES (%s,%s,%s,%s,%s, NOW() + INTERVAL '10 minutes')""",
+          (str(uuid.uuid4()), student_id, exam_id, code, request.user_id), fetch='none')
+    return jsonify({'code': code, 'student_name': student['name'], 'expires_in_minutes': 10})
+
 # ── Monitor ────────────────────────────────────────────────────
 @exams_bp.route('/api/exams/<exam_id>/monitor', methods=['GET'])
 @require_guru
 def monitor_exam(exam_id):
     exam = query("SELECT * FROM exams WHERE id=%s", (exam_id,), fetch='one')
     if not exam: return jsonify({'error': 'Tidak ditemukan'}), 404
-    if request.user_role != 'admin' and str(exam['teacher_id']) != request.user_id:
-        is_proctor = query("SELECT 1 FROM exam_proctors WHERE exam_id=%s AND teacher_id=%s",
-                           (exam_id, request.user_id), fetch='one')
-        if not is_proctor:
-            return jsonify({'error': 'Anda belum menjadi pengawas ujian ini. Masukkan kode pengawas terlebih dahulu.'}), 403
+    if not _is_exam_proctor(exam, request.user_id, request.user_role):
+        return jsonify({'error': 'Anda belum menjadi pengawas ujian ini. Masukkan kode pengawas terlebih dahulu.'}), 403
     sessions = query("""SELECT es.*, u.name, u.avatar_url, c.name as class_name
                         FROM exam_sessions es
                         JOIN users u ON u.id=es.student_id

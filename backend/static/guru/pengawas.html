@@ -279,6 +279,28 @@
         </div>
 
         <div class="page-main">
+          <!-- Pindah device darurat: HP siswa mati/kuota habis -->
+          <div class="select-exam" style="background: #fff9ec; border: 1px solid #f5e6b2">
+            <div style="font-size: 13px; font-weight: 600; color: #7c5e08; margin-bottom: 0.5rem">
+              🔓 Pindahkan Device Siswa (HP mati / kuota habis)
+            </div>
+            <div style="font-size: 12px; color: #8a6c1a; margin-bottom: 0.75rem">
+              Scan atau ketik kode/barcode tetap milik siswa — jawaban yang sudah tersimpan tidak hilang,
+              siswa langsung bisa login di device baru begitu kode benar.
+            </div>
+            <div style="display: flex; gap: 8px">
+              <input
+                id="unlock-code-input"
+                class="form-control"
+                placeholder="Kode siswa, mis. 4F8K2X9P"
+                style="text-transform: uppercase; max-width: 260px"
+                onkeydown="if(event.key==='Enter')unlockByCode()"
+              />
+              <button class="btn btn-primary btn-sm" onclick="unlockByCode()">Buka Device</button>
+            </div>
+            <div id="unlock-result" style="display: none; margin-top: 0.625rem; font-size: 12px"></div>
+          </div>
+
           <!-- Pilih ujian (semua ujian, dari semua guru) -->
           <div class="select-exam">
             <div
@@ -550,6 +572,44 @@
         sel.value = prevValue;
       }
 
+      async function unlockByCode() {
+        const input = document.getElementById("unlock-code-input");
+        const code = input.value.trim();
+        const resultEl = document.getElementById("unlock-result");
+        if (!code) {
+          UI.toast("Masukkan kode siswa dulu", "warn");
+          return;
+        }
+        resultEl.style.display = "block";
+        resultEl.style.color = "var(--muted)";
+        resultEl.textContent = "Memeriksa...";
+        try {
+          const r = await API.post("/api/guru/unlock-by-code", { code });
+          resultEl.style.color = "var(--green3)";
+          resultEl.textContent = `✅ ${r.student_name} dibuka — bisa login di device baru sekarang (ujian: ${r.exam_title})`;
+          input.value = "";
+        } catch (e) {
+          resultEl.style.color = "var(--red2)";
+          resultEl.textContent = "❌ " + (e.error || "Gagal membuka device");
+        }
+      }
+
+      async function generateTransferCode(studentId, studentName) {
+        if (!currentExamId) return;
+        try {
+          const r = await API.post(`/api/exams/${currentExamId}/students/${studentId}/transfer-code`, {});
+          UI.confirm(
+            "🔑 Kode Pindah Device",
+            `Kode untuk <strong>${studentName}</strong>: <div style="font-size:28px;font-weight:800;letter-spacing:4px;color:var(--green);text-align:center;margin:.75rem 0">${r.code}</div>
+             Berlaku <strong>${r.expires_in_minutes} menit</strong> — sampaikan ke siswa untuk diketik di kolom "Kode dari Guru" pada device barunya.`,
+            () => {},
+            "success",
+          );
+        } catch (e) {
+          UI.toast(e.error || "Gagal membuat kode", "error");
+        }
+      }
+
       async function joinByCode() {
         const input = document.getElementById("proctor-code-input");
         const code = input.value.trim();
@@ -793,6 +853,9 @@
               <div style="display:flex;flex-direction:column;gap:4px">
                 ${s.status !== 'submitted'
                   ? `<button class="btn btn-secondary btn-sm" onclick="allowExit('${s.session_id}','${(s.name||'').replace(/'/g,"\\'")}')">🚪 Izinkan Keluar</button>`
+                  : ''}
+                ${s.status !== 'submitted'
+                  ? `<button class="btn btn-secondary btn-sm" onclick="generateTransferCode('${s.student_id}','${(s.name||'').replace(/'/g,"\\'")}')">🔑 Kode Pindah</button>`
                   : ''}
                 ${s.status === 'submitted'
                   ? `<button class="btn btn-primary btn-sm" onclick="openReopenModal('${s.session_id}','${(s.name||'').replace(/'/g,"\\'")}')">🔓 Buka Ulang</button>`

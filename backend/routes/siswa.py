@@ -12,16 +12,50 @@ siswa_bp = Blueprint('siswa', __name__)
 @require_auth
 def register_device():
     data = request.json or {}
-    device_id   = data.get('device_id','').strip()
-    device_info = data.get('device_info','').strip()
+    device_id     = data.get('device_id','').strip()
+    device_info   = data.get('device_info','').strip()
+    transfer_code = (data.get('transfer_code') or '').strip().upper()
     if not device_id: return jsonify({'error': 'device_id wajib'}), 400
     user = query("SELECT device_id FROM users WHERE id=%s", (request.user_id,), fetch='one')
     if not user: return jsonify({'error': 'User tidak ditemukan'}), 404
     if user.get('device_id') and user['device_id'] != device_id:
-        return jsonify({'allowed': False, 'error': 'Device tidak dikenali. Hubungi admin.'}), 403
+        # Device baru tidak dikenali — boleh lanjut kalau bawa kode pindah
+        # device yang masih berlaku dari guru (HP lama mati/kuota habis).
+        if transfer_code:
+            code_row = query("""
+                SELECT id FROM device_transfer_codes
+                WHERE student_id=%s AND code=%s AND used_at IS NULL AND expires_at > NOW()
+            """, (request.user_id, transfer_code), fetch='one')
+            if not code_row:
+                return jsonify({'allowed': False, 'error': 'Kode pindah device salah atau sudah kedaluwarsa.'}), 403
+            query("UPDATE device_transfer_codes SET used_at=NOW() WHERE id=%s", (code_row['id'],), fetch='none')
+        else:
+            return jsonify({
+                'allowed': False,
+                'error': 'Device tidak dikenali. Minta guru pengawas membuka akses lewat Pengawas Live (scan/kode), atau hubungi admin.',
+            }), 403
     query("UPDATE users SET device_id=%s, device_info=%s WHERE id=%s",
           (device_id, device_info, request.user_id), fetch='none')
     return jsonify({'allowed': True})
+
+@siswa_bp.route('/api/student/my-unlock-code', methods=['GET'])
+@require_auth
+def my_unlock_code():
+    """Kode/barcode tetap milik siswa ini — dipakai guru di Pengawas Live
+    untuk membuka device baru kalau HP lama siswa mati/kuota habis."""
+    user = query("SELECT unlock_code FROM users WHERE id=%s", (request.user_id,), fetch='one')
+    if not user: return jsonify({'error': 'User tidak ditemukan'}), 404
+    code = user.get('unlock_code')
+    if not code:
+        import random as _r, string as _s
+        for _ in range(5):
+            candidate = ''.join(_r.choices(_s.ascii_uppercase + _s.digits, k=8))
+            exists = query("SELECT 1 FROM users WHERE unlock_code=%s", (candidate,), fetch='one')
+            if not exists:
+                code = candidate
+                break
+        query("UPDATE users SET unlock_code=%s WHERE id=%s", (code, request.user_id), fetch='none')
+    return jsonify({'unlock_code': code})
 
 # ── Exams List ─────────────────────────────────────────────────
 @siswa_bp.route('/api/student/exams', methods=['GET'])

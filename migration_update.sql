@@ -252,6 +252,31 @@ CREATE INDEX IF NOT EXISTS idx_questions_content_trgm ON questions USING gin (co
 ALTER TABLE options ADD COLUMN IF NOT EXISTS image_url TEXT;
 ALTER TABLE options ALTER COLUMN content DROP NOT NULL;
 
+-- ── 26. Pindah device darurat (HP siswa mati/kuota habis) ─────────
+-- Dua mekanisme untuk siswa lanjut ujian di device lain tanpa kehilangan
+-- jawaban (jawaban sudah tersimpan di server, tinggal device_id-nya yang
+-- perlu "dibuka"):
+--   1. unlock_code — kode TETAP per siswa (boleh sama terus, semacam
+--      barcode pribadi). Guru bisa scan/ketik kode ini dari Pengawas Live
+--      untuk langsung reset device_id siswa itu (kalau guru memang sedang
+--      mengawasi ujian siswa tersebut).
+--   2. device_transfer_codes — kode SEKALI PAKAI yang baru dibuat tiap
+--      kali dibutuhkan (per ujian per siswa), untuk kasus kamera/scan
+--      tidak bisa dipakai: guru generate kode dari Pengawas Live, lalu
+--      ketik manual di device baru siswa.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS unlock_code TEXT UNIQUE;
+CREATE TABLE IF NOT EXISTS device_transfer_codes (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    student_id  UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    exam_id     UUID REFERENCES exams(id) ON DELETE CASCADE,
+    code        TEXT NOT NULL,
+    created_by  UUID REFERENCES users(id) ON DELETE SET NULL,
+    expires_at  TIMESTAMPTZ NOT NULL,
+    used_at     TIMESTAMPTZ,
+    created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_transfer_codes_lookup ON device_transfer_codes(code);
+
 -- ── Selesai ───────────────────────────────────────────────────
 -- Verifikasi: SELECT table_name FROM information_schema.tables
 --             WHERE table_schema='public' ORDER BY table_name;
