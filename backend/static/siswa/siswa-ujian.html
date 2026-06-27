@@ -704,8 +704,7 @@
         user = null,
         exams = [],
         examData = null,
-        sessionData = null,
-        _myFingerprint = null;
+        sessionData = null;
       let current = 0,
         answers = {},       // { qid: optionId | 'essay' | 'multi' }
         essayTexts = {},    // { qid: text }
@@ -758,44 +757,45 @@
         const root = document.getElementById("root");
         if (page === "loading") root.innerHTML = renderLoading("Memuat...");
         else if (page === "login") root.innerHTML = renderLogin();
-        else if (page === "device-locked") root.innerHTML = renderDeviceLocked();
         else if (page === "list") root.innerHTML = renderList();
         else if (page === "exam") root.innerHTML = renderExam();
         else if (page === "result") root.innerHTML = renderResult();
         attachEvents();
       }
 
-      // ── DEVICE TERKUNCI — HP lama mati/kuota habis, minta kode dari guru ──
-      function renderDeviceLocked() {
-        return `<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:1.5rem;background:var(--bg)">
-          <div style="max-width:420px;width:100%;background:#fff;border-radius:20px;padding:2rem 1.75rem;box-shadow:0 10px 40px rgba(0,0,0,.08);text-align:center">
-            <div style="font-size:44px;margin-bottom:.5rem">🔒</div>
-            <div style="font-size:18px;font-weight:700;color:var(--green);margin-bottom:.5rem">Perangkat Ini Belum Dikenali</div>
-            <div style="font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:1.5rem">
-              Kemungkinan Anda biasa ujian di HP lain (HP lama mati/kuota habis?). Jawaban Anda
-              <strong>tidak hilang</strong> — minta guru pengawas membuka akses untuk perangkat ini.
-            </div>
-            <div style="text-align:left;margin-bottom:1rem">
-              <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:6px">Kode dari Guru</label>
-              <input id="dl-code" placeholder="Contoh: 4F8K2X"
-                style="width:100%;padding:12px 14px;border:1.5px solid var(--border);border-radius:12px;font-size:18px;font-weight:700;letter-spacing:2px;text-transform:uppercase;text-align:center;outline:none;box-sizing:border-box"
-                onkeydown="if(event.key==='Enter')retryUnlock()" />
-            </div>
-            <button onclick="retryUnlock()" id="dl-submit-btn"
-              style="width:100%;padding:13px;background:var(--green);color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer">Masuk dengan Kode Ini</button>
-            <div id="dl-err" style="display:none;color:var(--red2);font-size:12px;margin-top:.75rem"></div>
-            <div style="margin-top:1.25rem;padding-top:1.25rem;border-top:.5px solid var(--border)">
-              <div style="font-size:12px;color:var(--muted);margin-bottom:.5rem">Atau tunjukkan kode/barcode tetap Anda ke guru:</div>
-              <button class="logout-btn" style="background:var(--light);color:var(--green);width:100%" onclick="showMyCode()">🆔 Tampilkan Kode Saya</button>
-            </div>
-            <button class="logout-btn" style="margin-top:.75rem;width:100%" onclick="Auth.logout()">⏻ Keluar</button>
+      // ── Keluar Ujian (kuota internet mau habis) ───────────────────────
+      // Siswa minta kode ke guru, ketik di sini SELAGI masih ada sinyal —
+      // setelah dikonfirmasi, boleh offline. Jawaban tetap tersimpan, bisa
+      // masuk lagi kapan saja (device sama atau lain) untuk lanjutkan.
+      function showExitModal() {
+        let modal = document.getElementById("_exit-modal");
+        if (!modal) {
+          modal = document.createElement("div");
+          modal.id = "_exit-modal";
+          modal.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem";
+          modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+          document.body.appendChild(modal);
+        }
+        modal.innerHTML = `<div style="background:#fff;border-radius:20px;padding:1.75rem;max-width:340px;width:100%;text-align:center">
+          <div style="font-size:36px;margin-bottom:.5rem">🚪</div>
+          <div style="font-weight:700;color:var(--green);margin-bottom:.5rem">Keluar Ujian</div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:1rem;line-height:1.5">
+            Kuota internet mau habis? Minta kode ke guru pengawas, ketik di sini SELAGI masih ada sinyal.
+            Jawaban Anda tetap tersimpan — boleh masuk lagi kapan saja untuk lanjutkan.
           </div>
+          <input id="exit-code-input" placeholder="Kode dari guru"
+            style="width:100%;padding:12px 14px;border:1.5px solid var(--border);border-radius:12px;font-size:18px;font-weight:700;letter-spacing:2px;text-transform:uppercase;text-align:center;outline:none;box-sizing:border-box;margin-bottom:.75rem"
+            onkeydown="if(event.key==='Enter')confirmExitWithCode()" />
+          <div id="exit-modal-err" style="display:none;color:var(--red2);font-size:12px;margin-bottom:.75rem"></div>
+          <button id="exit-confirm-btn" onclick="confirmExitWithCode()"
+            style="width:100%;padding:12px;background:var(--green);color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:.5rem">Keluar Sekarang</button>
+          <button class="logout-btn" style="width:100%" onclick="document.getElementById('_exit-modal').remove()">Batal</button>
         </div>`;
       }
 
-      async function retryUnlock() {
-        const input = document.getElementById("dl-code");
-        const errEl = document.getElementById("dl-err");
+      async function confirmExitWithCode() {
+        const input = document.getElementById("exit-code-input");
+        const errEl = document.getElementById("exit-modal-err");
         const code = (input?.value || "").trim();
         errEl.style.display = "none";
         if (!code) {
@@ -803,30 +803,30 @@
           errEl.style.display = "block";
           return;
         }
-        const btn = document.getElementById("dl-submit-btn");
+        const btn = document.getElementById("exit-confirm-btn");
         btn.textContent = "Memeriksa..."; btn.disabled = true;
         try {
-          await apiFetch("/api/student/register-device", {
+          await apiFetch(`/api/sessions/${sessionData.session_id}/confirm-exit`, {
             method: "POST",
-            body: JSON.stringify({
-              device_id: _myFingerprint,
-              device_info: navigator.userAgent.substring(0, 250),
-              transfer_code: code,
-            }),
+            body: JSON.stringify({ code }),
           });
-          page = "loading";
-          render();
-          await loadExams();
+          document.getElementById("_exit-modal").remove();
+          UI.toast("✅ Anda boleh keluar — jawaban tersimpan, masuk lagi kapan saja", "success");
+          clearInterval(timerInterval);
+          clearInterval(saveInterval);
           page = "list";
+          await loadExams();
           render();
         } catch (err) {
           errEl.textContent = err.error || "Kode salah atau sudah kedaluwarsa";
           errEl.style.display = "block";
-          btn.textContent = "Masuk dengan Kode Ini"; btn.disabled = false;
+          btn.textContent = "Keluar Sekarang"; btn.disabled = false;
         }
       }
 
-      // ── Kode/barcode tetap milik siswa — bisa dilihat kapan saja ──────
+      // ── Kode/barcode tetap milik siswa — buat guru gampang kenali siswa
+      // sebelum generate kode keluar ujian (lihat showExitModal). Bisa
+      // dilihat kapan saja, kodenya sama terus (bukan sekali pakai).
       async function showMyCode() {
         let modal = document.getElementById("_my-code-modal");
         if (!modal) {
@@ -838,7 +838,7 @@
         }
         modal.innerHTML = `<div style="background:#fff;border-radius:20px;padding:1.75rem;max-width:320px;width:100%;text-align:center">
           <div style="font-weight:700;color:var(--green);margin-bottom:.75rem">🆔 Kode Saya</div>
-          <div style="font-size:12px;color:var(--muted);margin-bottom:1rem">Tunjukkan ke guru pengawas — scan barcode atau bacakan kodenya untuk membuka device baru ini.</div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:1rem">Tunjukkan ke guru pengawas supaya gampang dikenali — kode ini cuma identitas, bukan untuk keluar ujian (lihat tombol "Keluar Ujian" saat mengerjakan soal).</div>
           <div id="_my-code-body"><div class="spin" style="margin:1.5rem auto"></div></div>
           <button class="logout-btn" style="margin-top:1rem;width:100%" onclick="document.getElementById('_my-code-modal').remove()">Tutup</button>
         </div>`;
@@ -952,6 +952,7 @@
         <div class="exam-topbar-title">${examData?.title || "Ujian"}</div>
         <div style="display:flex;align-items:center;gap:10px">
           <div class="timer ${timerCls}">${mm}:${ss}</div>
+          <button onclick="showExitModal()" title="Kuota internet mau habis? Minta kode dari guru lalu keluar di sini" style="background:var(--light);border:none;border-radius:8px;padding:6px 11px;font-size:12px;color:var(--muted);cursor:pointer">🚪</button>
           <button onclick="document.documentElement.requestFullscreen?.()" style="background:var(--light);border:none;border-radius:8px;padding:6px 11px;font-size:12px;color:var(--muted);cursor:pointer">⛶</button>
         </div>
       </div>
@@ -1546,24 +1547,17 @@
             }
             localStorage.setItem("ujian_user", JSON.stringify(user));
 
-            // Daftarkan device otomatis saat login
-            _myFingerprint = _deviceFingerprint();
+            // Daftarkan device — sekadar catatan, tidak menghalangi login di
+            // device lain kalau HP lama mati/rusak (lihat register_device).
             try {
               await apiFetch("/api/student/register-device", {
                 method: "POST",
                 body: JSON.stringify({
-                  device_id: _myFingerprint,
+                  device_id: _deviceFingerprint(),
                   device_info: navigator.userAgent.substring(0, 250),
                 }),
               });
-            } catch (err) {
-              // Device baru tidak dikenali — tampilkan layar minta kode dari
-              // guru, jangan diam-diam diteruskan (dulu begini, bikin siswa
-              // bingung kalau ternyata device-nya memang belum dibuka).
-              page = "device-locked";
-              render();
-              return;
-            }
+            } catch (_) { /* tidak kritis, jangan halangi siswa lanjut ujian */ }
 
             await loadExams();
             page = "list";

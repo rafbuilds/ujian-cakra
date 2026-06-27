@@ -392,49 +392,27 @@ def list_proctoring_exams():
 
 def _is_exam_proctor(exam, user_id, role):
     """Pemilik soal, admin, atau guru yang sudah unlock kode pengawas — sama
-    seperti otorisasi monitor_exam, dipakai juga untuk fitur pindah device."""
+    seperti otorisasi monitor_exam, dipakai juga untuk fitur generate kode keluar."""
     if role == 'admin' or str(exam['teacher_id']) == user_id:
         return True
     return bool(query("SELECT 1 FROM exam_proctors WHERE exam_id=%s AND teacher_id=%s",
                        (exam['id'], user_id), fetch='one'))
 
-def _student_ongoing_exam_for(student_id):
-    """Cari ujian yang sedang dikerjakan (belum submit) oleh siswa ini —
-    dipakai untuk verifikasi sebelum guru boleh membuka device baru siswa."""
-    return query("""
-        SELECT e.* FROM exam_sessions es
-        JOIN exams e ON e.id = es.exam_id
-        WHERE es.student_id=%s AND es.submitted_at IS NULL
-        ORDER BY es.started_at DESC LIMIT 1
-    """, (student_id,), fetch='one')
-
-# ── Pindah Device Darurat (HP siswa mati/kuota habis) ───────────
-@exams_bp.route('/api/guru/unlock-by-code', methods=['POST'])
-@require_guru
-def unlock_device_by_code():
-    """Guru scan/ketik kode tetap (unlock_code) milik siswa — kalau guru ini
-    memang sedang mengawasi ujian yang sedang dikerjakan siswa tersebut,
-    device_id siswa direset sehingga bisa login di device baru."""
-    code = (request.json or {}).get('code', '').strip().upper()
-    if not code:
-        return jsonify({'error': 'Kode wajib diisi'}), 400
-    student = query("SELECT id, name FROM users WHERE unlock_code=%s AND role='siswa'", (code,), fetch='one')
-    if not student:
-        return jsonify({'error': 'Kode tidak ditemukan'}), 404
-    exam = _student_ongoing_exam_for(student['id'])
-    if not exam:
-        return jsonify({'error': f"{student['name']} tidak sedang mengerjakan ujian apa pun"}), 404
-    if not _is_exam_proctor(exam, request.user_id, request.user_role):
-        return jsonify({'error': 'Anda bukan pengawas ujian yang sedang dikerjakan siswa ini'}), 403
-    query("UPDATE users SET device_id=NULL, device_info=NULL WHERE id=%s", (student['id'],), fetch='none')
-    return jsonify({'ok': True, 'student_name': student['name'], 'exam_title': exam['title']})
-
+# ── Kode Keluar Ujian (kuota internet mau/sudah habis) ──────────
+# Catatan: HP mati/rusak total TIDAK butuh kode apa pun — siswa cukup login
+# ulang di device lain (mis. PC lab), exam_sessions yang sama otomatis
+# dilanjutkan (lihat start_exam di siswa.py), tidak mulai dari awal.
+# Kode di bawah ini khusus untuk siswa yang MASIH di device yang sama tapi
+# kuota internet mau habis — minta kode ke guru SELAGI masih ada sinyal,
+# konfirmasi keluar lewat /api/sessions/<id>/confirm-exit, baru offline.
+# Kode unik per ujian per siswa (sekali pakai), QR/unlock_code siswa cuma
+# dipakai guru untuk gampang kenali siswa sebelum generate kode ini.
 @exams_bp.route('/api/exams/<exam_id>/students/<student_id>/transfer-code', methods=['POST'])
 @require_guru
 def generate_transfer_code(exam_id, student_id):
-    """Kode SEKALI PAKAI baru per ujian per siswa — fallback kalau kode tetap
-    (barcode) tidak bisa di-scan (misal kamera siswa/guru rusak). Guru ketik
-    manual kode ini di device baru siswa, berlaku 10 menit."""
+    """Kode keluar ujian, sekali pakai, baru per ujian per siswa. Guru
+    sampaikan ke siswa untuk diketik di tombol "Keluar Ujian" pada aplikasi
+    siswa SELAGI masih online, berlaku 10 menit."""
     exam = query("SELECT * FROM exams WHERE id=%s", (exam_id,), fetch='one')
     if not exam: return jsonify({'error': 'Ujian tidak ditemukan'}), 404
     if not _is_exam_proctor(exam, request.user_id, request.user_role):

@@ -252,18 +252,18 @@ CREATE INDEX IF NOT EXISTS idx_questions_content_trgm ON questions USING gin (co
 ALTER TABLE options ADD COLUMN IF NOT EXISTS image_url TEXT;
 ALTER TABLE options ALTER COLUMN content DROP NOT NULL;
 
--- ── 26. Pindah device darurat (HP siswa mati/kuota habis) ─────────
--- Dua mekanisme untuk siswa lanjut ujian di device lain tanpa kehilangan
--- jawaban (jawaban sudah tersimpan di server, tinggal device_id-nya yang
--- perlu "dibuka"):
---   1. unlock_code — kode TETAP per siswa (boleh sama terus, semacam
---      barcode pribadi). Guru bisa scan/ketik kode ini dari Pengawas Live
---      untuk langsung reset device_id siswa itu (kalau guru memang sedang
---      mengawasi ujian siswa tersebut).
---   2. device_transfer_codes — kode SEKALI PAKAI yang baru dibuat tiap
---      kali dibutuhkan (per ujian per siswa), untuk kasus kamera/scan
---      tidak bisa dipakai: guru generate kode dari Pengawas Live, lalu
---      ketik manual di device baru siswa.
+-- ── 26. Keluar ujian darurat (kuota internet mau/sudah habis) ─────
+-- HP mati/rusak total TIDAK butuh kolom/tabel ini sama sekali — siswa
+-- tinggal login ulang di device lain (mis. PC lab), exam_sessions yang
+-- sama otomatis dilanjutkan, tidak mulai dari awal (lihat start_exam).
+--
+-- Ini khusus untuk kuota internet mau/sudah habis (device TETAP sama):
+--   1. unlock_code — kode TETAP per siswa (boleh sama terus), cuma identitas
+--      supaya guru gampang kenali siswa di Pengawas Live, BUKAN untuk aksi apa pun.
+--   2. device_transfer_codes — kode SEKALI PAKAI baru per ujian per siswa.
+--      Guru generate dari Pengawas Live (tombol "Kode Keluar"), siswa ketik
+--      kodenya sendiri di tombol "Keluar Ujian" SELAGI masih ada sinyal,
+--      baru boleh offline. Jawaban tetap tersimpan, bisa masuk lagi kapan saja.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS unlock_code TEXT UNIQUE;
 CREATE TABLE IF NOT EXISTS device_transfer_codes (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
