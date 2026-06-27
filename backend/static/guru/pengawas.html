@@ -413,7 +413,7 @@
                   "
                 />
               </div>
-              <div id="stu-table"></div>
+              <div id="stu-table" style="overflow-x: auto; -webkit-overflow-scrolling: touch"></div>
             </div>
           </div>
         </div>
@@ -747,7 +747,7 @@
           return;
         }
         el.innerHTML = `
-    <table style="width:100%;border-collapse:collapse;font-size:13px">
+    <table style="width:100%;min-width:760px;border-collapse:collapse;font-size:13px">
       <thead><tr style="background:var(--green)">
         <th style="color:#fff;padding:9px 12px;text-align:left;font-size:12px">#</th>
         <th style="color:#fff;padding:9px 12px;text-align:left;font-size:12px">Nama Siswa</th>

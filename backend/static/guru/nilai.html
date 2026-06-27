@@ -306,6 +306,17 @@
         </div>
 
         <div class="page-main">
+          <div class="card" style="display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: end">
+            <div style="flex: 1; min-width: 140px">
+              <label style="font-size: 11px; color: var(--muted); display: block; margin-bottom: 4px">Tahun Ajaran</label>
+              <select class="form-control" id="f-year"></select>
+            </div>
+            <div style="flex: 1; min-width: 140px">
+              <label style="font-size: 11px; color: var(--muted); display: block; margin-bottom: 4px">Semester</label>
+              <select class="form-control" id="f-semester"></select>
+            </div>
+          </div>
+
           <div class="card">
             <select
               class="form-control"
@@ -314,6 +325,9 @@
             >
               <option value="">— Pilih ujian —</option>
             </select>
+            <div style="font-size: 11px; color: var(--muted); margin-top: 6px">
+              Hanya menampilkan ujian dari Tahun Ajaran & Semester yang dipilih di atas — pilih semester lain untuk lihat ujian periode sebelumnya.
+            </div>
           </div>
 
           <div id="nilai-content" style="display: none">
@@ -615,8 +629,60 @@
       const getColor = (n) => COLORS[n.charCodeAt(0) % COLORS.length];
 
       async function init() {
-        const exams = await API.get("/api/exams");
+        await loadYearSemesterFilter();
+        const id = new URLSearchParams(location.search).get("id");
+        if (id) {
+          // Ujian spesifik diminta lewat URL (misal dari Daftar Ujian) — cari
+          // semester-nya dulu supaya filter & dropdown ikut menyesuaikan.
+          try {
+            const exam = await API.get(`/api/exams/${id}`);
+            if (exam.semester_id) {
+              document.getElementById("f-semester").value = exam.semester_id;
+              await loadExamOptions();
+            }
+          } catch {}
+          document.getElementById("exam-select").value = id;
+          loadNilai(id);
+        }
+      }
+
+      async function loadYearSemesterFilter() {
+        try {
+          const [years, active] = await Promise.all([
+            API.get("/api/guru/academic-years"),
+            API.get("/api/guru/active-period").catch(() => ({})),
+          ]);
+          const ySel = document.getElementById("f-year");
+          ySel.innerHTML = (years || [])
+            .map((y) => `<option value="${y.id}">${y.name}${y.is_active ? " (aktif)" : ""}</option>`)
+            .join("");
+          const defaultYearId = active?.academic_year?.id || years?.[0]?.id || "";
+          if (defaultYearId) ySel.value = defaultYearId;
+          ySel.onchange = () => loadSemesterOptions();
+          document.getElementById("f-semester").onchange = loadExamOptions;
+          await loadSemesterOptions(active?.semester?.id);
+        } catch {}
+      }
+
+      async function loadSemesterOptions(defaultSemId) {
+        const yearId = document.getElementById("f-year").value;
+        const sSel = document.getElementById("f-semester");
+        if (!yearId) { sSel.innerHTML = ""; await loadExamOptions(); return; }
+        try {
+          const sems = await API.get(`/api/guru/semesters?academic_year_id=${yearId}`);
+          sSel.innerHTML = (sems || [])
+            .map((s) => `<option value="${s.id}">${s.name}${s.is_active ? " (aktif)" : ""}</option>`)
+            .join("");
+          if (defaultSemId) sSel.value = defaultSemId;
+          await loadExamOptions();
+        } catch {}
+      }
+
+      async function loadExamOptions() {
+        const semId = document.getElementById("f-semester")?.value || "";
+        const exams = await API.get(`/api/exams${semId ? `?semester_id=${semId}` : ""}`);
         const sel = document.getElementById("exam-select");
+        const prevValue = sel.value;
         sel.innerHTML =
           '<option value="">— Pilih ujian —</option>' +
           exams
@@ -625,10 +691,9 @@
                 `<option value="${e.id}">${e.title} — ${e.status}</option>`,
             )
             .join("");
-        const id = new URLSearchParams(location.search).get("id");
-        if (id) {
-          sel.value = id;
-          loadNilai(id);
+        sel.value = prevValue;
+        if (!exams.find((e) => e.id === prevValue)) {
+          document.getElementById("nilai-content").style.display = "none";
         }
       }
 

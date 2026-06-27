@@ -50,6 +50,27 @@
         gap: 10px;
         flex-wrap: wrap;
       }
+      @media (max-width: 768px) {
+        .exam-row {
+          flex-wrap: wrap;
+        }
+        .exam-icon {
+          display: none;
+        }
+        .exam-info {
+          flex: 1 1 100%;
+        }
+        .exam-meta {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 4px;
+        }
+        .exam-row > div:last-child {
+          flex: 1 1 100%;
+          flex-wrap: wrap;
+          margin-top: 8px;
+        }
+      }
       .modal {
         display: none;
         position: fixed;
