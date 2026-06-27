@@ -186,6 +186,27 @@
         background: linear-gradient(135deg, #cd7f32, #b8600b);
         color: #fff;
       }
+      @media (max-width: 768px) {
+        .sebaran-grid {
+          grid-template-columns: 1fr !important;
+        }
+        .nilai-filter-bar {
+          flex-direction: column;
+          align-items: stretch !important;
+        }
+        .nilai-filter-bar select,
+        .nilai-filter-bar input {
+          width: 100% !important;
+          max-width: 100% !important;
+        }
+        .nilai-filter-bar #count-label {
+          margin-left: 0 !important;
+          text-align: right;
+        }
+        .detail-panel {
+          width: 100% !important;
+        }
+      }
     </style>
   </head>
   <body>
@@ -408,6 +429,7 @@
 
             <!-- Distribusi grade bubbles + bar soal -->
             <div
+              class="sebaran-grid"
               style="
                 display: grid;
                 grid-template-columns: auto 1fr;
@@ -450,11 +472,13 @@
 
             <!-- Filter + search -->
             <div
+              class="nilai-filter-bar"
               style="
                 display: flex;
                 gap: 10px;
                 margin-bottom: 0.875rem;
                 align-items: center;
+                flex-wrap: wrap;
               "
             >
               <select
