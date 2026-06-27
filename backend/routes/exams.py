@@ -392,40 +392,20 @@ def list_proctoring_exams():
 
 def _is_exam_proctor(exam, user_id, role):
     """Pemilik soal, admin, atau guru yang sudah unlock kode pengawas — sama
-    seperti otorisasi monitor_exam, dipakai juga untuk fitur generate kode keluar."""
+    seperti otorisasi monitor_exam."""
     if role == 'admin' or str(exam['teacher_id']) == user_id:
         return True
     return bool(query("SELECT 1 FROM exam_proctors WHERE exam_id=%s AND teacher_id=%s",
                        (exam['id'], user_id), fetch='one'))
 
-# ── Kode Keluar Ujian (kuota internet mau/sudah habis) ──────────
-# Catatan: HP mati/rusak total TIDAK butuh kode apa pun — siswa cukup login
-# ulang di device lain (mis. PC lab), exam_sessions yang sama otomatis
-# dilanjutkan (lihat start_exam di siswa.py), tidak mulai dari awal.
-# Kode di bawah ini khusus untuk siswa yang MASIH di device yang sama tapi
-# kuota internet mau habis — minta kode ke guru SELAGI masih ada sinyal,
-# konfirmasi keluar lewat /api/sessions/<id>/confirm-exit, baru offline.
-# Kode unik per ujian per siswa (sekali pakai), QR/unlock_code siswa cuma
-# dipakai guru untuk gampang kenali siswa sebelum generate kode ini.
-@exams_bp.route('/api/exams/<exam_id>/students/<student_id>/transfer-code', methods=['POST'])
-@require_guru
-def generate_transfer_code(exam_id, student_id):
-    """Kode keluar ujian, sekali pakai, baru per ujian per siswa. Guru
-    sampaikan ke siswa untuk diketik di tombol "Keluar Ujian" pada aplikasi
-    siswa SELAGI masih online, berlaku 10 menit."""
-    exam = query("SELECT * FROM exams WHERE id=%s", (exam_id,), fetch='one')
-    if not exam: return jsonify({'error': 'Ujian tidak ditemukan'}), 404
-    if not _is_exam_proctor(exam, request.user_id, request.user_role):
-        return jsonify({'error': 'Anda bukan pengawas ujian ini'}), 403
-    student = query("SELECT id, name FROM users WHERE id=%s AND role='siswa'", (student_id,), fetch='one')
-    if not student: return jsonify({'error': 'Siswa tidak ditemukan'}), 404
-
-    import random as _r, string as _s
-    code = ''.join(_r.choices(_s.ascii_uppercase.replace('O','').replace('I','') + '23456789', k=6))
-    query("""INSERT INTO device_transfer_codes (id, student_id, exam_id, code, created_by, expires_at)
-              VALUES (%s,%s,%s,%s,%s, NOW() + INTERVAL '10 minutes')""",
-          (str(uuid.uuid4()), student_id, exam_id, code, request.user_id), fetch='none')
-    return jsonify({'code': code, 'student_name': student['name'], 'expires_in_minutes': 10})
+# Catatan soal "Keluar Ujian" darurat (kuota internet habis): kode-nya
+# (exam_sessions.exit_code) dibuat OTOMATIS sekali per sesi di start_exam
+# (siswa.py) — bukan di-generate manual oleh guru — supaya sudah tersimpan
+# di browser siswa sejak awal ujian dan tetap bisa dipakai walau offline
+# total. monitor_exam() di bawah ikut mengirim exit_code ini (lewat es.*)
+# supaya guru bisa lihat langsung di tabel Monitor Siswa tanpa aksi apa pun.
+# HP mati/rusak total malah TIDAK butuh kode sama sekali — siswa cukup login
+# ulang di device lain (mis. PC lab), sesi yang sama otomatis dilanjutkan.
 
 # ── Monitor ────────────────────────────────────────────────────
 @exams_bp.route('/api/exams/<exam_id>/monitor', methods=['GET'])

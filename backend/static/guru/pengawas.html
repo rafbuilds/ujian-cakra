@@ -287,10 +287,10 @@
             <div style="font-size: 12px; color: #8a6c1a; line-height: 1.6">
               <strong>HP mati/rusak total</strong> → tidak perlu kode apa pun. Siswa cukup login ulang di device lain
               (mis. PC lab) — otomatis lanjut dari soal & jawaban yang sama, tidak mulai dari awal.<br /><br />
-              <strong>Kuota internet mau/sudah habis</strong> (HP masih sama) → klik "🔑 Kode Keluar" di baris siswa pada
-              tabel Monitor Siswa di bawah. Sampaikan kodenya ke siswa untuk diketik di tombol
-              "Keluar Ujian" pada aplikasi siswa <u>selagi masih ada sinyal</u> — setelah itu siswa boleh offline,
-              dan bisa masuk lagi kapan saja untuk lanjutkan.
+              <strong>Kuota internet habis/offline mendadak</strong> → setiap siswa SUDAH otomatis punya kode keluar
+              sendiri sejak mulai ujian (lihat kolom "Kode Keluar" di tabel Monitor Siswa di bawah, tidak perlu di-generate).
+              Kode ini juga sudah tersimpan di HP siswa sejak awal — siswa bisa langsung pakai untuk keluar kapan pun
+              walau sudah tidak ada sinyal sama sekali. Jawaban tetap tersimpan, bisa masuk lagi kapan saja untuk lanjutkan.
             </div>
           </div>
 
@@ -565,22 +565,6 @@
         sel.value = prevValue;
       }
 
-      async function generateTransferCode(studentId, studentName) {
-        if (!currentExamId) return;
-        try {
-          const r = await API.post(`/api/exams/${currentExamId}/students/${studentId}/transfer-code`, {});
-          UI.confirm(
-            "🔑 Kode Keluar Ujian",
-            `Kode untuk <strong>${studentName}</strong>: <div style="font-size:28px;font-weight:800;letter-spacing:4px;color:var(--green);text-align:center;margin:.75rem 0">${r.code}</div>
-             Berlaku <strong>${r.expires_in_minutes} menit</strong> — sampaikan ke siswa untuk diketik di tombol "Keluar Ujian" pada aplikasinya, selagi masih ada sinyal.`,
-            () => {},
-            "success",
-          );
-        } catch (e) {
-          UI.toast(e.error || "Gagal membuat kode", "error");
-        }
-      }
-
       async function joinByCode() {
         const input = document.getElementById("proctor-code-input");
         const code = input.value.trim();
@@ -778,7 +762,7 @@
           return;
         }
         el.innerHTML = `
-    <table style="width:100%;min-width:760px;border-collapse:collapse;font-size:13px">
+    <table style="width:100%;min-width:880px;border-collapse:collapse;font-size:13px">
       <thead><tr style="background:var(--green)">
         <th style="color:#fff;padding:9px 12px;text-align:left;font-size:12px">#</th>
         <th style="color:#fff;padding:9px 12px;text-align:left;font-size:12px">Nama Siswa</th>
@@ -787,6 +771,7 @@
         <th style="color:#fff;padding:9px 12px;text-align:left;font-size:12px">Progress</th>
         <th style="color:#fff;padding:9px 12px;text-align:left;font-size:12px">Pelanggaran</th>
         <th style="color:#fff;padding:9px 12px;text-align:left;font-size:12px">Submit</th>
+        <th style="color:#fff;padding:9px 12px;text-align:left;font-size:12px">Kode Keluar</th>
         <th style="color:#fff;padding:9px 12px;text-align:left;font-size:12px">Aksi</th>
       </tr></thead>
       <tbody>
@@ -821,12 +806,12 @@
               ${s.submitted_at ? UI.fmtTime(s.submitted_at) : "—"}
             </td>
             <td style="padding:9px 12px">
+              ${s.exit_code ? `<span style="font-family:monospace;font-weight:700;letter-spacing:1px;background:var(--light);padding:3px 8px;border-radius:6px;font-size:13px">${s.exit_code}</span>` : '<span style="color:var(--muted);font-size:12px">—</span>'}
+            </td>
+            <td style="padding:9px 12px">
               <div style="display:flex;flex-direction:column;gap:4px">
                 ${s.status !== 'submitted'
                   ? `<button class="btn btn-secondary btn-sm" title="Guru langsung izinkan keluar dari sini — siswa boleh keluar/offline, masuk lagi kapan saja untuk lanjutkan" onclick="allowExit('${s.session_id}','${(s.name||'').replace(/'/g,"\\'")}')">🚪 Izinkan Keluar</button>`
-                  : ''}
-                ${s.status !== 'submitted'
-                  ? `<button class="btn btn-secondary btn-sm" title="Generate kode untuk siswa ketik sendiri di tombol Keluar Ujian — dipakai SELAGI siswa masih online sebelum kuota habis" onclick="generateTransferCode('${s.student_id}','${(s.name||'').replace(/'/g,"\\'")}')">🔑 Kode Keluar</button>`
                   : ''}
                 ${s.status === 'submitted'
                   ? `<button class="btn btn-primary btn-sm" onclick="openReopenModal('${s.session_id}','${(s.name||'').replace(/'/g,"\\'")}')">🔓 Buka Ulang</button>`

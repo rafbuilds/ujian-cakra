@@ -767,6 +767,12 @@
       // Siswa minta kode ke guru, ketik di sini SELAGI masih ada sinyal —
       // setelah dikonfirmasi, boleh offline. Jawaban tetap tersimpan, bisa
       // masuk lagi kapan saja (device sama atau lain) untuk lanjutkan.
+      // Begitu siswa konfirmasi keluar (cocok lokal), anti-cheat (visibility-
+      // change → auto-submit setelah 5x "pindah tab") DIMATIKAN untuk sesi
+      // ini, supaya siswa yang menyingkir karena offline tidak ke-auto-submit
+      // tanpa sengaja saat HP/tab-nya ditinggal.
+      let _exitedGracefully = false;
+
       function showExitModal() {
         let modal = document.getElementById("_exit-modal");
         if (!modal) {
@@ -780,10 +786,12 @@
           <div style="font-size:36px;margin-bottom:.5rem">🚪</div>
           <div style="font-weight:700;color:var(--green);margin-bottom:.5rem">Keluar Ujian</div>
           <div style="font-size:12px;color:var(--muted);margin-bottom:1rem;line-height:1.5">
-            Kuota internet mau habis? Minta kode ke guru pengawas, ketik di sini SELAGI masih ada sinyal.
-            Jawaban Anda tetap tersimpan — boleh masuk lagi kapan saja untuk lanjutkan.
+            Kuota internet habis atau mau menyingkir sebentar? Kode di bawah sudah tersimpan di HP ini sejak mulai
+            ujian — bisa dipakai walau <strong>sudah tidak ada sinyal</strong>. Jawaban Anda tetap tersimpan.
           </div>
-          <input id="exit-code-input" placeholder="Kode dari guru"
+          <div style="font-size:11px;color:var(--muted);margin-bottom:.5rem">Kode keluar Anda untuk ujian ini:</div>
+          <div style="font-size:24px;font-weight:800;letter-spacing:4px;color:var(--green);margin-bottom:1rem">${sessionData?.exit_code || "—"}</div>
+          <input id="exit-code-input" placeholder="Ketik ulang kode di atas untuk konfirmasi"
             style="width:100%;padding:12px 14px;border:1.5px solid var(--border);border-radius:12px;font-size:18px;font-weight:700;letter-spacing:2px;text-transform:uppercase;text-align:center;outline:none;box-sizing:border-box;margin-bottom:.75rem"
             onkeydown="if(event.key==='Enter')confirmExitWithCode()" />
           <div id="exit-modal-err" style="display:none;color:var(--red2);font-size:12px;margin-bottom:.75rem"></div>
@@ -793,66 +801,32 @@
         </div>`;
       }
 
-      async function confirmExitWithCode() {
+      function confirmExitWithCode() {
         const input = document.getElementById("exit-code-input");
         const errEl = document.getElementById("exit-modal-err");
-        const code = (input?.value || "").trim();
+        const code = (input?.value || "").trim().toUpperCase();
         errEl.style.display = "none";
         if (!code) {
-          errEl.textContent = "Masukkan kode dari guru dulu";
+          errEl.textContent = "Ketik kode keluar dulu";
           errEl.style.display = "block";
           return;
         }
-        const btn = document.getElementById("exit-confirm-btn");
-        btn.textContent = "Memeriksa..."; btn.disabled = true;
-        try {
-          await apiFetch(`/api/sessions/${sessionData.session_id}/confirm-exit`, {
-            method: "POST",
-            body: JSON.stringify({ code }),
-          });
-          document.getElementById("_exit-modal").remove();
-          UI.toast("✅ Anda boleh keluar — jawaban tersimpan, masuk lagi kapan saja", "success");
-          clearInterval(timerInterval);
-          clearInterval(saveInterval);
-          page = "list";
-          await loadExams();
-          render();
-        } catch (err) {
-          errEl.textContent = err.error || "Kode salah atau sudah kedaluwarsa";
+        // Dicocokkan SEPENUHNYA di browser — tidak ada request ke server di
+        // langkah ini, jadi tetap bisa dipakai walau benar-benar offline.
+        if (code !== (sessionData?.exit_code || "").toUpperCase()) {
+          errEl.textContent = "Kode salah — cek lagi dengan guru pengawas";
           errEl.style.display = "block";
-          btn.textContent = "Keluar Sekarang"; btn.disabled = false;
+          return;
+        }
+        _exitedGracefully = true;
+        document.getElementById("_exit-modal").remove();
+        UI.toast("✅ Anda boleh keluar/offline sekarang — jawaban tersimpan, masuk lagi kapan saja untuk lanjutkan", "success", 6000);
+        // Sinkron ke server cuma kalau online, fire-and-forget — TIDAK
+        // menjadi syarat keluar (sudah berlaku sejak baris di atas).
+        if (navigator.onLine) {
+          apiFetch(`/api/sessions/${sessionData.session_id}/log-exit`, { method: "POST" }).catch(() => {});
         }
       }
-
-      // ── Kode/barcode tetap milik siswa — buat guru gampang kenali siswa
-      // sebelum generate kode keluar ujian (lihat showExitModal). Bisa
-      // dilihat kapan saja, kodenya sama terus (bukan sekali pakai).
-      async function showMyCode() {
-        let modal = document.getElementById("_my-code-modal");
-        if (!modal) {
-          modal = document.createElement("div");
-          modal.id = "_my-code-modal";
-          modal.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem";
-          modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
-          document.body.appendChild(modal);
-        }
-        modal.innerHTML = `<div style="background:#fff;border-radius:20px;padding:1.75rem;max-width:320px;width:100%;text-align:center">
-          <div style="font-weight:700;color:var(--green);margin-bottom:.75rem">🆔 Kode Saya</div>
-          <div style="font-size:12px;color:var(--muted);margin-bottom:1rem">Tunjukkan ke guru pengawas supaya gampang dikenali — kode ini cuma identitas, bukan untuk keluar ujian (lihat tombol "Keluar Ujian" saat mengerjakan soal).</div>
-          <div id="_my-code-body"><div class="spin" style="margin:1.5rem auto"></div></div>
-          <button class="logout-btn" style="margin-top:1rem;width:100%" onclick="document.getElementById('_my-code-modal').remove()">Tutup</button>
-        </div>`;
-        try {
-          const r = await apiFetch("/api/student/my-unlock-code");
-          document.getElementById("_my-code-body").innerHTML = `
-            <img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(r.unlock_code)}" style="border-radius:10px;margin-bottom:.75rem" />
-            <div style="font-size:22px;font-weight:800;letter-spacing:3px;color:var(--green)">${r.unlock_code}</div>
-          `;
-        } catch {
-          document.getElementById("_my-code-body").innerHTML = '<div style="color:var(--red2);font-size:13px">Gagal memuat kode</div>';
-        }
-      }
-
       // ── LOADING ──────────────────────────────────────────────────
       function renderLoading(txt) {
         return `<div class="loading-page"><div class="spin"></div><div style="font-size:14px;color:var(--muted)">${txt}</div></div>`;
@@ -887,10 +861,7 @@
         <div class="user-av">${(user?.name || "S")[0]}</div>
         <div><div class="user-name">${user?.name || "Siswa"}</div><div class="user-class">${user?.class_id?.replace(/_/g, " ").toUpperCase() || "Siswa"}</div></div>
       </div>
-      <div style="display:flex;gap:8px">
-        <button class="logout-btn" onclick="showMyCode()">🆔 Kode Saya</button>
-        <button class="logout-btn" id="btn-logout">Keluar</button>
-      </div>
+      <button class="logout-btn" id="btn-logout">Keluar</button>
     </div>
     <div class="list-body">
       <div class="list-welcome">
@@ -1276,6 +1247,7 @@
           violations = 0;
           showViolation = false;
           showSubmit = false;
+          _exitedGracefully = false;
           render();
           startTimer();
           startAutoSave();
@@ -1385,7 +1357,7 @@
 
       function startAntiCheat() {
         document.addEventListener("visibilitychange", () => {
-          if (document.hidden) {
+          if (document.hidden && !_exitedGracefully) {
             violations++;
             apiFetch(
               `/api/student/sessions/${sessionData.session_id}/violation`,

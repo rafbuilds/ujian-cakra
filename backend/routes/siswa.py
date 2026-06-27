@@ -11,9 +11,7 @@ siswa_bp = Blueprint('siswa', __name__)
 # Catatan: dulu kolom mismatch device_id di-hard-block (minta kode dari guru).
 # Sekarang TIDAK lagi diblokir — kalau HP siswa mati/rusak, siswa cukup login
 # biasa di device lain (mis. PC lab) dan ujian lanjut dari sesi yang sama
-# (jawaban sudah tersimpan di server), tanpa kode/QR apa pun. QR & kode di
-# bawah ini sekarang khusus untuk fitur "Keluar Ujian" (lihat confirm_exit),
-# bukan untuk pindah device.
+# (jawaban sudah tersimpan di server), tanpa kode/QR apa pun.
 @siswa_bp.route('/api/student/register-device', methods=['POST'])
 @require_auth
 def register_device():
@@ -24,25 +22,6 @@ def register_device():
     query("UPDATE users SET device_id=%s, device_info=%s WHERE id=%s",
           (device_id, device_info, request.user_id), fetch='none')
     return jsonify({'allowed': True})
-
-@siswa_bp.route('/api/student/my-unlock-code', methods=['GET'])
-@require_auth
-def my_unlock_code():
-    """Kode/barcode tetap milik siswa ini — biar guru gampang kenali siswa
-    di Pengawas Live sebelum generate kode keluar (sekali pakai per ujian)."""
-    user = query("SELECT unlock_code FROM users WHERE id=%s", (request.user_id,), fetch='one')
-    if not user: return jsonify({'error': 'User tidak ditemukan'}), 404
-    code = user.get('unlock_code')
-    if not code:
-        import random as _r, string as _s
-        for _ in range(5):
-            candidate = ''.join(_r.choices(_s.ascii_uppercase + _s.digits, k=8))
-            exists = query("SELECT 1 FROM users WHERE unlock_code=%s", (candidate,), fetch='one')
-            if not exists:
-                code = candidate
-                break
-        query("UPDATE users SET unlock_code=%s WHERE id=%s", (code, request.user_id), fetch='none')
-    return jsonify({'unlock_code': code})
 
 # ── Exams List ─────────────────────────────────────────────────
 @siswa_bp.route('/api/student/exams', methods=['GET'])
@@ -86,6 +65,14 @@ def start_exam(exam_id):
     if exam['status'] == 'published':
         query("UPDATE exams SET status='ongoing' WHERE id=%s", (exam_id,), fetch='none')
 
+    # Kode keluar darurat — dibuat SEKALI di awal sesi (masih online), dikirim
+    # ke browser siswa sekarang juga supaya tersimpan di memori HALAMAN INI.
+    # Saat siswa nanti klik "Keluar Ujian", kode ini dicocokkan SEPENUHNYA di
+    # browser (tanpa request ke server) — harus tetap bisa dipakai walau
+    # sinyal sudah hilang total, jadi TIDAK boleh baru dibuat/diambil saat itu.
+    import random as _r, string as _s
+    exit_code = ''.join(_r.choices(_s.ascii_uppercase.replace('O','').replace('I','') + '23456789', k=6))
+
     if not existing:
         # Buat sesi baru
         session_id = str(uuid.uuid4())
@@ -93,17 +80,20 @@ def start_exam(exam_id):
         expires_at = now_utc + timedelta(minutes=int(exam.get('duration_minutes') or 90))
         token = uuid.uuid4().hex
         query("""INSERT INTO exam_sessions
-                 (id, exam_id, student_id, token, device_key, ip_address, status, started_at, expires_at)
-                 VALUES (%s,%s,%s,%s,%s,%s,'ongoing',%s,%s)""",
+                 (id, exam_id, student_id, token, device_key, ip_address, status, started_at, expires_at, exit_code)
+                 VALUES (%s,%s,%s,%s,%s,%s,'ongoing',%s,%s,%s)""",
               (session_id, exam_id, request.user_id, token,
                request.json.get('device_id') if request.json else None,
-               request.remote_addr, now_utc, expires_at), fetch='none')
+               request.remote_addr, now_utc, expires_at, exit_code), fetch='none')
     else:
         session_id = str(existing['id'])
         expires_at = existing.get('expires_at')
+        # Kode keluar dibuat sekali saja per sesi — pakai yang sudah ada kalau
+        # sudah pernah dibuat, jangan ganti-ganti tiap kali siswa buka ulang.
+        exit_code = existing.get('exit_code') or exit_code
         # Reset exit_allowed saat siswa masuk kembali setelah keluar sementara
-        query("UPDATE exam_sessions SET exit_allowed=FALSE, status='ongoing' WHERE id=%s",
-              (session_id,), fetch='none')
+        query("UPDATE exam_sessions SET exit_allowed=FALSE, status='ongoing', exit_code=%s WHERE id=%s",
+              (exit_code, session_id), fetch='none')
 
     # Ambil soal — dengan auto-deteksi type dari data (fix untuk soal lama tanpa type)
     randomize_q = exam.get('randomize_questions', True)
@@ -192,6 +182,7 @@ def start_exam(exam_id):
         'saved_answers': saved_answers,
         'remaining_seconds': remaining,
         'expires_at': expires_at_val.isoformat() if expires_at_val else (expires_at.isoformat() if expires_at else None),
+        'exit_code': exit_code,
     })
 
 # ── Answer ─────────────────────────────────────────────────────
@@ -326,27 +317,15 @@ def check_exit(session_id):
     if not sess: return jsonify({'allowed': False}), 404
     return jsonify({'allowed': bool(sess.get('exit_allowed'))})
 
-@siswa_bp.route('/api/sessions/<session_id>/confirm-exit', methods=['POST'])
+@siswa_bp.route('/api/sessions/<session_id>/log-exit', methods=['POST'])
 @require_auth
-def confirm_exit(session_id):
-    """Siswa sendiri yang konfirmasi keluar pakai kode sekali-pakai dari guru
-    (lihat /api/exams/<id>/students/<id>/transfer-code) — dipakai kalau kuota
-    internet mau habis: siswa minta kode ke guru, ketik di sini SELAGI masih
-    ada sinyal, baru offline. Tidak perlu guru klik apa pun secara real-time."""
-    code = (request.json or {}).get('code', '').strip().upper()
-    if not code:
-        return jsonify({'error': 'Kode wajib diisi'}), 400
-    sess = query("SELECT id, exam_id FROM exam_sessions WHERE id=%s AND student_id=%s",
-                 (session_id, request.user_id), fetch='one')
-    if not sess: return jsonify({'error': 'Sesi ujian tidak ditemukan'}), 404
-    code_row = query("""
-        SELECT id FROM device_transfer_codes
-        WHERE student_id=%s AND exam_id=%s AND code=%s AND used_at IS NULL AND expires_at > NOW()
-    """, (request.user_id, sess['exam_id'], code), fetch='one')
-    if not code_row:
-        return jsonify({'error': 'Kode salah, sudah dipakai, atau sudah kedaluwarsa'}), 403
-    query("UPDATE device_transfer_codes SET used_at=NOW() WHERE id=%s", (code_row['id'],), fetch='none')
-    query("UPDATE exam_sessions SET exit_allowed=true WHERE id=%s", (session_id,), fetch='none')
+def log_exit(session_id):
+    """Sinkronisasi best-effort SETELAH siswa sudah konfirmasi keluar secara
+    lokal di browser (cocokkan exit_code tanpa internet — lihat start_exam).
+    Endpoint ini cuma untuk catatan/riwayat di server kalau sempat online;
+    TIDAK menjadi syarat keluar, jadi aman dipanggil fire-and-forget."""
+    query("UPDATE exam_sessions SET exit_allowed=true, exited_at=NOW() WHERE id=%s AND student_id=%s",
+          (session_id, request.user_id), fetch='none')
     return jsonify({'ok': True})
 
 # ── History ────────────────────────────────────────────────────

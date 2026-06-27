@@ -252,30 +252,27 @@ CREATE INDEX IF NOT EXISTS idx_questions_content_trgm ON questions USING gin (co
 ALTER TABLE options ADD COLUMN IF NOT EXISTS image_url TEXT;
 ALTER TABLE options ALTER COLUMN content DROP NOT NULL;
 
--- ── 26. Keluar ujian darurat (kuota internet mau/sudah habis) ─────
--- HP mati/rusak total TIDAK butuh kolom/tabel ini sama sekali — siswa
--- tinggal login ulang di device lain (mis. PC lab), exam_sessions yang
--- sama otomatis dilanjutkan, tidak mulai dari awal (lihat start_exam).
+-- ── 26. Keluar ujian darurat — HARUS bisa dipakai walau 100% offline ──
+-- HP mati/rusak total TIDAK butuh kode apa pun — siswa tinggal login ulang
+-- di device lain (mis. PC lab), exam_sessions yang sama otomatis
+-- dilanjutkan, tidak mulai dari awal (lihat start_exam).
 --
--- Ini khusus untuk kuota internet mau/sudah habis (device TETAP sama):
---   1. unlock_code — kode TETAP per siswa (boleh sama terus), cuma identitas
---      supaya guru gampang kenali siswa di Pengawas Live, BUKAN untuk aksi apa pun.
---   2. device_transfer_codes — kode SEKALI PAKAI baru per ujian per siswa.
---      Guru generate dari Pengawas Live (tombol "Kode Keluar"), siswa ketik
---      kodenya sendiri di tombol "Keluar Ujian" SELAGI masih ada sinyal,
---      baru boleh offline. Jawaban tetap tersimpan, bisa masuk lagi kapan saja.
-ALTER TABLE users ADD COLUMN IF NOT EXISTS unlock_code TEXT UNIQUE;
-CREATE TABLE IF NOT EXISTS device_transfer_codes (
-    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    student_id  UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    exam_id     UUID REFERENCES exams(id) ON DELETE CASCADE,
-    code        TEXT NOT NULL,
-    created_by  UUID REFERENCES users(id) ON DELETE SET NULL,
-    expires_at  TIMESTAMPTZ NOT NULL,
-    used_at     TIMESTAMPTZ,
-    created_at  TIMESTAMPTZ DEFAULT NOW()
-);
-CREATE INDEX IF NOT EXISTS idx_transfer_codes_lookup ON device_transfer_codes(code);
+-- Untuk kuota internet habis/offline mendadak (worst case — TIDAK BOLEH
+-- butuh koneksi sama sekali saat dipakai): exit_code dibuat sekali secara
+-- OTOMATIS saat siswa mulai ujian (masih online), dikirim & disimpan
+-- LANGSUNG di halaman ujian siswa (di memori browser) sejak awal. Kode yang
+-- sama juga otomatis tampil di tabel Monitor Siswa pengawas (tanpa perlu
+-- generate manual). Saat siswa klik "Keluar Ujian", kode dicocokkan
+-- SEPENUHNYA di browser (tidak perlu kirim ke server), supaya tetap bisa
+-- dipakai walau sinyal sudah 100% hilang — mencegah auto-submit gara-gara
+-- terhitung "pindah tab" 5x saat siswa terpaksa menyingkir dari device.
+ALTER TABLE exam_sessions ADD COLUMN IF NOT EXISTS exit_code TEXT;
+ALTER TABLE exam_sessions ADD COLUMN IF NOT EXISTS exited_at TIMESTAMPTZ;
+-- Bersihkan sisa desain lama (kode sekali-pakai generate manual oleh guru —
+-- diganti exit_code otomatis di atas) kalau migrasi versi sebelumnya sudah
+-- pernah dijalankan:
+DROP TABLE IF EXISTS device_transfer_codes;
+ALTER TABLE users DROP COLUMN IF EXISTS unlock_code;
 
 -- ── Selesai ───────────────────────────────────────────────────
 -- Verifikasi: SELECT table_name FROM information_schema.tables
