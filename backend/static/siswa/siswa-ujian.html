@@ -771,6 +771,14 @@
       // change → auto-submit setelah 5x "pindah tab") DIMATIKAN untuk sesi
       // ini, supaya siswa yang menyingkir karena offline tidak ke-auto-submit
       // tanpa sengaja saat HP/tab-nya ditinggal.
+      //
+      // PENTING: kode TIDAK ditampilkan di modal ini sama sekali — kalau
+      // siswa bisa baca kodenya sendiri, dia bisa keluar kapan pun tanpa
+      // guru, jadi kode ini tidak lagi jadi kontrol apa pun (bisa disalah-
+      // gunakan untuk curang). Guru lihat kode ini otomatis di tabel
+      // Monitor Siswa (Pengawas Live). Praktiknya: siswa serahkan device
+      // yang sudah offline ke guru secara fisik, guru sendiri yang mengetik
+      // kodenya langsung di sini (mengetik tidak butuh internet).
       let _exitedGracefully = false;
 
       function showExitModal() {
@@ -786,12 +794,10 @@
           <div style="font-size:36px;margin-bottom:.5rem">🚪</div>
           <div style="font-weight:700;color:var(--green);margin-bottom:.5rem">Keluar Ujian</div>
           <div style="font-size:12px;color:var(--muted);margin-bottom:1rem;line-height:1.5">
-            Kuota internet habis atau mau menyingkir sebentar? Kode di bawah sudah tersimpan di HP ini sejak mulai
-            ujian — bisa dipakai walau <strong>sudah tidak ada sinyal</strong>. Jawaban Anda tetap tersimpan.
+            Kuota internet habis atau harus offline total? Serahkan device ini ke guru pengawas —
+            guru akan mengetik kode keluarnya langsung di sini. Jawaban Anda tetap tersimpan.
           </div>
-          <div style="font-size:11px;color:var(--muted);margin-bottom:.5rem">Kode keluar Anda untuk ujian ini:</div>
-          <div style="font-size:24px;font-weight:800;letter-spacing:4px;color:var(--green);margin-bottom:1rem">${sessionData?.exit_code || "—"}</div>
-          <input id="exit-code-input" placeholder="Ketik ulang kode di atas untuk konfirmasi"
+          <input id="exit-code-input" placeholder="Kode dari guru pengawas"
             style="width:100%;padding:12px 14px;border:1.5px solid var(--border);border-radius:12px;font-size:18px;font-weight:700;letter-spacing:2px;text-transform:uppercase;text-align:center;outline:none;box-sizing:border-box;margin-bottom:.75rem"
             onkeydown="if(event.key==='Enter')confirmExitWithCode()" />
           <div id="exit-modal-err" style="display:none;color:var(--red2);font-size:12px;margin-bottom:.75rem"></div>
