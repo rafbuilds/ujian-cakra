@@ -653,15 +653,46 @@ def session_detail(session_id):
 @exams_bp.route('/api/exams/<exam_id>/finish', methods=['POST'])
 @require_guru
 def finish_exam(exam_id):
-    query("UPDATE exams SET status='finished' WHERE id=%s AND teacher_id=%s",
-          (exam_id, request.user_id), fetch='none')
-    return jsonify({'ok': True})
+    exam = query("SELECT * FROM exams WHERE id=%s", (exam_id,), fetch='one')
+    if not exam: return jsonify({'error': 'Ujian tidak ditemukan'}), 404
+    if not _is_exam_proctor(exam, request.user_id, request.user_role):
+        return jsonify({'error': 'Anda bukan pengawas ujian ini'}), 403
+
+    # Auto-submit semua siswa yang belum mengumpulkan — dulu cuma ubah status
+    # ujian jadi 'finished' tanpa benar-benar menutup sesi siswa, padahal
+    # dialog konfirmasinya sudah bilang "siswa yang belum submit akan
+    # di-auto-submit". Sekarang benar-benar dihitung & disubmit, pakai
+    # count_correct_wrong yang sama dengan submit_exam biasa (termasuk
+    # soal multiple_answer).
+    ongoing = query("SELECT id FROM exam_sessions WHERE exam_id=%s AND submitted_at IS NULL", (exam_id,))
+    total_q = query("SELECT COUNT(*) as n FROM questions WHERE exam_id=%s", (exam_id,), fetch='one')['n']
+    spc = float(exam.get('score_per_correct') or (100.0/total_q if total_q else 0))
+    for sess in ongoing:
+        sid = str(sess['id'])
+        correct, wrong = count_correct_wrong(sid, exam_id)
+        empty = total_q - correct - wrong
+        score = round(correct * spc, 2)
+        query("UPDATE exam_sessions SET submitted_at=NOW(), auto_submitted=true WHERE id=%s", (sid,), fetch='none')
+        existing = query("SELECT id FROM results WHERE session_id=%s", (sid,), fetch='one')
+        if existing:
+            query("UPDATE results SET score=%s,correct_count=%s,wrong_count=%s,empty_count=%s WHERE session_id=%s",
+                  (score, correct, wrong, empty, sid), fetch='none')
+        else:
+            query("INSERT INTO results (id,session_id,score,correct_count,wrong_count,empty_count) VALUES (%s,%s,%s,%s,%s,%s)",
+                  (str(uuid.uuid4()), sid, score, correct, wrong, empty), fetch='none')
+
+    query("UPDATE exams SET status='finished' WHERE id=%s", (exam_id,), fetch='none')
+    return jsonify({'ok': True, 'submitted': len(ongoing)})
 
 @exams_bp.route('/api/exams/<exam_id>/publish-results', methods=['POST'])
 @require_guru
 def publish_results(exam_id):
-    query("UPDATE exams SET status='published', show_result_after=true WHERE id=%s AND teacher_id=%s",
-          (exam_id, request.user_id), fetch='none')
+    exam = query("SELECT * FROM exams WHERE id=%s", (exam_id,), fetch='one')
+    if not exam: return jsonify({'error': 'Ujian tidak ditemukan'}), 404
+    if not _is_exam_proctor(exam, request.user_id, request.user_role):
+        return jsonify({'error': 'Anda bukan pengawas ujian ini'}), 403
+    query("UPDATE exams SET status='published', show_result_after=true WHERE id=%s",
+          (exam_id,), fetch='none')
     return jsonify({'ok': True})
 
 # ── Grade Essay ────────────────────────────────────────────────

@@ -909,8 +909,8 @@
           "Selesaikan Ujian",
           "Ujian akan ditutup. Siswa yang belum submit akan di-auto-submit.",
           async () => {
-            await API.post(`/api/exams/${currentExamId}/finish`);
-            UI.toast("Ujian diselesaikan", "success");
+            const r = await API.post(`/api/exams/${currentExamId}/finish`);
+            UI.toast(`✅ Ujian diselesaikan${r.submitted ? ` — ${r.submitted} siswa di-auto-submit` : ""}`, "success");
             // Update status lokal supaya dropdown ujian langsung berubah dari
             // "Berlangsung" jadi "Selesai" tanpa perlu reload halaman.
             const exam = allExamsForProctor.find((e) => e.id === currentExamId);
