@@ -311,20 +311,9 @@
                 <div style="font-weight: 600; font-size: 15px">
                   Soal (<span id="q-count">0</span>)
                 </div>
-                <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap">
-                  <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);cursor:pointer">
-                    <input type="checkbox" id="chk-select-all" onchange="toggleSelectAll(this.checked)" />
-                    Pilih Semua
-                  </label>
-                  <button
-                    class="btn btn-primary btn-sm"
-                    id="btn-download-selected"
-                    onclick="downloadSelected()"
-                    disabled
-                  >
-                    📥 Download Terpilih (<span id="sel-count">0</span>)
-                  </button>
-                </div>
+                <button class="btn btn-primary btn-sm" onclick="downloadExam()">
+                  📥 Download Soal Ujian Ini
+                </button>
               </div>
             </div>
 
@@ -350,7 +339,6 @@
       }
 
       let exam = null;
-      const selectedQids = new Set();
 
       async function load() {
         try {
@@ -419,12 +407,8 @@
             (q, i) => `
     <div class="q-card" id="qcard-${q.id}">
       <div style="display:flex;align-items:flex-start;gap:10px">
-        <input type="checkbox" class="q-select" data-qid="${q.id}" style="margin-top:3px;flex-shrink:0" onchange="toggleSelectQuestion('${q.id}', this.checked)" />
         <div style="flex:1;min-width:0">
-          <div class="q-num" style="display:flex;align-items:center;justify-content:space-between">
-            <span>Soal ${i + 1} ${typeBadge(q.type||'multiple_choice')}</span>
-            <button class="btn btn-secondary btn-sm" title="Download soal ini" onclick="downloadOne('${q.id}')">📥</button>
-          </div>
+          <div class="q-num">Soal ${i + 1} ${typeBadge(q.type||'multiple_choice')}</div>
           ${q.attachment_url ? `<div style="margin:6px 0"><a href="${q.attachment_url}" target="_blank" style="font-size:12px;color:var(--green)">📎 Lihat Lampiran</a></div>` : ''}
           ${q.audio_url ? `<div style="margin:6px 0"><audio controls src="${q.audio_url}" style="width:100%;height:36px"></audio></div>` : ''}
           <div class="q-text">${q.content}</div>
@@ -462,38 +446,12 @@
           .join("")}</div>`;
       }
 
-      // ── Pilih & Download Soal ──────────────────────────────────────
-      function toggleSelectQuestion(qid, checked) {
-        if (checked) selectedQids.add(qid); else selectedQids.delete(qid);
-        updateSelCount();
-      }
-      function toggleSelectAll(checked) {
-        document.querySelectorAll(".q-select").forEach((cb) => {
-          cb.checked = checked;
-          if (checked) selectedQids.add(cb.dataset.qid); else selectedQids.delete(cb.dataset.qid);
-        });
-        updateSelCount();
-      }
-      function updateSelCount() {
-        document.getElementById("sel-count").textContent = selectedQids.size;
-        document.getElementById("btn-download-selected").disabled = selectedQids.size === 0;
-      }
-      async function downloadSelected() {
-        if (!selectedQids.size) return;
+      // ── Download Soal (1 ujian utuh) ────────────────────────────────
+      async function downloadExam() {
         try {
           await API.download(
-            `/api/exams/${examId}/export-soal?question_ids=${[...selectedQids].join(",")}`,
+            `/api/exams/${examId}/export-soal`,
             `Soal_${(exam.title||'ujian').replace(/[\/\\:*?"<>|]/g,'-')}.docx`,
-          );
-        } catch (e) {
-          UI.toast(e.error || "Gagal download soal", "error");
-        }
-      }
-      async function downloadOne(qid) {
-        try {
-          await API.download(
-            `/api/exams/${examId}/export-soal?question_ids=${qid}`,
-            `Soal_${(exam.title||'ujian').replace(/[\/\\:*?"<>|]/g,'-')}_1.docx`,
           );
         } catch (e) {
           UI.toast(e.error || "Gagal download soal", "error");

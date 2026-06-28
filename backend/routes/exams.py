@@ -684,7 +684,50 @@ def finish_exam(exam_id):
     query("UPDATE exams SET status='finished' WHERE id=%s", (exam_id,), fetch='none')
     return jsonify({'ok': True, 'submitted': len(ongoing)})
 
-# ── Download Soal (Word) — semua atau hanya yang dipilih ────────
+_QTYPE_LABEL = {'multiple_choice': 'Pilihan Ganda', 'multiple_answer': 'Jawaban Ganda',
+                'yes_no': 'Ya/Tidak', 'audio': 'Audio', 'camera_essay': 'Kamera + Uraian'}
+
+def _doc_add_image(doc, data_url, width=2.2):
+    from docx.shared import Inches
+    import base64 as _b64
+    try:
+        data = data_url.split(',', 1)[1]
+        doc.add_picture(io.BytesIO(_b64.b64decode(data)), width=Inches(width))
+    except Exception:
+        doc.add_paragraph('[Gambar tidak bisa ditampilkan]')
+
+def _doc_write_questions(doc, questions):
+    """Tulis daftar soal (pertanyaan+pilihan+kunci+gambar) ke dokumen Word
+    yang sedang dibangun — dipakai oleh export_soal (1 ujian) dan
+    export_soal_bulk (gabungan beberapa ujian)."""
+    from docx.shared import Pt
+    if not questions:
+        doc.add_paragraph('(Belum ada soal)')
+        return
+    q_ids = [str(q['id']) for q in questions]
+    all_opts = query("SELECT * FROM options WHERE question_id=ANY(%s::uuid[]) ORDER BY label", (q_ids,))
+    opts_by_q = {}
+    for o in all_opts:
+        opts_by_q.setdefault(str(o['question_id']), []).append(o)
+
+    for i, q in enumerate(questions, 1):
+        p = doc.add_paragraph()
+        run = p.add_run(f"{i}. {q['content']}")
+        run.bold = True
+        run.font.size = Pt(12)
+        doc.add_paragraph(f"Tipe: {_QTYPE_LABEL.get(q.get('type'), 'Pilihan Ganda')}").runs[0].italic = True
+        if q.get('image_url') and str(q['image_url']).startswith('data:image'):
+            _doc_add_image(doc, q['image_url'])
+        if q.get('attachment_url') and str(q['attachment_url']).startswith('data:image'):
+            _doc_add_image(doc, q['attachment_url'])
+        for o in opts_by_q.get(str(q['id']), []):
+            mark = '  ✓ (KUNCI)' if o.get('is_correct') else ''
+            doc.add_paragraph(f"   {o['label']}. {o.get('content') or ''}{mark}")
+            if o.get('image_url') and str(o['image_url']).startswith('data:image'):
+                _doc_add_image(doc, o['image_url'], width=1.8)
+        doc.add_paragraph('')
+
+# ── Download Soal (Word) — 1 ujian, semua atau hanya soal terpilih ──
 @exams_bp.route('/api/exams/<exam_id>/export-soal', methods=['GET'])
 @require_guru
 def export_soal(exam_id):
@@ -705,45 +748,10 @@ def export_soal(exam_id):
     if not questions:
         return jsonify({'error': 'Tidak ada soal untuk diunduh'}), 404
 
-    q_ids = [str(q['id']) for q in questions]
-    all_opts = query("SELECT * FROM options WHERE question_id=ANY(%s::uuid[]) ORDER BY label", (q_ids,))
-    opts_by_q = {}
-    for o in all_opts:
-        opts_by_q.setdefault(str(o['question_id']), []).append(o)
-
     from docx import Document
-    from docx.shared import Pt, Inches
-    import base64 as _b64
-
-    def add_image(doc, data_url, width=2.2):
-        try:
-            data = data_url.split(',', 1)[1]
-            doc.add_picture(io.BytesIO(_b64.b64decode(data)), width=Inches(width))
-        except Exception:
-            doc.add_paragraph('[Gambar tidak bisa ditampilkan]')
-
-    type_label = {'multiple_choice': 'Pilihan Ganda', 'multiple_answer': 'Jawaban Ganda',
-                  'yes_no': 'Ya/Tidak', 'audio': 'Audio', 'camera_essay': 'Kamera + Uraian'}
-
     doc = Document()
     doc.add_heading(exam.get('title') or 'Soal', level=1)
-    for i, q in enumerate(questions, 1):
-        p = doc.add_paragraph()
-        run = p.add_run(f"{i}. {q['content']}")
-        run.bold = True
-        run.font.size = Pt(12)
-        doc.add_paragraph(f"Tipe: {type_label.get(q.get('type'), 'Pilihan Ganda')}").runs[0].italic = True
-        if q.get('image_url') and str(q['image_url']).startswith('data:image'):
-            add_image(doc, q['image_url'])
-        if q.get('attachment_url') and str(q['attachment_url']).startswith('data:image'):
-            add_image(doc, q['attachment_url'])
-
-        for o in opts_by_q.get(str(q['id']), []):
-            mark = '  ✓ (KUNCI)' if o.get('is_correct') else ''
-            doc.add_paragraph(f"   {o['label']}. {o.get('content') or ''}{mark}")
-            if o.get('image_url') and str(o['image_url']).startswith('data:image'):
-                add_image(doc, o['image_url'], width=1.8)
-        doc.add_paragraph('')
+    _doc_write_questions(doc, questions)
 
     buf = io.BytesIO()
     doc.save(buf)
@@ -751,6 +759,35 @@ def export_soal(exam_id):
     safe_name = (exam.get('title') or 'soal').replace('/', '-').replace('\\', '-')
     return send_file(buf, mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
                      as_attachment=True, download_name=f"Soal_{safe_name}.docx")
+
+# ── Download Soal (Word) — GABUNGAN beberapa ujian sekaligus ────
+@exams_bp.route('/api/exams/export-soal-bulk', methods=['GET'])
+@require_guru
+def export_soal_bulk():
+    ids_param = request.args.get('exam_ids', '')
+    id_list = [x for x in ids_param.split(',') if x]
+    if not id_list:
+        return jsonify({'error': 'exam_ids wajib'}), 400
+    exam_rows = query("SELECT * FROM exams WHERE id=ANY(%s::uuid[]) ORDER BY title", (id_list,))
+    if request.user_role != 'admin':
+        exam_rows = [e for e in exam_rows if str(e['teacher_id']) == request.user_id]
+    if not exam_rows:
+        return jsonify({'error': 'Tidak ada ujian yang bisa diakses'}), 404
+
+    from docx import Document
+    doc = Document()
+    for idx, exam in enumerate(exam_rows):
+        if idx > 0:
+            doc.add_page_break()
+        doc.add_heading(exam.get('title') or 'Soal', level=1)
+        questions = query("SELECT * FROM questions WHERE exam_id=%s ORDER BY order_num", (exam['id'],))
+        _doc_write_questions(doc, questions)
+
+    buf = io.BytesIO()
+    doc.save(buf)
+    buf.seek(0)
+    return send_file(buf, mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                     as_attachment=True, download_name='Soal_Gabungan.docx')
 
 @exams_bp.route('/api/exams/<exam_id>/publish-results', methods=['POST'])
 @require_guru

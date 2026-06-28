@@ -95,7 +95,7 @@
             <div id="cek-similar-result" style="display: none; margin-top: 0.75rem"></div>
           </div>
 
-          <div style="display: flex; gap: 8px; margin-bottom: 0.875rem; flex-wrap: wrap">
+          <div style="display: flex; gap: 8px; margin-bottom: 0.875rem; flex-wrap: wrap; align-items: center">
             <select id="bs-teacher" onchange="renderBankSoal()" class="form-control" style="width: auto">
               <option value="">Semua Guru</option>
             </select>
@@ -112,6 +112,9 @@
               oninput="renderBankSoal()"
               style="flex: 1; max-width: 280px; padding: 8px 12px; border: 1px solid var(--border2); border-radius: 8px; font-size: 13px"
             />
+            <button class="btn btn-primary btn-sm" id="btn-download-selected" onclick="downloadSelected()" disabled>
+              📥 Download Terpilih (<span id="sel-count">0</span>)
+            </button>
             <div style="margin-left: auto; align-self: center; font-size: 13px; color: var(--muted)" id="bs-count"></div>
           </div>
 
@@ -120,6 +123,7 @@
               <table>
                 <thead>
                   <tr>
+                    <th style="width: 32px"><input type="checkbox" id="chk-select-all" onchange="toggleSelectAll(this.checked)" /></th>
                     <th>Judul Soal</th>
                     <th>Guru</th>
                     <th>Mapel</th>
@@ -130,7 +134,7 @@
                   </tr>
                 </thead>
                 <tbody id="bs-tbody">
-                  <tr><td colspan="7" style="text-align:center;padding:2rem"><div class="loading-spinner" style="margin:auto"></div></td></tr>
+                  <tr><td colspan="8" style="text-align:center;padding:2rem"><div class="loading-spinner" style="margin:auto"></div></td></tr>
                 </tbody>
               </table>
             </div>
@@ -148,6 +152,7 @@
       UI.initSidebar();
 
       let _bankSoal = [];
+      const selectedExamIds = new Set();
 
       async function init() {
         try {
@@ -197,12 +202,13 @@
         document.getElementById("bs-count").textContent = list.length + " soal";
         const tbody = document.getElementById("bs-tbody");
         if (!list.length) {
-          tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--muted)">Belum ada soal di bank soal</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--muted)">Belum ada soal di bank soal</td></tr>';
           return;
         }
         tbody.innerHTML = list
           .map(
             (e) => `<tr>
+      <td><input type="checkbox" class="exam-select" data-id="${e.id}" ${selectedExamIds.has(e.id) ? "checked" : ""} onchange="toggleSelectExam('${e.id}', this.checked)" /></td>
       <td style="font-weight:500;font-size:13px">${e.title || "—"}</td>
       <td style="font-size:13px">${e.teacher_name || "—"}</td>
       <td style="font-size:12px;color:var(--muted)">${e.subject_name || "—"}</td>
@@ -211,6 +217,7 @@
       <td style="font-size:11px;color:var(--muted)">${e.created_at ? UI.fmtDT(e.created_at) : "—"}</td>
       <td><div class="action-btns">
         <button class="btn btn-secondary btn-sm" onclick="viewSoal('${e.id}')">📄 Lihat Soal</button>
+        <button class="btn btn-secondary btn-sm" title="Download soal ujian ini" onclick="downloadOne('${e.id}','${(e.title || "").replace(/'/g, "\\'")}')">📥</button>
         <button class="btn btn-danger btn-sm" onclick="hapusSoal('${e.id}','${(e.title || "").replace(/'/g, "\\'")}')">🗑</button>
       </div></td>
     </tr>`,
@@ -220,6 +227,44 @@
 
       function viewSoal(id) {
         location.href = "admin_soal.html?id=" + id;
+      }
+
+      // ── Pilih & Download Soal per Ujian ───────────────────────────
+      function toggleSelectExam(id, checked) {
+        if (checked) selectedExamIds.add(id); else selectedExamIds.delete(id);
+        updateSelCount();
+      }
+      function toggleSelectAll(checked) {
+        document.querySelectorAll(".exam-select").forEach((cb) => {
+          cb.checked = checked;
+          if (checked) selectedExamIds.add(cb.dataset.id); else selectedExamIds.delete(cb.dataset.id);
+        });
+        updateSelCount();
+      }
+      function updateSelCount() {
+        document.getElementById("sel-count").textContent = selectedExamIds.size;
+        document.getElementById("btn-download-selected").disabled = selectedExamIds.size === 0;
+      }
+      async function downloadOne(examId, title) {
+        try {
+          await API.download(
+            `/api/exams/${examId}/export-soal`,
+            `Soal_${(title || "ujian").replace(/[\/\\:*?"<>|]/g, "-")}.docx`,
+          );
+        } catch (e) {
+          UI.toast(e.error || "Gagal download soal", "error");
+        }
+      }
+      async function downloadSelected() {
+        if (!selectedExamIds.size) return;
+        try {
+          await API.download(
+            `/api/exams/export-soal-bulk?exam_ids=${[...selectedExamIds].join(",")}`,
+            "Soal_Gabungan.docx",
+          );
+        } catch (e) {
+          UI.toast(e.error || "Gagal download soal", "error");
+        }
       }
 
       async function cekSoalSerupa() {
@@ -258,6 +303,8 @@
           await API.del("/api/admin/exams/" + id);
           UI.toast("Soal dihapus", "success");
           _bankSoal = _bankSoal.filter((e) => e.id !== id);
+          selectedExamIds.delete(id);
+          updateSelCount();
           renderBankSoal();
         });
       }
