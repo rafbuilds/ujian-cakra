@@ -435,23 +435,37 @@
         const cnt = document.getElementById('monitor-count');
         try {
           const rows = await API.get('/api/admin/exam-monitor');
-          cnt.textContent = rows.length + ' sesi aktif';
-          if (!rows.length) {
+          // Kelompokkan per ujian — admin mau lihat ujian apa saja yang
+          // sedang aktif, bukan daftar tiap siswa satu-satu.
+          const byExam = {};
+          for (const r of rows) {
+            if (!byExam[r.exam_id]) {
+              byExam[r.exam_id] = { exam_title: r.exam_title, students: 0, answered: 0, total: 0, violations: 0 };
+            }
+            const g = byExam[r.exam_id];
+            g.students += 1;
+            g.answered += r.answered_count || 0;
+            g.total += r.total_questions || 0;
+            if (r.tab_violations > 0) g.violations += 1;
+          }
+          const exams = Object.values(byExam);
+          cnt.textContent = exams.length + ' ujian aktif';
+          if (!exams.length) {
             el.innerHTML = '<div style="color:var(--muted);font-size:13px;text-align:center;padding:1.5rem">Tidak ada ujian berlangsung saat ini</div>';
             return;
           }
-          el.innerHTML = rows.slice(0, 10).map(r => {
-            const pct = r.total_questions > 0 ? Math.round(r.answered_count / r.total_questions * 100) : 0;
-            const vBadge = r.tab_violations > 0
-              ? `<span class="badge badge-red">${r.tab_violations}× pelanggaran</span>` : '';
+          el.innerHTML = exams.map(g => {
+            const pct = g.total > 0 ? Math.round(g.answered / g.total * 100) : 0;
+            const vBadge = g.violations > 0
+              ? `<span class="badge badge-red">${g.violations} siswa pelanggaran</span>` : '';
             return `
               <div class="monitor-row">
                 <div style="flex:1;min-width:0">
-                  <div style="font-weight:500;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.student_name}</div>
-                  <div style="font-size:10px;color:var(--muted)">${r.class_name||'—'} · ${r.exam_title}</div>
+                  <div style="font-weight:500;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${g.exam_title}</div>
+                  <div style="font-size:10px;color:var(--muted)">${g.students} siswa sedang mengerjakan</div>
                   <div style="display:flex;align-items:center;gap:6px;margin-top:4px">
                     <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
-                    <span style="font-size:10px;color:var(--muted);white-space:nowrap">${r.answered_count}/${r.total_questions}</span>
+                    <span style="font-size:10px;color:var(--muted);white-space:nowrap">${pct}%</span>
                     ${vBadge}
                   </div>
                 </div>
