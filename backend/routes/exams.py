@@ -1,7 +1,7 @@
 # backend/routes/exams.py
 from flask import Blueprint, request, jsonify, send_file
 import uuid, io
-from db import query, count_correct_wrong
+from db import query, count_correct_wrong, log_activity
 from auth import require_guru, require_auth, require_admin
 
 exams_bp = Blueprint('exams', __name__)
@@ -109,6 +109,7 @@ def create_exam():
     for cls in (data.get('class_ids') or []):
         query("INSERT INTO exam_classes (exam_id, class_id) VALUES (%s,%s) ON CONFLICT DO NOTHING",
               (exam_id, cls), fetch='none')
+    log_activity(request.user_id, 'UJIAN_BUAT', f"Buat ujian \"{data.get('title','Ujian Baru')}\"", request.remote_addr)
     return jsonify({'id': exam_id}), 201
 
 @exams_bp.route('/api/exams/<exam_id>', methods=['GET'])
@@ -163,6 +164,10 @@ def update_exam(exam_id):
         for cls in (data['class_ids'] or []):
             query("INSERT INTO exam_classes (exam_id, class_id) VALUES (%s,%s) ON CONFLICT DO NOTHING",
                   (exam_id, cls), fetch='none')
+    if data.get('status') == 'published':
+        title = query("SELECT title FROM exams WHERE id=%s", (exam_id,), fetch='one')
+        log_activity(request.user_id, 'UJIAN_PUBLISH',
+                     f"Publish ujian \"{(title or {}).get('title','')}\"", request.remote_addr)
     return jsonify({'ok': True})
 
 @exams_bp.route('/api/exams/<exam_id>', methods=['DELETE'])
@@ -217,6 +222,9 @@ def add_question(exam_id):
 
     q    = query("SELECT * FROM questions WHERE id=%s", (q_id,), fetch='one')
     opts = query("SELECT * FROM options WHERE question_id=%s ORDER BY label", (q_id,))
+    exam_title = query("SELECT title FROM exams WHERE id=%s", (exam_id,), fetch='one')
+    log_activity(request.user_id, 'SOAL_BUAT',
+                 f"Tambah soal ke \"{(exam_title or {}).get('title','ujian')}\"", request.remote_addr)
     return jsonify({**dict(q), 'options': [dict(o) for o in opts]}), 201
 
 @exams_bp.route('/api/questions/<question_id>', methods=['PATCH'])
@@ -682,6 +690,7 @@ def finish_exam(exam_id):
                   (str(uuid.uuid4()), sid, score, correct, wrong, empty), fetch='none')
 
     query("UPDATE exams SET status='finished' WHERE id=%s", (exam_id,), fetch='none')
+    log_activity(request.user_id, 'UJIAN_SELESAI', f"Selesaikan ujian \"{exam.get('title','')}\"", request.remote_addr)
     return jsonify({'ok': True, 'submitted': len(ongoing)})
 
 _QTYPE_LABEL = {'multiple_choice': 'Pilihan Ganda', 'multiple_answer': 'Jawaban Ganda',

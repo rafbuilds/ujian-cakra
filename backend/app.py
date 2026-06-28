@@ -36,7 +36,7 @@ def index():
 
 @app.route('/api/auth/login', methods=['POST'])
 def login():
-    from db import query
+    from db import query, log_activity
     body  = request.json or {}
     email = (body.get('email') or '').strip().lower()
     pw    = body.get('password') or ''
@@ -55,6 +55,7 @@ def login():
         return jsonify({'error': 'Password salah'}), 401
 
     query("UPDATE users SET last_login=NOW() WHERE id=%s", (user['id'],), fetch='none')
+    log_activity(user['id'], 'LOGIN', f"{user['name']} login", request.remote_addr)
     token = create_token(str(user['id']), user['role'])
     return jsonify({
         'token': token,

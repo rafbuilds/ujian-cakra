@@ -94,6 +94,17 @@ def query(sql, params=None, fetch="all", _retry=True):
         release_db(conn)
         raise
 
+def log_activity(user_id, action, detail='', ip=''):
+    """Catat aksi ke activity_logs (silent, tidak crash bila tabel belum ada).
+    Diletakkan di db.py (bukan satu route module saja) supaya bisa dipanggil
+    dari app.py/routes mana pun tanpa import melingkar."""
+    try:
+        query("""INSERT INTO activity_logs (id, user_id, action, detail, ip_address)
+                 VALUES (gen_random_uuid(), %s, %s, %s, %s)""",
+              (user_id, action, (detail or '')[:500], ip), fetch='none')
+    except Exception:
+        pass
+
 def count_correct_wrong(session_id, exam_id):
     """Hitung correct/wrong untuk soal single-choice (answers) + multiple_answer (multi_answers).
     Soal multiple_answer dianggap benar hanya jika pilihan siswa sama persis dengan kunci jawaban."""

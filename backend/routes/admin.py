@@ -1,7 +1,7 @@
 # backend/routes/admin.py
 from flask import Blueprint, request, jsonify, send_file
 import uuid, io
-from db import query
+from db import query, log_activity
 from auth import require_admin, require_guru
 
 admin_bp = Blueprint('admin', __name__)
@@ -976,16 +976,6 @@ def cleanup_exams():
 #   created_at TIMESTAMPTZ DEFAULT NOW()
 # );
 # ══════════════════════════════════════════════════════════════
-
-def log_activity(user_id, action, detail='', ip=''):
-    """Helper: catat aksi ke activity_logs (silent, tidak crash bila tabel belum ada)."""
-    try:
-        query("""INSERT INTO activity_logs (id, user_id, action, detail, ip_address)
-                 VALUES (gen_random_uuid(), %s, %s, %s, %s)""",
-              (user_id, action, detail[:500], ip), fetch='none')
-    except Exception:
-        pass
-
 
 def _ensure_log_table():
     try:
