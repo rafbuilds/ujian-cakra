@@ -684,6 +684,74 @@ def finish_exam(exam_id):
     query("UPDATE exams SET status='finished' WHERE id=%s", (exam_id,), fetch='none')
     return jsonify({'ok': True, 'submitted': len(ongoing)})
 
+# ── Download Soal (Word) — semua atau hanya yang dipilih ────────
+@exams_bp.route('/api/exams/<exam_id>/export-soal', methods=['GET'])
+@require_guru
+def export_soal(exam_id):
+    exam = query("SELECT * FROM exams WHERE id=%s", (exam_id,), fetch='one')
+    if not exam: return jsonify({'error': 'Ujian tidak ditemukan'}), 404
+    if request.user_role != 'admin' and str(exam['teacher_id']) != request.user_id:
+        return jsonify({'error': 'Akses ditolak'}), 403
+
+    qids_param = request.args.get('question_ids')
+    if qids_param:
+        id_list = [x for x in qids_param.split(',') if x]
+        if not id_list:
+            return jsonify({'error': 'question_ids kosong'}), 400
+        questions = query("SELECT * FROM questions WHERE exam_id=%s AND id=ANY(%s::uuid[]) ORDER BY order_num",
+                          (exam_id, id_list))
+    else:
+        questions = query("SELECT * FROM questions WHERE exam_id=%s ORDER BY order_num", (exam_id,))
+    if not questions:
+        return jsonify({'error': 'Tidak ada soal untuk diunduh'}), 404
+
+    q_ids = [str(q['id']) for q in questions]
+    all_opts = query("SELECT * FROM options WHERE question_id=ANY(%s::uuid[]) ORDER BY label", (q_ids,))
+    opts_by_q = {}
+    for o in all_opts:
+        opts_by_q.setdefault(str(o['question_id']), []).append(o)
+
+    from docx import Document
+    from docx.shared import Pt, Inches
+    import base64 as _b64
+
+    def add_image(doc, data_url, width=2.2):
+        try:
+            data = data_url.split(',', 1)[1]
+            doc.add_picture(io.BytesIO(_b64.b64decode(data)), width=Inches(width))
+        except Exception:
+            doc.add_paragraph('[Gambar tidak bisa ditampilkan]')
+
+    type_label = {'multiple_choice': 'Pilihan Ganda', 'multiple_answer': 'Jawaban Ganda',
+                  'yes_no': 'Ya/Tidak', 'audio': 'Audio', 'camera_essay': 'Kamera + Uraian'}
+
+    doc = Document()
+    doc.add_heading(exam.get('title') or 'Soal', level=1)
+    for i, q in enumerate(questions, 1):
+        p = doc.add_paragraph()
+        run = p.add_run(f"{i}. {q['content']}")
+        run.bold = True
+        run.font.size = Pt(12)
+        doc.add_paragraph(f"Tipe: {type_label.get(q.get('type'), 'Pilihan Ganda')}").runs[0].italic = True
+        if q.get('image_url') and str(q['image_url']).startswith('data:image'):
+            add_image(doc, q['image_url'])
+        if q.get('attachment_url') and str(q['attachment_url']).startswith('data:image'):
+            add_image(doc, q['attachment_url'])
+
+        for o in opts_by_q.get(str(q['id']), []):
+            mark = '  ✓ (KUNCI)' if o.get('is_correct') else ''
+            doc.add_paragraph(f"   {o['label']}. {o.get('content') or ''}{mark}")
+            if o.get('image_url') and str(o['image_url']).startswith('data:image'):
+                add_image(doc, o['image_url'], width=1.8)
+        doc.add_paragraph('')
+
+    buf = io.BytesIO()
+    doc.save(buf)
+    buf.seek(0)
+    safe_name = (exam.get('title') or 'soal').replace('/', '-').replace('\\', '-')
+    return send_file(buf, mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                     as_attachment=True, download_name=f"Soal_{safe_name}.docx")
+
 @exams_bp.route('/api/exams/<exam_id>/publish-results', methods=['POST'])
 @require_guru
 def publish_results(exam_id):

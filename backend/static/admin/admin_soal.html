@@ -272,8 +272,9 @@
           <div style="display: flex; align-items: center; gap: 10px">
             <a
               href="bank-soal.html"
+              onclick="if (document.referrer && document.referrer.includes(location.host)) { history.back(); return false; }"
               style="color: var(--muted); font-size: 13px; font-weight: 500"
-              >← Bank Soal</a
+              >← Kembali</a
             >
             <span style="color: var(--border)">/</span>
             <div class="topbar-title" id="exam-title-topbar">Kelola Soal</div>
@@ -289,41 +290,10 @@
             <!-- Info ujian -->
             <div class="exam-info-bar" id="exam-info-bar"></div>
 
-            <!-- Kunci mode banner -->
-            <div class="kunci-banner" id="kunci-banner" style="display: none">
-              <div style="display: flex; align-items: center; gap: 12px">
-                <div style="font-size: 24px">🔑</div>
-                <div>
-                  <div style="font-weight: 700; font-size: 15px; color: #fff">
-                    Mode Set Kunci Jawaban
-                  </div>
-                  <div
-                    style="font-size: 13px; color: rgba(255, 255, 255, 0.75)"
-                    id="kunci-counter"
-                  >
-                    Pilih jawaban benar untuk setiap soal
-                  </div>
-                </div>
-              </div>
-              <div style="display: flex; gap: 8px">
-                <button
-                  class="btn btn-sm"
-                  style="
-                    background: #fff;
-                    color: var(--green);
-                    font-weight: 700;
-                  "
-                  onclick="simpanKunci()"
-                >
-                  💾 Simpan Semua
-                </button>
-                <button
-                  class="btn btn-sm"
-                  style="background: rgba(255, 255, 255, 0.2); color: #fff"
-                  onclick="exitKunciMode()"
-                >
-                  ✕ Batal
-                </button>
+            <!-- Mode lihat saja — admin tidak bisa ubah isi soal -->
+            <div class="card" style="padding: 0.625rem 1.25rem; margin-bottom: 0.875rem; background: #e6f1fb; border: none">
+              <div style="font-size: 12px; color: #185fa5">
+                👁 Mode lihat saja — soal/kunci jawaban hanya bisa diubah oleh guru pembuatnya. Admin bisa lihat & unduh.
               </div>
             </div>
 
@@ -341,135 +311,19 @@
                 <div style="font-weight: 600; font-size: 15px">
                   Soal (<span id="q-count">0</span>)
                 </div>
-                <div style="display: flex; gap: 8px; flex-wrap: wrap">
-                  <button
-                    class="btn btn-secondary btn-sm"
-                    onclick="downloadTemplate()"
-                  >
-                    ⬇ Template CSV
-                  </button>
-                  <label
-                    class="btn btn-secondary btn-sm"
-                    style="cursor: pointer"
-                  >
-                    ⬆ Import File
-                    <input
-                      type="file"
-                      id="import-file"
-                      accept=".csv,.xlsx,.xls,.docx,.doc"
-                      style="display: none"
-                      onchange="importSoal(this)"
-                    />
+                <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap">
+                  <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);cursor:pointer">
+                    <input type="checkbox" id="chk-select-all" onchange="toggleSelectAll(this.checked)" />
+                    Pilih Semua
                   </label>
-                  <button
-                    class="btn btn-secondary btn-sm"
-                    id="btn-kunci"
-                    onclick="enterKunciMode()"
-                  >
-                    🔑 Set Kunci
-                  </button>
                   <button
                     class="btn btn-primary btn-sm"
-                    onclick="toggleAddForm()"
+                    id="btn-download-selected"
+                    onclick="downloadSelected()"
+                    disabled
                   >
-                    + Tambah Soal
+                    📥 Download Terpilih (<span id="sel-count">0</span>)
                   </button>
-                </div>
-              </div>
-
-              <!-- Form tambah soal -->
-              <div
-                class="add-soal-box"
-                id="add-soal-form"
-                style="display: none; margin-top: 0.875rem"
-              >
-                <div style="font-weight:600;font-size:14px;color:var(--green);margin-bottom:.875rem">Tambah Soal Baru</div>
-
-                <!-- Tipe Soal -->
-                <div class="form-group">
-                  <label>Tipe Soal</label>
-                  <div style="display:flex;flex-wrap:wrap;gap:8px" id="type-selector">
-                    <button type="button" class="type-btn active" data-type="multiple_choice" onclick="setType('multiple_choice')">📝 Pilihan Ganda</button>
-                    <button type="button" class="type-btn" data-type="multiple_answer" onclick="setType('multiple_answer')">☑️ Jawaban Ganda</button>
-                    <button type="button" class="type-btn" data-type="yes_no" onclick="setType('yes_no')">✅ Ya / Tidak</button>
-                    <button type="button" class="type-btn" data-type="audio" onclick="setType('audio')">🎵 Audio (Seni Musik)</button>
-                    <button type="button" class="type-btn" data-type="camera_essay" onclick="setType('camera_essay')">📷 Kamera + Uraian</button>
-                  </div>
-                </div>
-
-                <!-- Pertanyaan -->
-                <div class="form-group">
-                  <label>Pertanyaan / Instruksi</label>
-                  <textarea class="form-control" id="nq-text" rows="3" placeholder="Ketik pertanyaan di sini..."></textarea>
-                </div>
-
-                <!-- Upload penunjang (foto/PDF) -->
-                <div class="form-group">
-                  <label>Lampiran Penunjang <span style="color:var(--muted);font-weight:400">(opsional — foto atau PDF)</span></label>
-                  <div id="attachment-area" style="border:1.5px dashed var(--border2);border-radius:10px;padding:12px;text-align:center;cursor:pointer;background:#fafaf8;position:relative" onclick="document.getElementById('nq-attach').click()">
-                    <div id="attach-preview" style="font-size:13px;color:var(--muted)">📎 Klik untuk upload foto atau PDF</div>
-                    <button type="button" id="attach-clear" onclick="event.stopPropagation();clearAttach()" style="display:none;position:absolute;top:6px;right:6px;background:#ef4444;color:#fff;border:none;border-radius:50%;width:22px;height:22px;font-size:13px;cursor:pointer;line-height:1">×</button>
-                  </div>
-                  <input type="file" id="nq-attach" accept="image/*,.pdf" style="display:none" onchange="previewAttach(this)"/>
-                </div>
-
-                <!-- Upload audio (hanya tipe audio) -->
-                <div class="form-group" id="audio-upload-group" style="display:none">
-                  <label>File Audio <span style="color:var(--muted);font-weight:400">(MP3/WAV/OGG)</span></label>
-                  <div id="audio-area" style="border:1.5px dashed var(--border2);border-radius:10px;padding:12px;text-align:center;cursor:pointer;background:#fafaf8;position:relative" onclick="document.getElementById('nq-audio').click()">
-                    <div id="audio-preview" style="font-size:13px;color:var(--muted)">🎵 Klik untuk upload file audio</div>
-                    <button type="button" id="audio-clear" onclick="event.stopPropagation();clearAudio()" style="display:none;position:absolute;top:6px;right:6px;background:#ef4444;color:#fff;border:none;border-radius:50%;width:22px;height:22px;font-size:13px;cursor:pointer;line-height:1">×</button>
-                  </div>
-                  <input type="file" id="nq-audio" accept="audio/*" style="display:none" onchange="previewAudio(this)"/>
-                </div>
-
-                <!-- Pilihan jawaban (multiple_choice & multiple_answer) -->
-                <div id="options-group" style="margin-bottom:.875rem">
-                  <label style="display:block;font-size:12px;font-weight:600;color:#5f5e5a;margin-bottom:8px">
-                    Pilihan Jawaban
-                    <span id="options-hint" style="color:var(--muted);font-weight:400">(klik huruf = set kunci)</span>
-                  </label>
-                  <div id="opt-inputs">
-                    <div class="opt-input-row" data-label="A"><div class="opt-letter key" onclick="setKey('A')">A</div><input class="form-control" placeholder="Pilihan A..." style="flex:1"/><span style="font-size:11px;color:var(--green);font-weight:600;white-space:nowrap">✓ Kunci</span></div>
-                    <div class="opt-input-row" data-label="B"><div class="opt-letter nokey" onclick="setKey('B')">B</div><input class="form-control" placeholder="Pilihan B..." style="flex:1"/><span style="font-size:11px;color:transparent">✓ Kunci</span></div>
-                    <div class="opt-input-row" data-label="C"><div class="opt-letter nokey" onclick="setKey('C')">C</div><input class="form-control" placeholder="Pilihan C..." style="flex:1"/><span style="font-size:11px;color:transparent">✓ Kunci</span></div>
-                    <div class="opt-input-row" data-label="D"><div class="opt-letter nokey" onclick="setKey('D')">D</div><input class="form-control" placeholder="Pilihan D..." style="flex:1"/><span style="font-size:11px;color:transparent">✓ Kunci</span></div>
-                    <div class="opt-input-row" data-label="E"><div class="opt-letter nokey" onclick="setKey('E')">E</div><input class="form-control" placeholder="Pilihan E (opsional)..." style="flex:1"/><span style="font-size:11px;color:transparent">✓ Kunci</span></div>
-                  </div>
-                  <div style="font-size:11px;color:var(--muted);margin-top:4px" id="options-tip">Klik huruf A/B/C/D/E untuk set kunci jawaban</div>
-                </div>
-
-                <!-- Batas maksimal pilihan siswa (multiple_answer) -->
-                <div class="form-group" id="max-choices-group" style="display:none;margin-bottom:.875rem">
-                  <label style="display:block;font-size:12px;font-weight:600;color:#5f5e5a;margin-bottom:8px">
-                    Maksimal Pilihan Siswa
-                    <span style="color:var(--muted);font-weight:400">(berapa opsi yang boleh dicentang siswa)</span>
-                  </label>
-                  <input type="number" id="nq-max-choices" class="form-control" min="1" max="5" style="max-width:120px" oninput="maxChoicesEdited = true"/>
-                </div>
-
-                <!-- Ya/Tidak (yes_no) -->
-                <div id="yesno-group" style="display:none;margin-bottom:.875rem">
-                  <label style="display:block;font-size:12px;font-weight:600;color:#5f5e5a;margin-bottom:8px">Jawaban Benar</label>
-                  <div style="display:flex;gap:10px">
-                    <button type="button" class="yesno-btn active" id="yn-ya" onclick="setYesNo('ya')">✅ Ya</button>
-                    <button type="button" class="yesno-btn" id="yn-tidak" onclick="setYesNo('tidak')">❌ Tidak</button>
-                  </div>
-                </div>
-
-                <!-- Info camera_essay -->
-                <div id="camera-info" style="display:none;margin-bottom:.875rem;padding:10px;background:var(--green4);border-radius:10px;font-size:12px;color:var(--green)">
-                  📷 Siswa akan memfoto jawaban tulisan tangan mereka + mengetik alasan/penjelasan singkat.
-                </div>
-
-                <!-- Info audio -->
-                <div id="audio-info" style="display:none;margin-bottom:.875rem;padding:10px;background:#f0f7ff;border-radius:10px;font-size:12px;color:#1565c0">
-                  🎵 Siswa akan mendengarkan audio, lalu menjawab dengan pilihan yang tersedia.
-                </div>
-
-                <div style="display:flex;gap:8px">
-                  <button class="btn btn-primary btn-sm" onclick="addSoal()">Simpan Soal</button>
-                  <button class="btn btn-secondary btn-sm" onclick="toggleAddForm()">Batal</button>
                 </div>
               </div>
             </div>
@@ -488,12 +342,6 @@
     <script>
       if (!Auth.requireRole(["admin"])) throw new Error();
       UI.initSidebar();
-      // Hide tombol yang hanya untuk guru
-      document.addEventListener('DOMContentLoaded', () => {
-        document.querySelectorAll('.btn-danger').forEach(b => {
-          if (b.textContent.includes('Hapus')) b.style.display = 'none';
-        });
-      });
 
       const examId = new URLSearchParams(location.search).get("id");
       if (!examId) {
@@ -501,9 +349,8 @@
         throw new Error();
       }
 
-      let exam = null,
-        kunciMode = false,
-        kunciDraft = {};
+      let exam = null;
+      const selectedQids = new Set();
 
       async function load() {
         try {
@@ -564,28 +411,35 @@
         const el = document.getElementById("soal-list");
         if (!exam.questions.length) {
           el.innerHTML = `<div class="card"><div class="empty-state"><div class="empty-icon">📝</div>
-      <div class="empty-text">Belum ada soal. Tambah soal manual atau import dari file.</div></div></div>`;
+      <div class="empty-text">Belum ada soal di ujian ini.</div></div></div>`;
           return;
         }
         el.innerHTML = exam.questions
           .map(
             (q, i) => `
     <div class="q-card" id="qcard-${q.id}">
-      <div class="q-num">Soal ${i + 1} ${typeBadge(q.type||'multiple_choice')}</div>
-      ${q.attachment_url ? `<div style="margin:6px 0"><a href="${q.attachment_url}" target="_blank" style="font-size:12px;color:var(--green)">📎 Lihat Lampiran</a></div>` : ''}
-      ${q.audio_url ? `<div style="margin:6px 0"><audio controls src="${q.audio_url}" style="width:100%;height:36px"></audio></div>` : ''}
-      <div class="q-text">${q.content}</div>
-      ${(q.type==='yes_no') ? `<div style="display:flex;gap:8px;margin-top:8px"><span style="padding:4px 14px;border-radius:8px;font-size:13px;font-weight:600;background:${q.options?.find(o=>o.is_correct)?.label==='Ya'?'var(--green)':'var(--light)'};color:${q.options?.find(o=>o.is_correct)?.label==='Ya'?'#fff':'var(--text)'}">✅ Ya</span><span style="padding:4px 14px;border-radius:8px;font-size:13px;font-weight:600;background:${q.options?.find(o=>o.is_correct)?.label==='Tidak'?'var(--green)':'var(--light)'};color:${q.options?.find(o=>o.is_correct)?.label==='Tidak'?'#fff':'var(--text)'}">❌ Tidak</span></div>` : ''}
-      ${(q.type==='camera_essay') ? `<div style="padding:8px;background:var(--green4);border-radius:8px;font-size:12px;color:var(--green);margin-top:6px">📷 Siswa menjawab dengan foto + uraian</div>` : ''}
-      ${(q.type!=='yes_no'&&q.type!=='camera_essay') ? (kunciMode ? renderKunciOptions(q) : renderNormalOptions(q)) : ''}
-      <div class="q-footer">
-        <div style="font-size:11px;color:var(--muted)">
-          ${q.type==='multiple_answer' ? '☑️ Multi-kunci: '+q.options?.filter(o=>o.is_correct).map(o=>o.label).join(', ')+' · maks. pilihan siswa: '+(q.max_choices || q.options?.filter(o=>o.is_correct).length || 1)
-            : q.type==='yes_no' ? '✅ Kunci: '+(q.options?.find(o=>o.is_correct)?.label||'—')
-            : q.type==='camera_essay' ? '📷 Dinilai manual guru'
-            : (q.options?.filter(o=>o.is_correct).length ? "Kunci: "+q.options.find(o=>o.is_correct)?.label : "⚠ Belum ada kunci")}
+      <div style="display:flex;align-items:flex-start;gap:10px">
+        <input type="checkbox" class="q-select" data-qid="${q.id}" style="margin-top:3px;flex-shrink:0" onchange="toggleSelectQuestion('${q.id}', this.checked)" />
+        <div style="flex:1;min-width:0">
+          <div class="q-num" style="display:flex;align-items:center;justify-content:space-between">
+            <span>Soal ${i + 1} ${typeBadge(q.type||'multiple_choice')}</span>
+            <button class="btn btn-secondary btn-sm" title="Download soal ini" onclick="downloadOne('${q.id}')">📥</button>
+          </div>
+          ${q.attachment_url ? `<div style="margin:6px 0"><a href="${q.attachment_url}" target="_blank" style="font-size:12px;color:var(--green)">📎 Lihat Lampiran</a></div>` : ''}
+          ${q.audio_url ? `<div style="margin:6px 0"><audio controls src="${q.audio_url}" style="width:100%;height:36px"></audio></div>` : ''}
+          <div class="q-text">${q.content}</div>
+          ${(q.type==='yes_no') ? `<div style="display:flex;gap:8px;margin-top:8px"><span style="padding:4px 14px;border-radius:8px;font-size:13px;font-weight:600;background:${q.options?.find(o=>o.is_correct)?.label==='Ya'?'var(--green)':'var(--light)'};color:${q.options?.find(o=>o.is_correct)?.label==='Ya'?'#fff':'var(--text)'}">✅ Ya</span><span style="padding:4px 14px;border-radius:8px;font-size:13px;font-weight:600;background:${q.options?.find(o=>o.is_correct)?.label==='Tidak'?'var(--green)':'var(--light)'};color:${q.options?.find(o=>o.is_correct)?.label==='Tidak'?'#fff':'var(--text)'}">❌ Tidak</span></div>` : ''}
+          ${(q.type==='camera_essay') ? `<div style="padding:8px;background:var(--green4);border-radius:8px;font-size:12px;color:var(--green);margin-top:6px">📷 Siswa menjawab dengan foto + uraian</div>` : ''}
+          ${(q.type!=='yes_no'&&q.type!=='camera_essay') ? renderNormalOptions(q) : ''}
+          <div class="q-footer">
+            <div style="font-size:11px;color:var(--muted)">
+              ${q.type==='multiple_answer' ? '☑️ Multi-kunci: '+q.options?.filter(o=>o.is_correct).map(o=>o.label).join(', ')+' · maks. pilihan siswa: '+(q.max_choices || q.options?.filter(o=>o.is_correct).length || 1)
+                : q.type==='yes_no' ? '✅ Kunci: '+(q.options?.find(o=>o.is_correct)?.label||'—')
+                : q.type==='camera_essay' ? '📷 Dinilai manual guru'
+                : (q.options?.filter(o=>o.is_correct).length ? "Kunci: "+q.options.find(o=>o.is_correct)?.label : "⚠ Belum ada kunci")}
+            </div>
+          </div>
         </div>
-        ${!kunciMode ? `<button class="btn btn-danger btn-sm" onclick="deleteSoal('${q.id}')">🗑 Hapus</button>` : ""}
       </div>
     </div>
   `,
@@ -608,351 +462,44 @@
           .join("")}</div>`;
       }
 
-      function renderKunciOptions(q) {
-        return `<div>${q.options
-          .map((o) => {
-            const isDraft = kunciDraft[q.id] === o.id;
-            const isSaved = !kunciDraft[q.id] && o.is_correct;
-            const selected = isDraft || isSaved;
-            return `<button class="opt-kunci-btn ${selected ? "selected" : ""}" onclick="pickKunci('${q.id}','${o.id}')">
-      <div class="opt-kunci-letter ${selected ? "selected" : "nosel"}">${o.label}</div>
-      ${o.image_url ? `<img src="${o.image_url}" style="max-width:60px;max-height:46px;border-radius:6px;object-fit:cover"/>` : ""}
-      <div style="font-size:14px;flex:1;text-align:left">${o.content || ""}</div>
-      ${isDraft ? '<span style="font-size:11px;background:#d4edda;color:var(--green);padding:2px 8px;border-radius:6px;font-weight:600">✓ Dipilih</span>' : ""}
-    </button>`;
-          })
-          .join("")}</div>`;
+      // ── Pilih & Download Soal ──────────────────────────────────────
+      function toggleSelectQuestion(qid, checked) {
+        if (checked) selectedQids.add(qid); else selectedQids.delete(qid);
+        updateSelCount();
       }
-
-      // ── Kunci Mode ───────────────────────────────────────────────
-      function enterKunciMode() {
-        kunciMode = true;
-        kunciDraft = {};
-        document.getElementById("kunci-banner").style.display = "flex";
-        document.getElementById("btn-kunci").style.display = "none";
-        renderSoal();
-        updateKunciCounter();
-      }
-      function exitKunciMode() {
-        kunciMode = false;
-        kunciDraft = {};
-        document.getElementById("kunci-banner").style.display = "none";
-        document.getElementById("btn-kunci").style.display = "";
-        renderSoal();
-      }
-      function pickKunci(qid, oid) {
-        kunciDraft[qid] = oid;
-        document
-          .getElementById(`qcard-${qid}`)
-          .querySelector("div:nth-child(3)").innerHTML = renderKunciOptions(
-          exam.questions.find((q) => q.id === qid),
-        );
-        // Re-attach events
-        document
-          .getElementById(`qcard-${qid}`)
-          .querySelectorAll(".opt-kunci-btn")
-          .forEach((btn, i) => {
-            const q = exam.questions.find((q) => q.id === qid);
-            btn.onclick = () => pickKunci(qid, q.options[i].id);
-          });
-        updateKunciCounter();
-      }
-      function updateKunciCounter() {
-        const filled = Object.keys(kunciDraft).length;
-        const total = exam.questions.length;
-        document.getElementById("kunci-counter").textContent =
-          `Sudah dipilih: ${filled} dari ${total} soal`;
-      }
-      async function simpanKunci() {
-        if (!Object.keys(kunciDraft).length) {
-          UI.toast("Belum ada kunci yang dipilih", "warn");
-          return;
-        }
-        UI.loading(true, "Menyimpan kunci jawaban...");
-        let ok = 0;
-        try {
-          for (const [qid, oid] of Object.entries(kunciDraft)) {
-            const q = exam.questions.find((q) => q.id === qid);
-            if (!q) continue;
-            await API.patch(`/api/questions/${qid}`, {
-              options: q.options.map((o) => ({
-                label: o.label,
-                content: o.content,
-                image_url: o.image_url,
-                is_correct: o.id === oid,
-              })),
-            });
-            ok++;
-          }
-          UI.toast(`✅ ${ok} kunci jawaban disimpan`, "success");
-          exitKunciMode();
-          await load();
-        } catch {
-          UI.toast("Gagal menyimpan kunci", "error");
-        } finally {
-          UI.loading(false);
-        }
-      }
-
-      // ── Tambah Soal ──────────────────────────────────────────────
-      let currentKey = "A";
-      function setKey(label) {
-        currentKey = label;
-        document
-          .querySelectorAll("#opt-inputs .opt-input-row")
-          .forEach((row) => {
-            const lbl = row.dataset.label;
-            const letterEl = row.querySelector(".opt-letter");
-            const kunciEl = row.querySelector("span");
-            letterEl.className = `opt-letter ${lbl === label ? "key" : "nokey"}`;
-            kunciEl.style.color =
-              lbl === label ? "var(--green)" : "transparent";
-          });
-      }
-      function toggleAddForm() {
-        const el = document.getElementById("add-soal-form");
-        el.style.display = el.style.display === "none" ? "block" : "none";
-        if (el.style.display === "block") {
-          document.getElementById("nq-text").value = "";
-          document
-            .querySelectorAll("#opt-inputs input")
-            .forEach((i) => (i.value = ""));
-          setKey("A");
-          multiCorrectKeys = new Set(['A']);
-          maxChoicesEdited = false;
-          document.getElementById('nq-max-choices').value = 1;
-        }
-      }
-      // ── Tipe soal state ─────────────────────────────────
-      let currentType = 'multiple_choice';
-      let currentYesNo = 'ya';
-      let multiCorrectKeys = new Set(['A']);
-
-      function setType(type) {
-        currentType = type;
-        document.querySelectorAll('.type-btn').forEach(b => b.classList.toggle('active', b.dataset.type === type));
-
-        // Toggle visibility sections
-        const isChoice = type === 'multiple_choice' || type === 'audio';
-        const isMulti  = type === 'multiple_answer';
-        const isYesNo  = type === 'yes_no';
-        const isCamera = type === 'camera_essay';
-        const isAudio  = type === 'audio';
-
-        document.getElementById('options-group').style.display  = (isChoice||isMulti) ? '' : 'none';
-        document.getElementById('max-choices-group').style.display = isMulti ? '' : 'none';
-        document.getElementById('yesno-group').style.display    = isYesNo  ? '' : 'none';
-        document.getElementById('camera-info').style.display    = isCamera ? '' : 'none';
-        document.getElementById('audio-info').style.display     = isAudio  ? '' : 'none';
-        document.getElementById('audio-upload-group').style.display = isAudio ? '' : 'none';
-
-        // Hint teks
-        const hint = document.getElementById('options-hint');
-        const tip  = document.getElementById('options-tip');
-        if (isMulti) {
-          hint.textContent = '(klik huruf = centang/batal kunci, boleh lebih dari 1)';
-          tip.textContent  = 'Boleh pilih lebih dari satu kunci jawaban yang benar';
-          // Ganti click handler jadi multi-select
-          document.querySelectorAll('.opt-input-row .opt-letter').forEach(el => {
-            el.onclick = () => toggleMultiKey(el.dataset?.label || el.parentElement.dataset.label);
-          });
-        } else {
-          hint.textContent = '(klik huruf = set kunci)';
-          tip.textContent  = 'Klik huruf A/B/C/D/E untuk set kunci jawaban';
-          document.querySelectorAll('.opt-input-row .opt-letter').forEach((el, i) => {
-            const label = ['A','B','C','D','E'][i];
-            el.onclick = () => setKey(label);
-          });
-          // Reset ke single-select
-          if (currentKey) setKey(currentKey); else setKey('A');
-        }
-      }
-
-      let maxChoicesEdited = false;
-      function toggleMultiKey(label) {
-        if (!label) return;
-        multiCorrectKeys.has(label) ? multiCorrectKeys.delete(label) : multiCorrectKeys.add(label);
-        document.querySelectorAll('#opt-inputs .opt-input-row').forEach(row => {
-          const lbl = row.dataset.label;
-          const letterEl = row.querySelector('.opt-letter');
-          const kunciEl  = row.querySelectorAll('span')[0];
-          if (multiCorrectKeys.has(lbl)) {
-            letterEl.className = 'opt-letter key';
-            if (kunciEl) kunciEl.style.color = 'var(--green)';
-          } else {
-            letterEl.className = 'opt-letter nokey';
-            if (kunciEl) kunciEl.style.color = 'transparent';
-          }
+      function toggleSelectAll(checked) {
+        document.querySelectorAll(".q-select").forEach((cb) => {
+          cb.checked = checked;
+          if (checked) selectedQids.add(cb.dataset.qid); else selectedQids.delete(cb.dataset.qid);
         });
-        // Default maksimal pilihan = jumlah kunci jawaban, kecuali guru sudah ubah manual
-        if (!maxChoicesEdited) {
-          document.getElementById('nq-max-choices').value = multiCorrectKeys.size || 1;
-        }
+        updateSelCount();
       }
-
-      function setYesNo(val) {
-        currentYesNo = val;
-        document.getElementById('yn-ya').classList.toggle('active', val === 'ya');
-        document.getElementById('yn-tidak').classList.toggle('active', val === 'tidak');
+      function updateSelCount() {
+        document.getElementById("sel-count").textContent = selectedQids.size;
+        document.getElementById("btn-download-selected").disabled = selectedQids.size === 0;
       }
-
-      function previewAttach(input) {
-        const file = input.files[0]; if (!file) return;
-        const prev = document.getElementById('attach-preview');
-        const clearBtn = document.getElementById('attach-clear');
-        if (file.type.startsWith('image/')) {
-          const url = URL.createObjectURL(file);
-          prev.innerHTML = `<img src="${url}" class="attach-thumb"/><div style="font-size:11px;color:var(--muted);margin-top:4px">${file.name}</div>`;
-        } else {
-          prev.innerHTML = `📄 <strong>${file.name}</strong> <span style="color:var(--muted);font-size:11px">(${(file.size/1024).toFixed(0)} KB)</span>`;
-        }
-        if (clearBtn) clearBtn.style.display = 'flex';
-      }
-
-      function clearAttach() {
-        document.getElementById('nq-attach').value = '';
-        document.getElementById('attach-preview').innerHTML = '📎 Klik untuk upload foto atau PDF';
-        document.getElementById('attach-preview').style.color = 'var(--muted)';
-        const clearBtn = document.getElementById('attach-clear');
-        if (clearBtn) clearBtn.style.display = 'none';
-      }
-
-      function previewAudio(input) {
-        const file = input.files[0]; if (!file) return;
-        const url = URL.createObjectURL(file);
-        document.getElementById('audio-preview').innerHTML =
-          `<audio controls src="${url}" style="width:100%;margin-top:6px"></audio><div style="font-size:11px;color:var(--muted)">${file.name}</div>`;
-        const clearBtn = document.getElementById('audio-clear');
-        if (clearBtn) clearBtn.style.display = 'flex';
-      }
-
-      function clearAudio() {
-        document.getElementById('nq-audio').value = '';
-        document.getElementById('audio-preview').innerHTML = '🎵 Klik untuk upload file audio';
-        const clearBtn = document.getElementById('audio-clear');
-        if (clearBtn) clearBtn.style.display = 'none';
-      }
-
-      // Konversi file ke base64 data URL langsung di browser (tidak perlu server)
-      function fileToBase64(file) {
-        return new Promise((resolve, reject) => {
-          const MAX_MB = 5;
-          if (file.size > MAX_MB * 1024 * 1024) {
-            reject({ error: `Ukuran file maksimal ${MAX_MB}MB` }); return;
-          }
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result); // data:mime;base64,...
-          reader.onerror = () => reject({ error: 'Gagal membaca file' });
-          reader.readAsDataURL(file);
-        });
-      }
-
-      async function uploadFile(file, type='attachment') {
-        return await fileToBase64(file);
-      }
-
-      async function addSoal() {
-        const text = document.getElementById("nq-text").value.trim();
-        if (!text) { UI.toast("Isi pertanyaan terlebih dahulu", "warn"); return; }
-
-        const btn = document.querySelector('#add-soal-form .btn-primary');
-        btn.textContent = 'Menyimpan...'; btn.disabled = true;
-
+      async function downloadSelected() {
+        if (!selectedQids.size) return;
         try {
-          let attachment_url = null, audio_url = null;
-
-          // Upload lampiran jika ada
-          const attachFile = document.getElementById('nq-attach').files[0];
-          if (attachFile) attachment_url = await uploadFile(attachFile, 'attachment');
-
-          // Upload audio jika ada
-          const audioFile = document.getElementById('nq-audio')?.files[0];
-          if (audioFile && currentType === 'audio') audio_url = await uploadFile(audioFile, 'audio');
-
-          let options = [];
-          let payload = { content: text, type: currentType, attachment_url, audio_url };
-
-          if (currentType === 'multiple_choice' || currentType === 'audio') {
-            document.querySelectorAll("#opt-inputs .opt-input-row").forEach(row => {
-              const val = row.querySelector("input").value.trim();
-              if (val) options.push({ label: row.dataset.label, content: val, is_correct: row.dataset.label === currentKey });
-            });
-            if (options.length < 2) { UI.toast("Minimal 2 pilihan jawaban", "warn"); return; }
-            if (!options.some(o => o.is_correct)) { UI.toast("Set kunci jawaban dulu", "warn"); return; }
-            payload.options = options;
-
-          } else if (currentType === 'multiple_answer') {
-            document.querySelectorAll("#opt-inputs .opt-input-row").forEach(row => {
-              const val = row.querySelector("input").value.trim();
-              if (val) options.push({ label: row.dataset.label, content: val, is_correct: multiCorrectKeys.has(row.dataset.label) });
-            });
-            if (options.length < 2) { UI.toast("Minimal 2 pilihan jawaban", "warn"); return; }
-            if (!options.some(o => o.is_correct)) { UI.toast("Centang minimal 1 kunci jawaban", "warn"); return; }
-            payload.options = options;
-            payload.max_choices = Math.max(1, parseInt(document.getElementById('nq-max-choices').value) || multiCorrectKeys.size);
-
-          } else if (currentType === 'yes_no') {
-            payload.options = [
-              { label: 'Ya',    content: 'Ya',    is_correct: currentYesNo === 'ya' },
-              { label: 'Tidak', content: 'Tidak', is_correct: currentYesNo === 'tidak' },
-            ];
-
-          } else if (currentType === 'camera_essay') {
-            payload.options = []; // tidak ada pilihan, dinilai manual
-          }
-
-          await API.post(`/api/exams/${examId}/questions`, payload);
-          UI.toast("✅ Soal ditambahkan", "success");
-          toggleAddForm();
-          await load();
-        } catch (e) {
-          UI.toast(e.error || "Gagal menyimpan soal", "error");
-        } finally {
-          btn.textContent = 'Simpan Soal'; btn.disabled = false;
-        }
-      }
-
-      // ── Import ────────────────────────────────────────────────────
-      async function importSoal(input) {
-        const file = input.files[0];
-        if (!file) return;
-        UI.loading(true, "Mengimport soal...");
-        try {
-          const fd = new FormData();
-          fd.append("file", file);
-          const r = await API.upload(`/api/exams/${examId}/import`, fd);
-          UI.toast(
-            `✅ ${r.saved} dari ${r.total} soal berhasil diimport`,
-            "success",
+          await API.download(
+            `/api/exams/${examId}/export-soal?question_ids=${[...selectedQids].join(",")}`,
+            `Soal_${(exam.title||'ujian').replace(/[\/\\:*?"<>|]/g,'-')}.docx`,
           );
-          await load();
         } catch (e) {
-          UI.toast(e.error || "Gagal import", "error");
-        } finally {
-          UI.loading(false);
-          input.value = "";
+          UI.toast(e.error || "Gagal download soal", "error");
         }
       }
-      async function downloadTemplate() {
+      async function downloadOne(qid) {
         try {
-          await API.download("/api/template-soal", "template_soal.csv");
-        } catch {
-          UI.toast("Gagal download template", "error");
+          await API.download(
+            `/api/exams/${examId}/export-soal?question_ids=${qid}`,
+            `Soal_${(exam.title||'ujian').replace(/[\/\\:*?"<>|]/g,'-')}_1.docx`,
+          );
+        } catch (e) {
+          UI.toast(e.error || "Gagal download soal", "error");
         }
       }
 
-      // ── Hapus & Publish ───────────────────────────────────────────
-      async function deleteSoal(qid) {
-        UI.confirm(
-          "Hapus Soal",
-          "Soal ini akan dihapus permanen.",
-          async () => {
-            await API.del(`/api/questions/${qid}`);
-            UI.toast("Soal dihapus", "success");
-            await load();
-          },
-        );
-      }
       async function publish() {
         if (!exam.questions.length) {
           UI.toast("Tambah soal dulu sebelum publish", "warn");
