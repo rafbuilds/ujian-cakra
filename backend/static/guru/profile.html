@@ -29,6 +29,15 @@
         flex-shrink: 0;
         border: 3px solid rgba(255, 255, 255, 0.25);
       }
+      /* Halaman lain mendefinisikan override ini sendiri-sendiri — kalau
+         tidak di-set di sini, .modal-overlay global di style.css (display:
+         flex tanpa kondisi .show) bikin modal selalu kebuka dari awal. */
+      .modal-overlay {
+        display: none;
+      }
+      .modal-overlay.show {
+        display: flex;
+      }
       .class-chip {
         display: inline-flex;
         align-items: center;
