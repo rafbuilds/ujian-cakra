@@ -1002,6 +1002,12 @@ def get_activity_logs():
     params = []
     if action:
         where += " AND al.action=%s"; params.append(action)
+    else:
+        # Reset/buka-ulang sesi siswa terlalu sering terjadi saat guru aktif
+        # mengoreksi ujian — kalau ikut ditampilkan, banjir log ini menutupi
+        # aktivitas lain yang lebih relevan (login, buat ujian/soal, dst).
+        # Tetap bisa diambil lewat ?action=SESSION_RESET kalau memang perlu.
+        where += " AND al.action NOT IN ('SESSION_RESET','SESSION_REOPEN')"
     try:
         rows = query(f"""
             SELECT al.id, al.action, al.detail, al.ip_address, al.created_at,

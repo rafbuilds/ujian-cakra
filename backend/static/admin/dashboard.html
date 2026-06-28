@@ -469,8 +469,8 @@
           const rows = await API.get('/api/admin/activity-logs?limit=12');
           if (rows.length) {
             const iconMap = { LOGIN:'🔑', LOGOUT:'🚪', UJIAN_BUAT:'📝', SOAL_BUAT:'✏️',
-                              UJIAN_PUBLISH:'📢', UJIAN_SELESAI:'✅', SESSION_REOPEN:'🔓',
-                              SESSION_RESET:'🔄', TAHUN_AJARAN_BUAT:'📅', DEFAULT:'📌' };
+                              UJIAN_PUBLISH:'📢', UJIAN_SELESAI:'✅',
+                              TAHUN_AJARAN_BUAT:'📅', DEFAULT:'📌' };
             el.innerHTML = rows.map(r => `
               <div class="log-row">
                 <div class="log-icon" style="background:var(--light)">${iconMap[r.action] || iconMap.DEFAULT}</div>
