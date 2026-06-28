@@ -36,13 +36,13 @@ def update_user(user_id):
 @admin_bp.route('/api/admin/users/<user_id>/set-password', methods=['POST'])
 @require_admin
 def set_user_password(user_id):
-    from werkzeug.security import generate_password_hash
+    from auth import hash_password
     pw = (request.json or {}).get('password', '').strip()
     if not pw or len(pw) < 6:
         return jsonify({'error': 'Password minimal 6 karakter'}), 400
     try:
         query("UPDATE users SET password_hash=%s WHERE id=%s",
-              (generate_password_hash(pw), user_id), fetch='none')
+              (hash_password(pw), user_id), fetch='none')
         return jsonify({'ok': True})
     except Exception as e:
         if 'password_hash' in str(e):
@@ -52,7 +52,7 @@ def set_user_password(user_id):
 @admin_bp.route('/api/admin/users', methods=['POST'])
 @require_admin
 def create_user():
-    from werkzeug.security import generate_password_hash
+    from auth import hash_password
     data  = request.json or {}
     name  = data.get('name', '').strip()
     email = data.get('email', '').strip().lower()
@@ -70,7 +70,7 @@ def create_user():
     try:
         query("""INSERT INTO users (id, google_id, email, name, role, password_hash, is_active)
                  VALUES (%s,%s,%s,%s,%s,%s,true)""",
-              (uid, dummy_gid, email, name, role, generate_password_hash(pw)), fetch='none')
+              (uid, dummy_gid, email, name, role, hash_password(pw)), fetch='none')
     except Exception as e:
         err = str(e)
         if 'password_hash' in err:

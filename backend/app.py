@@ -24,8 +24,8 @@ app.register_blueprint(siswa_bp)
 app.register_blueprint(exams_bp)
 
 # ── Auth Routes ────────────────────────────────────────────────
-from auth import require_auth, require_admin, require_guru, create_token
-from werkzeug.security import generate_password_hash, check_password_hash
+from auth import (require_auth, require_admin, require_guru, create_token,
+                   hash_password, verify_password, needs_rehash)
 
 FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:8080')
 DEV_MODE     = os.environ.get('DEV_MODE', 'false').lower() == 'true'
@@ -51,10 +51,15 @@ def login():
     ph = user.get('password_hash') or ''
     if not ph:
         return jsonify({'error': 'Password belum di-set. Hubungi admin sekolah.'}), 401
-    if not check_password_hash(ph, pw):
+    if not verify_password(ph, pw):
         return jsonify({'error': 'Password salah'}), 401
 
     query("UPDATE users SET last_login=NOW() WHERE id=%s", (user['id'],), fetch='none')
+    if needs_rehash(ph):
+        # Migrasi diam-diam dari hash lama (scrypt, boros memori) ke pbkdf2
+        # begitu user ini login lagi — tidak perlu migrasi massal di awal.
+        query("UPDATE users SET password_hash=%s WHERE id=%s",
+              (hash_password(pw), user['id']), fetch='none')
     log_activity(user['id'], 'LOGIN', f"{user['name']} login", request.remote_addr)
     token = create_token(str(user['id']), user['role'])
     return jsonify({
@@ -122,10 +127,10 @@ def change_password():
         return jsonify({'error': 'Password baru minimal 6 karakter'}), 400
     user = query("SELECT password_hash FROM users WHERE id=%s", (request.user_id,), fetch='one')
     if user and user.get('password_hash'):
-        if not check_password_hash(user['password_hash'], old_pw):
+        if not verify_password(user['password_hash'], old_pw):
             return jsonify({'error': 'Password lama salah'}), 401
     query("UPDATE users SET password_hash=%s WHERE id=%s",
-          (generate_password_hash(new_pw), request.user_id), fetch='none')
+          (hash_password(new_pw), request.user_id), fetch='none')
     return jsonify({'ok': True})
 
 # ── Dev Login ──────────────────────────────────────────────────

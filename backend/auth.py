@@ -1,10 +1,11 @@
 """
 auth.py — Google OAuth & JWT session
 """
-import os, jwt, requests
+import os, threading, jwt, requests
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 from flask import request, jsonify
+from werkzeug.security import generate_password_hash as _gen_hash, check_password_hash as _check_hash
 from db import query
 
 GOOGLE_TOKEN_URL   = "https://oauth2.googleapis.com/token"
@@ -13,6 +14,34 @@ SECRET_KEY         = os.environ.get("SECRET_KEY", "dev-secret-key")
 ALLOWED_DOMAIN     = os.environ.get("ALLOWED_DOMAIN", "sman1batangan.sch.id")
 DEV_MODE           = os.environ.get("DEV_MODE", "false").lower() == "true"
 TOKEN_HOURS        = 8  # sesi login expired 8 jam
+
+# ── Password hashing ─────────────────────────────────────────
+# Werkzeug versi baru default-nya pakai scrypt, yang sengaja boros memori
+# (~32MB per verifikasi) untuk tahan brute-force. Itu aman untuk login
+# satu-satu, tapi saat ratusan siswa login BERSAMAAN (mis. semua buka ujian
+# di waktu yang sama), total kebutuhan memorinya bisa habiskan RAM server
+# dan crash (malloc failure) — sudah terbukti lewat load test lokal.
+# pbkdf2 nyaris tidak butuh memori ekstra (cuma CPU), jadi di beban tinggi
+# dia cuma jadi lambat (request mengantri), bukan crash.
+PASSWORD_HASH_METHOD = 'pbkdf2:sha256:260000'
+
+# Tetap batasi jumlah verifikasi password yang dihitung BERSAMAAN — pbkdf2
+# di iterasi segini cukup berat CPU (~150ms/operasi), jadi tanpa batas pun
+# bisa membuat semua thread sibuk hash password dan request lain (load
+# soal, dst) jadi keteteran kalau ratusan login nyerbu di detik yang sama.
+_HASH_SEMAPHORE = threading.Semaphore(int(os.environ.get('PASSWORD_HASH_CONCURRENCY', '8')))
+
+def hash_password(password: str) -> str:
+    with _HASH_SEMAPHORE:
+        return _gen_hash(password, method=PASSWORD_HASH_METHOD)
+
+def verify_password(password_hash: str, password: str) -> bool:
+    with _HASH_SEMAPHORE:
+        return _check_hash(password_hash, password)
+
+def needs_rehash(password_hash: str) -> bool:
+    """True kalau hash masih pakai scheme lama (scrypt) yang boros memori."""
+    return not (password_hash or '').startswith('pbkdf2:')
 
 # ── JWT ────────────────────────────────────────────────────
 def create_token(user_id: str, role: str) -> str:
