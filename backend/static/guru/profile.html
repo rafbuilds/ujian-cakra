@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+    <title>Profil Saya — Ujian Online</title>
+    <link rel="stylesheet" href="../style.css" />
+    <style>
+      .profile-hero {
+        background: linear-gradient(135deg, #0a3323, #0f4c35, #1a6b4a);
+        border-radius: 18px;
+        padding: 1.75rem;
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+      }
+      .profile-avatar {
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.15);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 26px;
+        font-weight: 800;
+        color: #fff;
+        flex-shrink: 0;
+        border: 3px solid rgba(255, 255, 255, 0.25);
+      }
+      .class-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: var(--green4);
+        border: 1px solid rgba(29, 158, 117, 0.2);
+        border-radius: 20px;
+        padding: 5px 10px;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--green);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-shell">
+      <nav class="sidebar">
+        <div class="sb-logo">
+          <div class="sb-logo-title">📋 Ujian Online</div>
+          <div class="sb-logo-sub">SMAN 1 Batangan</div>
+        </div>
+        <div class="sb-nav">
+          <div class="sb-section">Menu</div>
+          <a href="dashboard.html" class="sb-item" id="nav-dashboard">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" stroke-linecap="round" stroke-linejoin="round" />
+              <polyline points="9 22 9 12 15 12 15 22" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            Dashboard
+          </a>
+          <a href="ujian.html" class="sb-item" id="nav-ujian">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" stroke-linecap="round" />
+            </svg>
+            Daftar Ujian
+          </a>
+          <a href="bank-soal.html" class="sb-item" id="nav-bank-soal">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M4 19.5A2.5 2.5 0 016.5 17H20" stroke-linecap="round" />
+              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z" stroke-linecap="round" />
+            </svg>
+            Bank Soal
+          </a>
+          <a href="rooms.html" class="sb-item" id="nav-rooms">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke-linecap="round" />
+              <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke-linecap="round" />
+            </svg>
+            Room Ujian
+          </a>
+          <a href="pengawas.html" class="sb-item" id="nav-pengawas">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M15 10l4.553-2.069A1 1 0 0121 8.82V15.18a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" stroke-linecap="round" />
+            </svg>
+            Pengawas Live
+          </a>
+          <a href="nilai.html" class="sb-item" id="nav-nilai">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <line x1="18" y1="20" x2="18" y2="10" stroke-linecap="round" />
+              <line x1="12" y1="20" x2="12" y2="4" stroke-linecap="round" />
+              <line x1="6" y1="20" x2="6" y2="14" stroke-linecap="round" />
+            </svg>
+            Nilai & Rekap
+          </a>
+          <a href="mapel.html" class="sb-item" id="nav-mapel">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" stroke-linecap="round" />
+            </svg>
+            Mata Pelajaran
+          </a>
+          <a href="siswa.html" class="sb-item" id="nav-siswa">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke-linecap="round" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke-linecap="round" />
+            </svg>
+            Data Siswa
+          </a>
+          <a href="profile.html" class="sb-item active" id="nav-profile">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <circle cx="12" cy="8" r="4" stroke-linecap="round" />
+              <path d="M4 21c0-4 3.5-7 8-7s8 3 8 7" stroke-linecap="round" />
+            </svg>
+            Profil Saya
+          </a>
+        </div>
+        <div class="sb-user">
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px">
+            <div class="sb-avatar" id="sb-avatar">G</div>
+            <div>
+              <div class="sb-user-name" id="sb-user-name">Guru</div>
+              <div class="sb-user-role">Guru Pengampu</div>
+            </div>
+          </div>
+          <button class="sb-logout" onclick="Auth.logout()">⏻ Keluar</button>
+        </div>
+      </nav>
+
+      <div class="main-wrap">
+        <div class="topbar">
+          <div class="topbar-title">Profil Saya</div>
+        </div>
+
+        <div class="page-main">
+          <!-- Hero identitas -->
+          <div class="profile-hero">
+            <div class="profile-avatar" id="profile-avatar">G</div>
+            <div>
+              <div style="font-size: 19px; font-weight: 700; color: #fff" id="profile-name">—</div>
+              <div style="font-size: 13px; color: rgba(255, 255, 255, 0.65); margin-top: 2px" id="profile-email">—</div>
+              <div style="font-size: 12px; color: rgba(255, 255, 255, 0.5); margin-top: 4px" id="profile-meta">—</div>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem">
+            <!-- Ganti Password -->
+            <div class="card">
+              <div class="card-header">
+                <div class="card-title">🔒 Ubah Password</div>
+              </div>
+              <div style="margin-top: 0.875rem">
+                <div class="form-group">
+                  <label>Password Lama</label>
+                  <input class="form-control" type="password" id="old-pw" placeholder="Masukkan password lama" />
+                </div>
+                <div class="form-group">
+                  <label>Password Baru</label>
+                  <input class="form-control" type="password" id="new-pw" placeholder="Minimal 6 karakter" />
+                </div>
+                <div class="form-group">
+                  <label>Konfirmasi Password Baru</label>
+                  <input class="form-control" type="password" id="confirm-pw" placeholder="Ulangi password baru" />
+                </div>
+                <button class="btn btn-primary" style="width: 100%" id="btn-save-pw" onclick="changePassword()">
+                  💾 Simpan Password Baru
+                </button>
+              </div>
+            </div>
+
+            <!-- Kelas yang Diampu -->
+            <div class="card">
+              <div class="card-header">
+                <div class="card-title">🏫 Kelas yang Diampu</div>
+                <button class="btn btn-primary btn-sm" onclick="openTambahKelas()">+ Tambah</button>
+              </div>
+              <div style="font-size: 12px; color: var(--muted); margin: 0.5rem 0 0.75rem">
+                Kelas-kelas yang kamu ajar — dipakai sebagai filter saat membuat ujian & melihat data siswa.
+              </div>
+              <div id="kelas-list">
+                <div class="loading-spinner"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Tambah Kelas -->
+    <div id="modal-kelas" class="modal-overlay">
+      <div class="modal-box" style="max-width: 420px">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem">
+          <div style="font-weight: 700; font-size: 18px; color: var(--green)">Tambah Kelas Diampu</div>
+          <button onclick="closeModal('modal-kelas')" style="background: none; border: none; font-size: 22px; cursor: pointer">✕</button>
+        </div>
+        <div class="form-group">
+          <label>Pilih Kelas</label>
+          <select class="form-control" id="kelas-select">
+            <option value="">— Pilih kelas —</option>
+          </select>
+        </div>
+        <div style="display: flex; gap: 10px; margin-top: 1rem">
+          <button class="btn btn-secondary" style="flex: 1" onclick="closeModal('modal-kelas')">Batal</button>
+          <button class="btn btn-primary" style="flex: 1" onclick="tambahKelas()">Tambah</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="../config.js"></script>
+    <script src="../components/api.js"></script>
+    <script src="../components/auth.js"></script>
+    <script src="../components/common.js"></script>
+    <script>
+      if (!Auth.requireRole(["guru", "admin"])) throw new Error();
+      UI.initSidebar();
+
+      let myKelas = [], allKelas = [];
+
+      async function load() {
+        try {
+          const [me, kelas, allK] = await Promise.all([
+            API.get("/api/auth/me"),
+            API.get("/api/guru/taught-classes"),
+            API.get("/api/classes"),
+          ]);
+          myKelas = kelas;
+          allKelas = allK;
+
+          const initial = (me.name || "G")[0].toUpperCase();
+          document.getElementById("profile-avatar").textContent = initial;
+          document.getElementById("profile-name").textContent = me.name || "—";
+          document.getElementById("profile-email").textContent = me.email || "—";
+          document.getElementById("profile-meta").textContent =
+            `${me.role === "admin" ? "Administrator" : "Guru Pengampu"}${me.last_login ? " · Login terakhir " + UI.fmtDT(me.last_login) : ""}`;
+
+          renderKelas();
+        } catch (e) {
+          UI.toast("Gagal memuat profil", "error");
+        }
+      }
+
+      function renderKelas() {
+        document.getElementById("kelas-list").innerHTML = myKelas.length
+          ? '<div style="display:flex;flex-wrap:wrap;gap:7px">' +
+            myKelas
+              .map(
+                (k) => `
+          <div class="class-chip">
+            ${k.name}
+            <button onclick="hapusKelas('${k.id}')" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;line-height:1">×</button>
+          </div>`,
+              )
+              .join("") +
+            "</div>"
+          : '<div style="font-size:13px;color:var(--muted)">Belum ada kelas. Klik + Tambah untuk menambahkan.</div>';
+      }
+
+      function openTambahKelas() {
+        const existing = myKelas.map((k) => k.id);
+        document.getElementById("kelas-select").innerHTML =
+          '<option value="">— Pilih kelas —</option>' +
+          allKelas
+            .filter((k) => !existing.includes(k.id))
+            .map((k) => `<option value="${k.id}">${k.name}</option>`)
+            .join("");
+        document.getElementById("modal-kelas").classList.add("show");
+      }
+
+      async function tambahKelas() {
+        const id = document.getElementById("kelas-select").value;
+        if (!id) {
+          UI.toast("Pilih kelas dulu", "warn");
+          return;
+        }
+        try {
+          await API.post("/api/guru/taught-classes", { class_id: id });
+          UI.toast("✅ Kelas ditambahkan", "success");
+          closeModal("modal-kelas");
+          const kelas = await API.get("/api/guru/taught-classes");
+          myKelas = kelas;
+          renderKelas();
+        } catch (e) {
+          UI.toast(e.error || "Gagal", "error");
+        }
+      }
+
+      async function hapusKelas(id) {
+        const kls = myKelas.find((k) => k.id === id);
+        UI.confirm("Hapus Kelas", `Hapus kelas <strong>${kls?.name || id}</strong> dari daftar yang kamu ampu?`, async () => {
+          await API.del("/api/guru/taught-classes/" + id);
+          UI.toast("Kelas dihapus", "success");
+          myKelas = myKelas.filter((k) => k.id !== id);
+          renderKelas();
+        });
+      }
+
+      function closeModal(id) {
+        document.getElementById(id).classList.remove("show");
+      }
+
+      async function changePassword() {
+        const oldPw = document.getElementById("old-pw").value;
+        const newPw = document.getElementById("new-pw").value;
+        const confirmPw = document.getElementById("confirm-pw").value;
+        if (!newPw || newPw.length < 6) {
+          UI.toast("Password baru minimal 6 karakter", "warn");
+          return;
+        }
+        if (newPw !== confirmPw) {
+          UI.toast("Konfirmasi password tidak cocok", "warn");
+          return;
+        }
+        const btn = document.getElementById("btn-save-pw");
+        btn.disabled = true;
+        btn.textContent = "Menyimpan...";
+        try {
+          await API.post("/api/auth/change-password", { old_password: oldPw, new_password: newPw });
+          UI.toast("✅ Password berhasil diubah", "success");
+          document.getElementById("old-pw").value = "";
+          document.getElementById("new-pw").value = "";
+          document.getElementById("confirm-pw").value = "";
+        } catch (e) {
+          UI.toast(e.error || "Gagal mengubah password", "error");
+        } finally {
+          btn.disabled = false;
+          btn.textContent = "💾 Simpan Password Baru";
+        }
+      }
+
+      load();
+    </script>
+  </body>
+</html>
