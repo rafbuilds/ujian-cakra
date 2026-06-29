@@ -536,15 +536,17 @@ def student_exam_detail(exam_id, student_id):
     questions = query("""
         SELECT q.id, q.content, q.order_num,
                COALESCE(q.type, 'multiple_choice') as type,
-               q.attachment_url, q.audio_url,
+               q.image_url, q.attachment_url, q.audio_url,
                a.option_id as student_option_id,
                ao.label as student_label, ao.content as student_answer,
-               ao.is_correct as is_correct,
+               ao.is_correct as is_correct, ao.image_url as student_option_image,
                -- Agregasi semua kunci jawaban menjadi 1 baris per soal
                (SELECT STRING_AGG(label, ', ' ORDER BY label)
                 FROM options WHERE question_id=q.id AND is_correct=true) as correct_label,
                (SELECT STRING_AGG(content, ' / ' ORDER BY label)
-                FROM options WHERE question_id=q.id AND is_correct=true) as correct_answer
+                FROM options WHERE question_id=q.id AND is_correct=true) as correct_answer,
+               (SELECT image_url FROM options
+                WHERE question_id=q.id AND is_correct=true LIMIT 1) as correct_option_image
         FROM questions q
         LEFT JOIN answers a ON a.question_id=q.id AND a.session_id=%s
         LEFT JOIN options ao ON ao.id=a.option_id
@@ -1175,12 +1177,19 @@ def export_detail(exam_id):
                 if j == 2:  # pertanyaan
                     c.font = font(size=10)
 
-            # ── Sisipkan foto jika ada ─────────────────
+            # ── Sisipkan foto jika ada — foto jawaban siswa (camera_essay)
+            # atau gambar soal sendiri (tipe lain) — kolom G sama, dipakai
+            # bergantian karena tidak pernah ada keduanya di baris yang sama.
             photo_b64 = essay.get('photo_b64', '')
-            if photo_b64 and qtype == 'camera_essay':
+            if qtype == 'camera_essay':
+                image_ref = photo_b64
+            else:
+                image_ref = q.get('image_url') if is_image_ref(q.get('image_url')) \
+                    else (q.get('attachment_url') if is_image_ref(q.get('attachment_url')) else None)
+            if image_ref:
                 try:
                     from PIL import Image as PILImage
-                    img_bytes = fetch_image_bytes(photo_b64)
+                    img_bytes = fetch_image_bytes(image_ref)
                     pil_img   = PILImage.open(io.BytesIO(img_bytes))
                     pil_img.thumbnail((180, 140))
                     img_buf = io.BytesIO()

@@ -1057,6 +1057,36 @@
         }
       }
 
+      // Foto jawaban siswa (essay_answers.photo_b64) & gambar soal/opsi bisa
+      // berupa base64 lama ATAU URL Supabase Storage baru — keduanya valid
+      // langsung sebagai <img src>, beda dengan base64 polos (essay photo
+      // lama) yang butuh prefix data: ditambahkan manual.
+      function imgSrc(value) {
+        if (!value) return "";
+        if (value.startsWith("data:") || value.startsWith("http")) return value;
+        return `data:image/jpeg;base64,${value}`;
+      }
+      function isImgUrl(value) {
+        if (!value) return false;
+        if (value.startsWith("data:image")) return true;
+        if (value.startsWith("http"))
+          return /\.(jpg|jpeg|png|gif|webp)(\?|$)/i.test(value);
+        return false;
+      }
+      function questionImageHtml(q) {
+        const url = isImgUrl(q.image_url)
+          ? q.image_url
+          : isImgUrl(q.attachment_url)
+            ? q.attachment_url
+            : null;
+        if (!url) return "";
+        return `<img src="${imgSrc(url)}" style="max-width:100%;max-height:220px;border-radius:10px;border:.5px solid var(--border);margin-bottom:8px;cursor:zoom-in" onclick="this.style.maxHeight=this.style.maxHeight==='220px'?'none':'220px'" />`;
+      }
+      function optionThumb(url) {
+        if (!isImgUrl(url)) return "";
+        return `<img src="${imgSrc(url)}" style="max-width:90px;max-height:70px;border-radius:6px;border:.5px solid var(--border);vertical-align:middle;margin-left:6px;cursor:zoom-in" onclick="event.stopPropagation();this.style.maxHeight=this.style.maxHeight==='70px'?'none':'70px'" />`;
+      }
+
       function renderDetailQ(questions) {
         if (!questions.length) {
           document.getElementById("dp-questions").innerHTML =
@@ -1080,10 +1110,11 @@
       <div style="flex:1">
         <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:4px">SOAL ${i + 1} · KAMERA+URAIAN</div>
         <div style="font-size:13px;line-height:1.6;color:var(--text);margin-bottom:8px">${q.content}</div>
+        ${questionImageHtml(q)}
         ${q.photo_b64 ? `
           <div style="margin-bottom:8px">
             <div style="font-size:11px;color:var(--muted);margin-bottom:4px">📷 Foto jawaban:</div>
-            <img src="data:image/jpeg;base64,${q.photo_b64}"
+            <img src="${imgSrc(q.photo_b64)}"
               style="max-width:100%;max-height:260px;border-radius:10px;border:.5px solid var(--border);cursor:zoom-in"
               onclick="this.style.maxHeight=this.style.maxHeight==='260px'?'none':'260px'" />
           </div>` : ''}
@@ -1139,6 +1170,7 @@
       <div style="flex:1">
         <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:4px">SOAL ${i + 1} · YA/TIDAK</div>
         <div style="font-size:13px;line-height:1.6;color:var(--text);margin-bottom:6px">${q.content}</div>
+        ${questionImageHtml(q)}
         ${
           !answered
             ? '<span class="ans-pill empty">⬜ Tidak dijawab</span>'
@@ -1160,6 +1192,7 @@
       <div style="flex:1">
         <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:4px">SOAL ${i + 1} · JAWABAN GANDA</div>
         <div style="font-size:13px;line-height:1.6;color:var(--text);margin-bottom:6px">${q.content}</div>
+        ${questionImageHtml(q)}
         ${
           !answered
             ? '<span class="ans-pill empty">⬜ Tidak dijawab</span>'
@@ -1182,14 +1215,15 @@
       <div style="flex:1">
         <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:4px">SOAL ${i + 1}${type === "audio" ? " · AUDIO" : ""}</div>
         <div style="font-size:13px;line-height:1.6;color:var(--text);margin-bottom:6px">${q.content}</div>
+        ${questionImageHtml(q)}
         ${
           empty
             ? `<span class="ans-pill empty">⬜ Tidak dijawab</span>`
             : correct
-              ? `<span class="ans-pill correct">✓ ${q.student_label}. ${q.student_answer}</span>`
+              ? `<span class="ans-pill correct">✓ ${q.student_label}. ${q.student_answer}</span>${optionThumb(q.student_option_image)}`
               : `<div>
-                <span class="ans-pill wrong">✗ ${q.student_label}. ${q.student_answer}</span>
-                <div class="correct-ans">↳ Jawaban benar: <strong>${q.correct_label}. ${q.correct_answer || "—"}</strong></div>
+                <span class="ans-pill wrong">✗ ${q.student_label}. ${q.student_answer}</span>${optionThumb(q.student_option_image)}
+                <div class="correct-ans">↳ Jawaban benar: <strong>${q.correct_label}. ${q.correct_answer || "—"}</strong>${optionThumb(q.correct_option_image)}</div>
               </div>`
         }
       </div>
