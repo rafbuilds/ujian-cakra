@@ -3,6 +3,7 @@ from flask import Blueprint, request, jsonify, send_file
 import uuid, io
 from db import query, count_correct_wrong, log_activity
 from auth import require_guru, require_auth, require_admin
+from storage import upload_base64, fetch_image_bytes, is_image_ref
 
 exams_bp = Blueprint('exams', __name__)
 
@@ -205,20 +206,22 @@ def add_question(exam_id):
     q_id  = str(uuid.uuid4())
     total = query("SELECT COUNT(*) as n FROM questions WHERE exam_id=%s", (exam_id,), fetch='one')['n']
     q_type         = data.get('type', 'multiple_choice')
-    attachment_url = data.get('attachment_url')
-    audio_url      = data.get('audio_url')
+    image_url      = upload_base64(data.get('image_url'), folder='soal')
+    attachment_url = upload_base64(data.get('attachment_url'), folder='lampiran')
+    audio_url      = upload_base64(data.get('audio_url'), folder='audio')
     max_choices    = data.get('max_choices') if q_type == 'multiple_answer' else None
 
     query("""INSERT INTO questions
                (id, exam_id, content, image_url, type, attachment_url, audio_url, order_num, score, max_choices)
              VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
-          (q_id, exam_id, data.get('content',''), data.get('image_url'),
+          (q_id, exam_id, data.get('content',''), image_url,
            q_type, attachment_url, audio_url,
            total+1, data.get('score',1), max_choices), fetch='none')
 
     for opt in (data.get('options') or []):
+        opt_image = upload_base64(opt.get('image_url'), folder='opsi')
         query("INSERT INTO options (id, question_id, label, content, image_url, is_correct) VALUES (%s,%s,%s,%s,%s,%s)",
-              (str(uuid.uuid4()), q_id, opt['label'], opt.get('content',''), opt.get('image_url'), opt.get('is_correct',False)), fetch='none')
+              (str(uuid.uuid4()), q_id, opt['label'], opt.get('content',''), opt_image, opt.get('is_correct',False)), fetch='none')
 
     q    = query("SELECT * FROM questions WHERE id=%s", (q_id,), fetch='one')
     opts = query("SELECT * FROM options WHERE question_id=%s ORDER BY label", (q_id,))
@@ -235,17 +238,23 @@ def update_question(question_id):
         query("UPDATE questions SET content=%s WHERE id=%s", (data['content'], question_id), fetch='none')
     if 'type' in data:
         query("UPDATE questions SET type=%s WHERE id=%s", (data['type'], question_id), fetch='none')
+    if 'image_url' in data:
+        query("UPDATE questions SET image_url=%s WHERE id=%s",
+              (upload_base64(data['image_url'], folder='soal'), question_id), fetch='none')
     if 'attachment_url' in data:
-        query("UPDATE questions SET attachment_url=%s WHERE id=%s", (data['attachment_url'], question_id), fetch='none')
+        query("UPDATE questions SET attachment_url=%s WHERE id=%s",
+              (upload_base64(data['attachment_url'], folder='lampiran'), question_id), fetch='none')
     if 'audio_url' in data:
-        query("UPDATE questions SET audio_url=%s WHERE id=%s", (data['audio_url'], question_id), fetch='none')
+        query("UPDATE questions SET audio_url=%s WHERE id=%s",
+              (upload_base64(data['audio_url'], folder='audio'), question_id), fetch='none')
     if 'max_choices' in data:
         query("UPDATE questions SET max_choices=%s WHERE id=%s", (data['max_choices'], question_id), fetch='none')
     if 'options' in data:
         query("DELETE FROM options WHERE question_id=%s", (question_id,), fetch='none')
         for opt in data['options']:
+            opt_image = upload_base64(opt.get('image_url'), folder='opsi')
             query("INSERT INTO options (id, question_id, label, content, image_url, is_correct) VALUES (%s,%s,%s,%s,%s,%s)",
-                  (str(uuid.uuid4()), question_id, opt['label'], opt.get('content',''), opt.get('image_url'), opt.get('is_correct',False)), fetch='none')
+                  (str(uuid.uuid4()), question_id, opt['label'], opt.get('content',''), opt_image, opt.get('is_correct',False)), fetch='none')
     return jsonify({'ok': True})
 
 @exams_bp.route('/api/questions/<question_id>', methods=['DELETE'])
@@ -698,10 +707,12 @@ _QTYPE_LABEL = {'multiple_choice': 'Pilihan Ganda', 'multiple_answer': 'Jawaban 
 
 def _doc_add_image(doc, data_url, width=2.2):
     from docx.shared import Inches
-    import base64 as _b64
+    img_bytes = fetch_image_bytes(data_url)
+    if not img_bytes:
+        doc.add_paragraph('[Gambar tidak bisa ditampilkan]')
+        return
     try:
-        data = data_url.split(',', 1)[1]
-        doc.add_picture(io.BytesIO(_b64.b64decode(data)), width=Inches(width))
+        doc.add_picture(io.BytesIO(img_bytes), width=Inches(width))
     except Exception:
         doc.add_paragraph('[Gambar tidak bisa ditampilkan]')
 
@@ -725,14 +736,14 @@ def _doc_write_questions(doc, questions):
         run.bold = True
         run.font.size = Pt(12)
         doc.add_paragraph(f"Tipe: {_QTYPE_LABEL.get(q.get('type'), 'Pilihan Ganda')}").runs[0].italic = True
-        if q.get('image_url') and str(q['image_url']).startswith('data:image'):
+        if is_image_ref(q.get('image_url')):
             _doc_add_image(doc, q['image_url'])
-        if q.get('attachment_url') and str(q['attachment_url']).startswith('data:image'):
+        if is_image_ref(q.get('attachment_url')):
             _doc_add_image(doc, q['attachment_url'])
         for o in opts_by_q.get(str(q['id']), []):
             mark = '  ✓ (KUNCI)' if o.get('is_correct') else ''
             doc.add_paragraph(f"   {o['label']}. {o.get('content') or ''}{mark}")
-            if o.get('image_url') and str(o['image_url']).startswith('data:image'):
+            if is_image_ref(o.get('image_url')):
                 _doc_add_image(doc, o['image_url'], width=1.8)
         doc.add_paragraph('')
 
@@ -896,7 +907,7 @@ def export_nilai(exam_id):
 @exams_bp.route('/api/exams/<exam_id>/export-detail', methods=['GET'])
 @require_guru
 def export_detail(exam_id):
-    import io, base64 as b64mod
+    import io
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
     from openpyxl.utils import get_column_letter
@@ -1169,8 +1180,7 @@ def export_detail(exam_id):
             if photo_b64 and qtype == 'camera_essay':
                 try:
                     from PIL import Image as PILImage
-                    raw = photo_b64.split(',')[-1] if ',' in photo_b64 else photo_b64
-                    img_bytes = b64mod.b64decode(raw)
+                    img_bytes = fetch_image_bytes(photo_b64)
                     pil_img   = PILImage.open(io.BytesIO(img_bytes))
                     pil_img.thumbnail((180, 140))
                     img_buf = io.BytesIO()

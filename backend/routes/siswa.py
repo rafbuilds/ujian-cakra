@@ -4,6 +4,7 @@ import uuid, random
 from datetime import datetime, timezone, timedelta
 from db import query, count_correct_wrong
 from auth import require_auth
+from storage import upload_base64
 
 siswa_bp = Blueprint('siswa', __name__)
 
@@ -213,7 +214,11 @@ def save_essay_answer(session_id):
     data        = request.json or {}
     question_id = data.get('question_id')
     essay_text  = data.get('essay_text', '') or ''
-    photo_b64   = data.get('photo_b64', '') or None  # simpan NULL jika kosong
+    # Nama kolom "photo_b64" dipertahankan apa adanya (hindari migrasi
+    # rename), tapi isinya sekarang URL Supabase Storage, bukan base64
+    # mentah lagi — base64 foto siswa adalah penyumbang storage terbesar
+    # kalau disimpan langsung di kolom DB (kelipatan siswa x soal x sesi).
+    photo_b64   = upload_base64(data.get('photo_b64') or None, folder='jawaban-siswa')
     if not question_id:
         return jsonify({'error': 'question_id wajib'}), 400
     sess = query(
