@@ -68,9 +68,9 @@ def create_user():
     dummy_gid = f"manual_{uuid.uuid4().hex[:12]}"
     uid = str(uuid.uuid4())
     try:
-        query("""INSERT INTO users (id, google_id, email, name, role, password_hash, is_active)
-                 VALUES (%s,%s,%s,%s,%s,%s,true)""",
-              (uid, dummy_gid, email, name, role, hash_password(pw)), fetch='none')
+        query("""INSERT INTO users (id, google_id, email, name, role, password_hash, is_active, school_id)
+                 VALUES (%s,%s,%s,%s,%s,%s,true,%s)""",
+              (uid, dummy_gid, email, name, role, hash_password(pw), request.school_id), fetch='none')
     except Exception as e:
         err = str(e)
         if 'password_hash' in err:

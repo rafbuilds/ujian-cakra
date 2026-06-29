@@ -61,7 +61,8 @@ def login():
         query("UPDATE users SET password_hash=%s WHERE id=%s",
               (hash_password(pw), user['id']), fetch='none')
     log_activity(user['id'], 'LOGIN', f"{user['name']} login", request.remote_addr)
-    token = create_token(str(user['id']), user['role'])
+    school_id = str(user['school_id']) if user.get('school_id') else None
+    token = create_token(str(user['id']), user['role'], school_id)
     return jsonify({
         'token': token,
         'role':  user['role'],
@@ -99,7 +100,8 @@ def device_login():
     else:
         query("UPDATE users SET last_login=NOW() WHERE id=%s", (user['id'],), fetch='none')
 
-    token = create_token(str(user['id']), user['role'])
+    school_id = str(user['school_id']) if user.get('school_id') else None
+    token = create_token(str(user['id']), user['role'], school_id)
     return jsonify({
         'token': token,
         'role':  user['role'],
@@ -142,7 +144,8 @@ def dev_login():
     user  = query("SELECT * FROM users WHERE email=%s", (email,), fetch='one')
     if not user: return jsonify({'error': f'User {email} tidak ditemukan'}), 404
     query("UPDATE users SET last_login=NOW() WHERE id=%s", (user['id'],), fetch='none')
-    token = create_token(str(user['id']), user['role'])
+    school_id = str(user['school_id']) if user.get('school_id') else None
+    token = create_token(str(user['id']), user['role'], school_id)
     return jsonify({'token': token, 'role': user['role'], 'name': user['name']})
 
 # ══════════════════════════════════════════════════════════════

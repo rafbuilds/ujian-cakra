@@ -15,6 +15,13 @@ ALLOWED_DOMAIN     = os.environ.get("ALLOWED_DOMAIN", "sman1batangan.sch.id")
 DEV_MODE           = os.environ.get("DEV_MODE", "false").lower() == "true"
 TOKEN_HOURS        = 8  # sesi login expired 8 jam
 
+# Sekolah default — dibuat oleh migration_update.sql #27 untuk semua data
+# lama (SMAN 1 Batangan). Dipakai sebagai fallback saat membuat user baru
+# yang belum punya jalur penentuan sekolah eksplisit (mis. signup Google
+# OAuth) — onboarding sekolah baru lewat super_admin akan punya school_id
+# sendiri, bukan fallback ini.
+DEFAULT_SCHOOL_ID  = "00000000-0000-0000-0000-000000000001"
+
 # ── Password hashing ─────────────────────────────────────────
 # Werkzeug versi baru default-nya pakai scrypt, yang sengaja boros memori
 # (~32MB per verifikasi) untuk tahan brute-force. Itu aman untuk login
@@ -44,11 +51,12 @@ def needs_rehash(password_hash: str) -> bool:
     return not (password_hash or '').startswith('pbkdf2:')
 
 # ── JWT ────────────────────────────────────────────────────
-def create_token(user_id: str, role: str) -> str:
+def create_token(user_id: str, role: str, school_id: str | None = None) -> str:
     payload = {
-        "sub":  user_id,
-        "role": role,
-        "exp":  datetime.now(timezone.utc) + timedelta(hours=TOKEN_HOURS)
+        "sub":       user_id,
+        "role":      role,
+        "school_id": school_id,  # None untuk super_admin (tidak terikat sekolah manapun)
+        "exp":       datetime.now(timezone.utc) + timedelta(hours=TOKEN_HOURS)
     }
     return jwt.encode(payload, SECRET_KEY, algorithm="HS256")
 
@@ -77,11 +85,12 @@ def require_auth(f):
             return jsonify({"error": "Token tidak valid"}), 401
         request.user_id   = payload["sub"]
         request.user_role = payload["role"]
+        request.school_id = payload.get("school_id")
         return f(*args, **kwargs)
     return wrapper
 
 def require_guru(f):
-    """Hanya guru dan admin."""
+    """Guru, admin, dan super_admin."""
     @wraps(f)
     def wrapper(*args, **kwargs):
         token = get_token_from_request()
@@ -91,15 +100,16 @@ def require_guru(f):
             payload = decode_token(token)
         except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
             return jsonify({"error": "Token tidak valid"}), 401
-        if payload["role"] not in ("guru", "admin"):
+        if payload["role"] not in ("guru", "admin", "super_admin"):
             return jsonify({"error": "Akses ditolak"}), 403
         request.user_id   = payload["sub"]
         request.user_role = payload["role"]
+        request.school_id = payload.get("school_id")
         return f(*args, **kwargs)
     return wrapper
 
 def require_admin(f):
-    """Hanya admin."""
+    """Admin sekolah dan super_admin."""
     @wraps(f)
     def wrapper(*args, **kwargs):
         token = get_token_from_request()
@@ -109,10 +119,33 @@ def require_admin(f):
             payload = decode_token(token)
         except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
             return jsonify({"error": "Token tidak valid"}), 401
-        if payload["role"] != "admin":
+        if payload["role"] not in ("admin", "super_admin"):
             return jsonify({"error": "Akses ditolak"}), 403
         request.user_id   = payload["sub"]
         request.user_role = payload["role"]
+        request.school_id = payload.get("school_id")
+        return f(*args, **kwargs)
+    return wrapper
+
+def require_super_admin(f):
+    """Hanya super_admin (pemilik platform) — kelola semua sekolah,
+    billing, dan setting lintas-tenant. Sengaja TIDAK diturunkan dari
+    require_admin supaya admin sekolah biasa tidak pernah bisa naik
+    privilege ke endpoint super_admin walau ada bug di tempat lain."""
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        token = get_token_from_request()
+        if not token:
+            return jsonify({"error": "Belum login"}), 401
+        try:
+            payload = decode_token(token)
+        except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
+            return jsonify({"error": "Token tidak valid"}), 401
+        if payload["role"] != "super_admin":
+            return jsonify({"error": "Akses ditolak"}), 403
+        request.user_id   = payload["sub"]
+        request.user_role = payload["role"]
+        request.school_id = None
         return f(*args, **kwargs)
     return wrapper
 
@@ -187,13 +220,17 @@ def upsert_user(google_info: dict, requested_role: str = "siswa") -> dict:
         else:
             assigned_role = "siswa"
 
+        # Signup Google OAuth saat ini hanya untuk domain sekolah tunggal
+        # (ALLOWED_DOMAIN) — belum ada pemilihan sekolah saat daftar, jadi
+        # masuk ke sekolah default. Onboarding sekolah baru (lewat invite/
+        # subdomain) ditangani terpisah oleh super_admin, tidak lewat jalur ini.
         import uuid
         query("""
-            INSERT INTO users (id, google_id, email, name, avatar_url, role, is_active)
-            VALUES (%s, %s, %s, %s, %s, %s, true)
-        """, (str(uuid.uuid4()), google_id, email, name, avatar, assigned_role), fetch="none")
+            INSERT INTO users (id, google_id, email, name, avatar_url, role, is_active, school_id)
+            VALUES (%s, %s, %s, %s, %s, %s, true, %s)
+        """, (str(uuid.uuid4()), google_id, email, name, avatar, assigned_role, DEFAULT_SCHOOL_ID), fetch="none")
 
         user = query("SELECT * FROM users WHERE google_id=%s", (google_id,), fetch="one")
 
-    token = create_token(str(user["id"]), user["role"])
+    token = create_token(str(user["id"]), user["role"], str(user["school_id"]) if user.get("school_id") else None)
     return {"user": dict(user), "token": token}

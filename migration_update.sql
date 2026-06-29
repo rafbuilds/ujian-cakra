@@ -274,6 +274,69 @@ ALTER TABLE exam_sessions ADD COLUMN IF NOT EXISTS exited_at TIMESTAMPTZ;
 DROP TABLE IF EXISTS device_transfer_codes;
 ALTER TABLE users DROP COLUMN IF EXISTS unlock_code;
 
+-- ── 27. Multi-tenant: tabel sekolah + role super_admin ────────────
+-- Satu instance backend+database sekarang bisa melayani BANYAK sekolah.
+-- school_id ditambahkan ke semua tabel data utama; setiap admin/guru/siswa
+-- selalu terikat 1 sekolah. super_admin (pemilik platform) TIDAK terikat
+-- sekolah manapun — school_id-nya NULL permanen, bisa lihat semua sekolah.
+CREATE TABLE IF NOT EXISTS schools (
+    id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name       TEXT NOT NULL,
+    slug       TEXT UNIQUE NOT NULL,
+    plan       TEXT DEFAULT 'standard',
+    is_active  BOOLEAN DEFAULT TRUE,   -- toggle manual super_admin (suspend akses kalau belum bayar)
+    paid_until DATE,                   -- tanggal jatuh tempo pembayaran lisensi
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Sekolah default untuk SEMUA data yang sudah ada (SMAN 1 Batangan) —
+-- supaya migrasi ini aman dijalankan di database produksi yang sudah
+-- berisi data, tanpa ada baris school_id NULL setelah migrasi selesai.
+INSERT INTO schools (id, name, slug, plan, is_active)
+SELECT '00000000-0000-0000-0000-000000000001', 'SMAN 1 Batangan', 'sman1batangan', 'standard', true
+WHERE NOT EXISTS (SELECT 1 FROM schools WHERE slug = 'sman1batangan');
+
+ALTER TABLE users          ADD COLUMN IF NOT EXISTS school_id UUID REFERENCES schools(id);
+ALTER TABLE exams          ADD COLUMN IF NOT EXISTS school_id UUID REFERENCES schools(id);
+ALTER TABLE rooms          ADD COLUMN IF NOT EXISTS school_id UUID REFERENCES schools(id);
+ALTER TABLE classes        ADD COLUMN IF NOT EXISTS school_id UUID REFERENCES schools(id);
+ALTER TABLE subjects       ADD COLUMN IF NOT EXISTS school_id UUID REFERENCES schools(id);
+ALTER TABLE academic_years ADD COLUMN IF NOT EXISTS school_id UUID REFERENCES schools(id);
+ALTER TABLE semesters      ADD COLUMN IF NOT EXISTS school_id UUID REFERENCES schools(id);
+ALTER TABLE exam_settings  ADD COLUMN IF NOT EXISTS school_id UUID REFERENCES schools(id);
+ALTER TABLE exam_sessions  ADD COLUMN IF NOT EXISTS school_id UUID REFERENCES schools(id);
+ALTER TABLE activity_logs  ADD COLUMN IF NOT EXISTS school_id UUID REFERENCES schools(id);
+ALTER TABLE guru_invites   ADD COLUMN IF NOT EXISTS school_id UUID REFERENCES schools(id);
+
+-- Backfill semua baris yang sudah ada ke sekolah default di atas.
+UPDATE users          SET school_id='00000000-0000-0000-0000-000000000001' WHERE school_id IS NULL;
+UPDATE exams          SET school_id='00000000-0000-0000-0000-000000000001' WHERE school_id IS NULL;
+UPDATE rooms          SET school_id='00000000-0000-0000-0000-000000000001' WHERE school_id IS NULL;
+UPDATE classes        SET school_id='00000000-0000-0000-0000-000000000001' WHERE school_id IS NULL;
+UPDATE subjects       SET school_id='00000000-0000-0000-0000-000000000001' WHERE school_id IS NULL;
+UPDATE academic_years SET school_id='00000000-0000-0000-0000-000000000001' WHERE school_id IS NULL;
+UPDATE semesters      SET school_id='00000000-0000-0000-0000-000000000001' WHERE school_id IS NULL;
+UPDATE exam_settings  SET school_id='00000000-0000-0000-0000-000000000001' WHERE school_id IS NULL;
+UPDATE exam_sessions  SET school_id='00000000-0000-0000-0000-000000000001' WHERE school_id IS NULL;
+UPDATE activity_logs  SET school_id='00000000-0000-0000-0000-000000000001' WHERE school_id IS NULL;
+
+CREATE INDEX IF NOT EXISTS idx_users_school    ON users(school_id);
+CREATE INDEX IF NOT EXISTS idx_exams_school    ON exams(school_id);
+CREATE INDEX IF NOT EXISTS idx_rooms_school    ON rooms(school_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_school ON exam_sessions(school_id);
+
+-- Role super_admin ditambahkan ke constraint yang sudah ada.
+ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
+ALTER TABLE users ADD CONSTRAINT users_role_check
+    CHECK (role IN ('super_admin','admin','guru','guru_pending','siswa'));
+
+-- CATATAN PENTING: classes.id masih TEXT bebas (mis. 'x_ipa_1'), bukan
+-- per-sekolah secara skema — kalau 2 sekolah punya kelas dengan id yang
+-- sama persis akan bentrok primary key. Untuk sekarang dihindari lewat
+-- konvensi penamaan (prefix slug sekolah) saat membuat kelas sekolah baru,
+-- BUKAN lewat constraint database — perlu diperhatikan manual sampai
+-- nanti diperbaiki jadi composite key (school_id, id) kalau diperlukan.
+
 -- ── Selesai ───────────────────────────────────────────────────
 -- Verifikasi: SELECT table_name FROM information_schema.tables
 --             WHERE table_schema='public' ORDER BY table_name;
