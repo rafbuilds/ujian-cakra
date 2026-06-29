@@ -71,6 +71,11 @@ const Auth = (() => {
     const av = document.getElementById("sb-avatar");
     if (el) el.textContent = user.name || "";
     if (av) av.textContent = (user.name || "?")[0];
+    // Nama sekolah di bawah logo CAKRA — beda-beda per sekolah (multi-tenant),
+    // bukan teks statis lagi. super_admin tidak punya sekolah (school_name
+    // null) jadi dibiarkan apa adanya kalau halaman itu sudah set teks sendiri.
+    const sub = document.getElementById("sb-logo-sub");
+    if (sub && user.school_name) sub.textContent = user.school_name;
     return true;
   };
 

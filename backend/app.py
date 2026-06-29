@@ -34,7 +34,16 @@ DEV_MODE     = os.environ.get('DEV_MODE', 'false').lower() == 'true'
 
 @app.route('/api/health')
 def index():
-    return jsonify({'status': 'ok', 'service': 'Ujian Online SMABA', 'dev_mode': DEV_MODE})
+    return jsonify({'status': 'ok', 'service': 'CAKRA', 'dev_mode': DEV_MODE})
+
+def _school_name(school_id):
+    """Nama sekolah untuk ditampilkan di sidebar — beda-beda per tenant,
+    bukan hardcode satu sekolah lagi. None untuk super_admin (school_id None)."""
+    if not school_id:
+        return None
+    from db import query
+    row = query("SELECT name FROM schools WHERE id=%s", (school_id,), fetch='one')
+    return row['name'] if row else None
 
 @app.route('/api/auth/login', methods=['POST'])
 def login():
@@ -70,6 +79,7 @@ def login():
         'role':  user['role'],
         'name':  user['name'],
         'id':    str(user['id']),
+        'school_name': _school_name(school_id),
     })
 
 @app.route('/api/auth/device-login', methods=['POST'])
@@ -109,6 +119,7 @@ def device_login():
         'role':  user['role'],
         'name':  user['name'],
         'id':    str(user['id']),
+        'school_name': _school_name(school_id),
     })
 
 @app.route('/api/auth/me')
@@ -118,7 +129,9 @@ def auth_me():
     user = query("SELECT id,email,name,role,avatar_url,class_id,nisn,last_login FROM users WHERE id=%s",
                  (request.user_id,), fetch='one')
     if not user: return jsonify({'error': 'User tidak ditemukan'}), 404
-    return jsonify(dict(user))
+    result = dict(user)
+    result['school_name'] = _school_name(request.school_id)
+    return jsonify(result)
 
 @app.route('/api/auth/change-password', methods=['POST'])
 @require_auth
@@ -148,7 +161,8 @@ def dev_login():
     query("UPDATE users SET last_login=NOW() WHERE id=%s", (user['id'],), fetch='none')
     school_id = str(user['school_id']) if user.get('school_id') else None
     token = create_token(str(user['id']), user['role'], school_id)
-    return jsonify({'token': token, 'role': user['role'], 'name': user['name']})
+    return jsonify({'token': token, 'role': user['role'], 'name': user['name'],
+                    'school_name': _school_name(school_id)})
 
 # ══════════════════════════════════════════════════════════════
 # UPLOAD MEDIA — Lampiran & Audio untuk soal
