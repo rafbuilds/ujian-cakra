@@ -13,15 +13,17 @@ _allowed_origins = [o.strip() for o in os.environ.get('ALLOWED_ORIGINS', 'http:/
 CORS(app, resources={r"/api/*": {"origins": _allowed_origins}}, supports_credentials=True)
 
 # ── Register Blueprints ────────────────────────────────────────
-from routes.admin  import admin_bp
-from routes.guru   import guru_bp
-from routes.siswa  import siswa_bp
-from routes.exams  import exams_bp
+from routes.admin       import admin_bp
+from routes.guru        import guru_bp
+from routes.siswa       import siswa_bp
+from routes.exams       import exams_bp
+from routes.super_admin import super_admin_bp
 
 app.register_blueprint(admin_bp)
 app.register_blueprint(guru_bp)
 app.register_blueprint(siswa_bp)
 app.register_blueprint(exams_bp)
+app.register_blueprint(super_admin_bp)
 
 # ── Auth Routes ────────────────────────────────────────────────
 from auth import (require_auth, require_admin, require_guru, create_token,

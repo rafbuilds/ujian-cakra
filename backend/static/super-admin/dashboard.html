@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+    <title>Super Admin — Ujian Online</title>
+    <link rel="stylesheet" href="../style.css" />
+    <style>
+      /* style.css punya .modal-overlay global yang default-nya display:flex
+         (selalu tampil) — tiap halaman yang pakai modal WAJIB override ini
+         sendiri, kalau tidak modal langsung kebuka sejak page load. */
+      .modal-overlay {
+        display: none;
+      }
+      .modal-overlay.show {
+        display: flex;
+      }
+
+      .card { background:#fff; border-radius:12px; padding:1rem 1.125rem;
+        box-shadow:0 1px 4px rgba(0,0,0,.07); border:.5px solid var(--border); }
+
+      .badge { display:inline-block; padding:2px 9px; border-radius:20px;
+        font-size:11px; font-weight:700; }
+      .badge-green { background:#eaf3de; color:#3b6d11; }
+      .badge-red   { background:#fde8e8; color:#b91c1c; }
+      .badge-amber { background:#fff3cd; color:#856404; }
+      .badge-gray  { background:#f3f4f6; color:#6b7280; }
+
+      table.school-table { width:100%; border-collapse:collapse; font-size:13px; }
+      table.school-table th { text-align:left; padding:.6rem .5rem; border-bottom:2px solid var(--border);
+        color:var(--muted); font-weight:700; font-size:11px; text-transform:uppercase; }
+      table.school-table td { padding:.65rem .5rem; border-bottom:.5px solid var(--border); vertical-align:middle; }
+      table.school-table tr:hover td { background:var(--light); }
+
+      .stat-pill { font-size:11px; color:var(--muted); }
+    </style>
+  </head>
+  <body>
+    <div class="app-shell">
+      <nav class="sidebar">
+        <div class="sb-logo">
+          <div class="sb-logo-title">🛡️ Super Admin</div>
+          <div class="sb-logo-sub">Platform Owner</div>
+        </div>
+        <div class="sb-nav">
+          <div class="sb-section">MENU</div>
+          <a href="dashboard.html" class="sb-item active">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" stroke-linecap="round"/>
+              <polyline points="9 22 9 12 15 12 15 22" stroke-linecap="round"/>
+            </svg>Sekolah
+          </a>
+        </div>
+        <div class="sb-user">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+            <div class="sb-avatar" id="sb-avatar">S</div>
+            <div>
+              <div class="sb-user-name" id="sb-user-name">Super Admin</div>
+              <div class="sb-user-role">Platform Owner</div>
+            </div>
+          </div>
+          <button class="sb-logout" onclick="Auth.logout()">⏻ Keluar</button>
+        </div>
+      </nav>
+
+      <div class="main-wrap">
+        <div class="topbar">
+          <div class="topbar-title">Kelola Sekolah</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-left:auto;">
+            <button class="btn btn-primary btn-sm" onclick="openCreateModal()">+ Sekolah Baru</button>
+          </div>
+        </div>
+
+        <div class="page-main">
+          <div class="card" style="padding:0;overflow:hidden">
+            <div style="overflow-x:auto">
+              <table class="school-table">
+                <thead>
+                  <tr>
+                    <th>Sekolah</th>
+                    <th>Domain Email</th>
+                    <th>Plan</th>
+                    <th>Status</th>
+                    <th>Berlaku Hingga</th>
+                    <th>Guru</th>
+                    <th>Siswa</th>
+                    <th>Ujian</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="school-rows">
+                  <tr><td colspan="9" style="text-align:center;padding:2rem;color:var(--muted)">Memuat...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Tambah/Edit Sekolah -->
+    <div id="modal-school" class="modal-overlay">
+      <div class="modal-box">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem">
+          <div style="font-weight:700;font-size:18px;color:var(--green)" id="modal-title">Sekolah Baru</div>
+          <button onclick="closeModal()" style="background:none;border:none;font-size:22px;cursor:pointer">✕</button>
+        </div>
+
+        <div class="form-group">
+          <label>Nama Sekolah</label>
+          <input type="text" class="form-control" id="f-name" placeholder="mis. SMAN 1 Batangan" />
+        </div>
+        <div class="form-group">
+          <label>Domain Email (opsional)</label>
+          <input type="text" class="form-control" id="f-domain" placeholder="mis. smaba.com" />
+          <div style="font-size:11px;color:var(--muted);margin-top:4px">
+            Kalau diisi, admin sekolah ini hanya bisa daftarkan user dengan email @domain ini. Kosongkan kalau belum mau dibatasi.
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Plan</label>
+          <select class="form-control" id="f-plan">
+            <option value="standard">Standard</option>
+            <option value="pro">Pro</option>
+            <option value="trial">Trial</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Lisensi Berlaku Hingga (opsional)</label>
+          <input type="date" class="form-control" id="f-paid-until" />
+        </div>
+        <div class="form-group" id="f-active-wrap" style="display:none">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+            <input type="checkbox" id="f-active" style="width:auto" />
+            Aktif (matikan untuk suspend akses sekolah ini)
+          </label>
+        </div>
+
+        <div style="display:flex;gap:10px;margin-top:1rem">
+          <button class="btn btn-secondary" style="flex:1" onclick="closeModal()">Batal</button>
+          <button class="btn btn-primary" style="flex:1" onclick="saveSchool()">Simpan</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="../components/api.js"></script>
+    <script src="../components/auth.js"></script>
+    <script src="../components/common.js"></script>
+    <script>
+      if (!Auth.requireRole(["super_admin"])) throw new Error();
+      UI.initSidebar();
+
+      let schools = [];
+      let editingId = null;
+
+      async function load() {
+        try {
+          schools = await API.get("/api/super-admin/schools");
+          render();
+        } catch (e) {
+          UI.toast(e.error || "Gagal memuat data sekolah", "error");
+        }
+      }
+
+      function statusBadge(s) {
+        if (!s.is_active) return '<span class="badge badge-red">Disuspend</span>';
+        if (s.paid_until) {
+          const today = new Date().toISOString().slice(0, 10);
+          if (s.paid_until < today) return '<span class="badge badge-amber">Lisensi Habis</span>';
+        }
+        return '<span class="badge badge-green">Aktif</span>';
+      }
+
+      function render() {
+        const tbody = document.getElementById("school-rows");
+        if (!schools.length) {
+          tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:2rem;color:var(--muted)">Belum ada sekolah</td></tr>';
+          return;
+        }
+        tbody.innerHTML = schools
+          .map(
+            (s) => `
+          <tr>
+            <td><strong>${s.name}</strong><div class="stat-pill">${s.slug}</div></td>
+            <td>${s.allowed_domain ? "@" + s.allowed_domain : '<span class="stat-pill">— bebas —</span>'}</td>
+            <td><span class="badge badge-gray">${s.plan}</span></td>
+            <td>${statusBadge(s)}</td>
+            <td>${s.paid_until ? UI.fmtDate(s.paid_until) : '<span class="stat-pill">—</span>'}</td>
+            <td>${s.guru_count}</td>
+            <td>${s.siswa_count}</td>
+            <td>${s.exam_count}</td>
+            <td><button class="btn btn-secondary btn-sm" onclick="openEditModal('${s.id}')">Edit</button></td>
+          </tr>`,
+          )
+          .join("");
+      }
+
+      function openCreateModal() {
+        editingId = null;
+        document.getElementById("modal-title").textContent = "Sekolah Baru";
+        document.getElementById("f-name").value = "";
+        document.getElementById("f-domain").value = "";
+        document.getElementById("f-plan").value = "standard";
+        document.getElementById("f-paid-until").value = "";
+        document.getElementById("f-active-wrap").style.display = "none";
+        document.getElementById("modal-school").classList.add("show");
+      }
+
+      function openEditModal(id) {
+        const s = schools.find((x) => x.id === id);
+        if (!s) return;
+        editingId = id;
+        document.getElementById("modal-title").textContent = "Edit Sekolah";
+        document.getElementById("f-name").value = s.name || "";
+        document.getElementById("f-domain").value = s.allowed_domain || "";
+        document.getElementById("f-plan").value = s.plan || "standard";
+        document.getElementById("f-paid-until").value = s.paid_until || "";
+        document.getElementById("f-active").checked = !!s.is_active;
+        document.getElementById("f-active-wrap").style.display = "block";
+        document.getElementById("modal-school").classList.add("show");
+      }
+
+      function closeModal() {
+        document.getElementById("modal-school").classList.remove("show");
+      }
+
+      async function saveSchool() {
+        const name = document.getElementById("f-name").value.trim();
+        if (!name) {
+          UI.toast("Nama sekolah wajib diisi", "warn");
+          return;
+        }
+        const payload = {
+          name,
+          allowed_domain: document.getElementById("f-domain").value.trim(),
+          plan: document.getElementById("f-plan").value,
+          paid_until: document.getElementById("f-paid-until").value || null,
+        };
+        try {
+          if (editingId) {
+            payload.is_active = document.getElementById("f-active").checked;
+            await API.patch(`/api/super-admin/schools/${editingId}`, payload);
+            UI.toast("✅ Sekolah diperbarui", "success");
+          } else {
+            await API.post("/api/super-admin/schools", payload);
+            UI.toast("✅ Sekolah dibuat", "success");
+          }
+          closeModal();
+          load();
+        } catch (e) {
+          UI.toast(e.error || "Gagal menyimpan", "error");
+        }
+      }
+
+      load();
+    </script>
+  </body>
+</html>

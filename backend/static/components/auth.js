@@ -53,7 +53,17 @@ const Auth = (() => {
       return false;
     }
     if (!allowedRoles.includes(user.role)) {
-      setTimeout(() => redirectByRole(user.role), 800);
+      // Cache lokal bisa basi (mis. role user baru saja diubah di server
+      // tapi belum login ulang) — verifikasi ke server dulu sebelum
+      // memutuskan redirect, supaya tidak pingpong antar halaman berdasarkan
+      // role yang sudah tidak akurat.
+      fetchAndStoreUser().then((u) => {
+        if (u && allowedRoles.includes(u.role)) {
+          window.location.reload();
+        } else {
+          redirectByRole(u ? u.role : user.role);
+        }
+      });
       return false;
     }
     // Set nama di sidebar
@@ -88,6 +98,7 @@ const Auth = (() => {
 
   const redirectByRole = (role) => {
     const map = {
+      super_admin: "/super-admin/dashboard.html",
       admin: "/admin/dashboard.html",
       guru: "/guru/dashboard.html",
       siswa: "/siswa/siswa-ujian.html",

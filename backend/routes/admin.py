@@ -53,7 +53,7 @@ def set_user_password(user_id):
 @admin_bp.route('/api/admin/users', methods=['POST'])
 @require_admin
 def create_user():
-    from auth import hash_password
+    from auth import hash_password, validate_email_domain
     data  = request.json or {}
     name  = data.get('name', '').strip()
     email = data.get('email', '').strip().lower()
@@ -63,6 +63,9 @@ def create_user():
         return jsonify({'error': 'Nama dan email wajib'}), 400
     if not pw or len(pw) < 6:
         return jsonify({'error': 'Password minimal 6 karakter'}), 400
+    domain_err = validate_email_domain(request.school_id, email)
+    if domain_err:
+        return jsonify({'error': domain_err}), 400
     existing = query("SELECT id FROM users WHERE LOWER(email)=%s", (email,), fetch='one')
     if existing:
         return jsonify({'error': 'Email sudah terdaftar'}), 409
@@ -152,6 +155,9 @@ def reset_siswa_device(siswa_id):
 def _upsert_siswa_row(name, nisn, class_id, email, school_id):
     """Helper: insert atau update satu baris data siswa."""
     if not name: return False
+    from auth import validate_email_domain
+    if email and validate_email_domain(school_id, email):
+        return False  # domain email tidak cocok dengan yang diset super_admin
     dummy_gid = f"import_{uuid.uuid4().hex[:12]}"
     existing = query("SELECT id FROM users WHERE email=%s AND role='siswa' AND school_id=%s",
                      (email, school_id), fetch='one') if email else None

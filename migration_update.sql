@@ -336,6 +336,15 @@ ALTER TABLE users ADD CONSTRAINT users_role_check
 ALTER TABLE academic_years DROP CONSTRAINT IF EXISTS academic_years_name_key;
 ALTER TABLE academic_years ADD CONSTRAINT academic_years_school_name_key UNIQUE (school_id, name);
 
+-- ── 29. Domain email per sekolah — hanya super_admin yang atur ───
+-- Dulu ALLOWED_DOMAIN cuma 1 env var global, dan jalur login yang aktif
+-- (password-based) sama sekali tidak mengecek domain. Sekarang tiap
+-- sekolah punya domainnya sendiri, diisi/diubah HANYA oleh super_admin
+-- lewat dashboard super admin — admin sekolah cuma bisa lihat, validasi
+-- dipakai saat admin sekolah menambah user baru (tolak kalau domain email
+-- tidak cocok, kalau kolom ini sudah diisi).
+ALTER TABLE schools ADD COLUMN IF NOT EXISTS allowed_domain TEXT;
+
 -- CATATAN PENTING: classes.id masih TEXT bebas (mis. 'x_ipa_1'), bukan
 -- per-sekolah secara skema — kalau 2 sekolah punya kelas dengan id yang
 -- sama persis akan bentrok primary key. Untuk sekarang dihindari lewat

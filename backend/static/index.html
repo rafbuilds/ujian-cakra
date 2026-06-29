@@ -388,6 +388,7 @@
     <script src="components/auth.js"></script>
     <script>
       const ROLE_REDIRECT = {
+        super_admin: "/super-admin/dashboard.html",
         admin: "/admin/dashboard.html",
         guru: "/guru/dashboard.html",
         guru_pending: "/guru/pending.html",
@@ -473,6 +474,15 @@
           try {
             const user = await API.get("/api/auth/me");
             if (user && user.role) {
+              // Sinkronkan cache lokal juga (bukan cuma redirect) — kalau
+              // tidak, halaman tujuan masih baca role LAMA dari localStorage
+              // dan malah redirect balik (terjadi kalau role user berubah
+              // di server tapi belum login ulang, mis. promosi ke
+              // super_admin), bikin pingpong antar halaman.
+              localStorage.setItem(
+                "ujian_user",
+                JSON.stringify({ role: user.role, name: user.name, id: user.id }),
+              );
               window.location.href = ROLE_REDIRECT[user.role] || "/index.html";
               return;
             }

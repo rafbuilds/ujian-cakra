@@ -50,6 +50,41 @@ def needs_rehash(password_hash: str) -> bool:
     """True kalau hash masih pakai scheme lama (scrypt) yang boros memori."""
     return not (password_hash or '').startswith('pbkdf2:')
 
+# ── Subscription gate ────────────────────────────────────────
+def subscription_block_reason(school_id):
+    """None kalau sekolah ini boleh akses; string alasan kalau diblokir
+    (di-suspend manual oleh super_admin, atau lisensi sudah lewat
+    paid_until). school_id None (super_admin) selalu lolos."""
+    if not school_id:
+        return None
+    school = query("SELECT is_active, paid_until FROM schools WHERE id=%s", (school_id,), fetch='one')
+    if not school:
+        return None  # sekolah lama sebelum tabel schools ada — jangan blokir
+    if not school.get('is_active'):
+        return 'Akun sekolah ini sedang dinonaktifkan. Hubungi admin platform.'
+    paid_until = school.get('paid_until')
+    if paid_until:
+        from datetime import date
+        if paid_until < date.today():
+            return 'Lisensi sekolah ini sudah kedaluwarsa. Hubungi admin platform untuk perpanjangan.'
+    return None
+
+def validate_email_domain(school_id, email):
+    """None kalau email boleh dipakai untuk sekolah ini; string alasan
+    kalau ditolak. Hanya berlaku kalau super_admin sudah set
+    schools.allowed_domain untuk sekolah ini — kalau belum diisi,
+    semua domain email diterima (backward compatible)."""
+    if not school_id or not email:
+        return None
+    school = query("SELECT allowed_domain FROM schools WHERE id=%s", (school_id,), fetch='one')
+    domain = (school or {}).get('allowed_domain')
+    if not domain:
+        return None
+    email_domain = email.strip().lower().split('@')[-1]
+    if email_domain != domain.strip().lower():
+        return f"Email harus menggunakan domain @{domain}"
+    return None
+
 # ── JWT ────────────────────────────────────────────────────
 def create_token(user_id: str, role: str, school_id: str | None = None) -> str:
     payload = {
@@ -86,6 +121,9 @@ def require_auth(f):
         request.user_id   = payload["sub"]
         request.user_role = payload["role"]
         request.school_id = payload.get("school_id")
+        blocked = subscription_block_reason(request.school_id)
+        if blocked:
+            return jsonify({"error": blocked}), 403
         return f(*args, **kwargs)
     return wrapper
 
@@ -105,6 +143,9 @@ def require_guru(f):
         request.user_id   = payload["sub"]
         request.user_role = payload["role"]
         request.school_id = payload.get("school_id")
+        blocked = subscription_block_reason(request.school_id)
+        if blocked:
+            return jsonify({"error": blocked}), 403
         return f(*args, **kwargs)
     return wrapper
 
@@ -124,6 +165,9 @@ def require_admin(f):
         request.user_id   = payload["sub"]
         request.user_role = payload["role"]
         request.school_id = payload.get("school_id")
+        blocked = subscription_block_reason(request.school_id)
+        if blocked:
+            return jsonify({"error": blocked}), 403
         return f(*args, **kwargs)
     return wrapper
 

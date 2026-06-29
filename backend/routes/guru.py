@@ -137,6 +137,7 @@ def get_guru_siswa():
 @require_guru
 def guru_import_siswa():
     from openpyxl import load_workbook
+    from auth import validate_email_domain
     file = request.files.get('file')
     if not file: return jsonify({'error': 'File tidak ada'}), 400
     wb = load_workbook(file); ws = wb.active
@@ -150,6 +151,12 @@ def guru_import_siswa():
             class_id = str(row[2] or '').strip() or None
             email = str(row[3] or '').strip() or None
             if not name: continue
+
+            if email:
+                domain_err = validate_email_domain(request.school_id, email)
+                if domain_err:
+                    errors.append(f"Baris {idx}: {domain_err}")
+                    continue
 
             # Validasi kelas kalau ada
             if class_id:
