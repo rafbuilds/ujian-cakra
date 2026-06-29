@@ -60,8 +60,8 @@ def login():
         # begitu user ini login lagi — tidak perlu migrasi massal di awal.
         query("UPDATE users SET password_hash=%s WHERE id=%s",
               (hash_password(pw), user['id']), fetch='none')
-    log_activity(user['id'], 'LOGIN', f"{user['name']} login", request.remote_addr)
     school_id = str(user['school_id']) if user.get('school_id') else None
+    log_activity(user['id'], 'LOGIN', f"{user['name']} login", request.remote_addr, school_id)
     token = create_token(str(user['id']), user['role'], school_id)
     return jsonify({
         'token': token,

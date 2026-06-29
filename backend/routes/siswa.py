@@ -42,16 +42,16 @@ def student_exams():
         FROM exams e
         JOIN exam_classes ec ON ec.exam_id=e.id
         LEFT JOIN subjects s ON s.id=e.subject_id
-        WHERE ec.class_id=%s AND e.status IN ('published','ongoing','finished')
+        WHERE ec.class_id=%s AND e.school_id=%s AND e.status IN ('published','ongoing','finished')
         ORDER BY e.start_at DESC
-    """, (request.user_id, request.user_id, user['class_id']))
+    """, (request.user_id, request.user_id, user['class_id'], request.school_id))
     return jsonify([dict(r) for r in rows])
 
 # ── Start Exam ─────────────────────────────────────────────────
 @siswa_bp.route('/api/student/exams/<exam_id>/start', methods=['POST'])
 @require_auth
 def start_exam(exam_id):
-    exam = query("SELECT * FROM exams WHERE id=%s", (exam_id,), fetch='one')
+    exam = query("SELECT * FROM exams WHERE id=%s AND school_id=%s", (exam_id, request.school_id), fetch='one')
     if not exam: return jsonify({'error': 'Ujian tidak ditemukan'}), 404
     if exam['status'] not in ('published','ongoing'):
         return jsonify({'error': 'Ujian tidak tersedia'}), 400
@@ -272,7 +272,8 @@ def record_violation(session_id):
     query("""UPDATE exam_sessions SET tab_violations=tab_violations+1
              WHERE id=%s AND student_id=%s""", (session_id, request.user_id), fetch='none')
     sess = query("SELECT tab_violations FROM exam_sessions WHERE id=%s", (session_id,), fetch='one')
-    settings = query("SELECT max_violations FROM exam_settings LIMIT 1", fetch='one')
+    settings = query("SELECT max_violations FROM exam_settings WHERE school_id=%s LIMIT 1",
+                     (request.school_id,), fetch='one')
     max_v = settings['max_violations'] if settings else 5
     return jsonify({'violations': sess['tab_violations'] if sess else 0, 'max': max_v})
 
@@ -290,7 +291,8 @@ def submit_exam(session_id):
     query("UPDATE exam_sessions SET submitted_at=NOW(), auto_submitted=%s WHERE id=%s",
           (auto_submit, session_id), fetch='none')
 
-    exam_data = query("SELECT * FROM exams WHERE id=%s", (sess['exam_id'],), fetch='one')
+    exam_data = query("SELECT * FROM exams WHERE id=%s AND school_id=%s",
+                     (sess['exam_id'], request.school_id), fetch='one')
     total_q = query("SELECT COUNT(*) as n FROM questions WHERE exam_id=%s",
                     (sess['exam_id'],), fetch='one')['n']
     correct, wrong = count_correct_wrong(session_id, sess['exam_id'])
@@ -348,7 +350,7 @@ def siswa_history(siswa_id):
         JOIN exams e ON e.id=es.exam_id
         LEFT JOIN subjects s ON s.id=e.subject_id
         LEFT JOIN results r ON r.session_id=es.id
-        WHERE es.student_id=%s AND es.submitted_at IS NOT NULL
+        WHERE es.student_id=%s AND es.submitted_at IS NOT NULL AND e.school_id=%s
         ORDER BY es.submitted_at DESC
-    """, (siswa_id,))
+    """, (siswa_id, request.school_id))
     return jsonify([dict(r) for r in rows])

@@ -9,12 +9,13 @@ exams_bp = Blueprint('exams', __name__)
 
 # ── CRUD Ujian ─────────────────────────────────────────────────
 def _active_semester_id():
-    """Semester yang sedang aktif (tahun ajaran aktif + semester aktif). None kalau tidak ada."""
+    """Semester yang sedang aktif (tahun ajaran aktif + semester aktif) UNTUK SEKOLAH INI.
+    None kalau tidak ada."""
     row = query("""
         SELECT s.id FROM semesters s
         JOIN academic_years ay ON ay.id = s.academic_year_id
-        WHERE s.is_active=true AND ay.is_active=true LIMIT 1
-    """, fetch='one')
+        WHERE s.is_active=true AND ay.is_active=true AND s.school_id=%s LIMIT 1
+    """, (request.school_id,), fetch='one')
     return row['id'] if row else None
 
 @exams_bp.route('/api/exams', methods=['GET'])
@@ -23,7 +24,7 @@ def get_exams():
     sem_id = request.args.get('semester_id')
     if not sem_id and request.args.get('active_only') == '1':
         sem_id = _active_semester_id()
-    params = [request.user_id]
+    params = [request.user_id, request.school_id]
     extra_where = ""
     if sem_id:
         extra_where = " AND e.semester_id=%s"
@@ -38,7 +39,7 @@ def get_exams():
         LEFT JOIN subjects s ON s.id=e.subject_id
         LEFT JOIN semesters sem ON sem.id=e.semester_id
         LEFT JOIN academic_years ay ON ay.id=sem.academic_year_id
-        WHERE e.teacher_id=%s{extra_where}
+        WHERE e.teacher_id=%s AND e.school_id=%s{extra_where}
         ORDER BY e.created_at DESC
     """, tuple(params))
     return jsonify([dict(r) for r in rows])
@@ -61,9 +62,9 @@ def get_exams_for_proctor():
         LEFT JOIN subjects s ON s.id=e.subject_id
         LEFT JOIN users u ON u.id=e.teacher_id
         WHERE e.status IN ('published','ongoing','finished')
-          AND e.semester_id=%s
+          AND e.semester_id=%s AND e.school_id=%s
         ORDER BY e.start_at DESC
-    """, (request.user_id, active_id))
+    """, (request.user_id, active_id, request.school_id))
     return jsonify([dict(r) for r in rows])
 
 @exams_bp.route('/api/exams', methods=['POST'])
@@ -78,7 +79,8 @@ def create_exam():
     semester_id = None
     if room_id:
         room = query("SELECT semester_id FROM room_teachers rt JOIN rooms r ON r.id=rt.room_id "
-                     "WHERE rt.room_id=%s AND rt.teacher_id=%s", (room_id, request.user_id), fetch='one')
+                     "WHERE rt.room_id=%s AND rt.teacher_id=%s AND r.school_id=%s",
+                     (room_id, request.user_id, request.school_id), fetch='one')
         if not room:
             return jsonify({'error': 'Anda belum join room ujian ini'}), 403
         semester_id = room.get('semester_id')
@@ -86,14 +88,15 @@ def create_exam():
     # Kalau tidak ada room, atau room-nya belum diset semester, fallback ke
     # semester yang sedang aktif — frozen di waktu pembuatan.
     if not semester_id:
-        active_sem = query("SELECT id FROM semesters WHERE is_active=true LIMIT 1", fetch='one')
+        active_sem = query("SELECT id FROM semesters WHERE is_active=true AND school_id=%s LIMIT 1",
+                           (request.school_id,), fetch='one')
         semester_id = active_sem['id'] if active_sem else None
 
     query("""INSERT INTO exams
              (id, teacher_id, subject_id, title, instructions, duration_minutes,
               start_at, status, randomize_questions, randomize_options,
-              show_result_after, show_key_after, score_per_correct, room_id, grade, semester_id)
-             VALUES (%s,%s,%s,%s,%s,%s,%s,'draft',%s,%s,%s,%s,%s,%s,%s,%s)""",
+              show_result_after, show_key_after, score_per_correct, room_id, grade, semester_id, school_id)
+             VALUES (%s,%s,%s,%s,%s,%s,%s,'draft',%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
           (exam_id, request.user_id,
            data.get('subject_id') or None,
            data.get('title','Ujian Baru'),
@@ -105,22 +108,23 @@ def create_exam():
            data.get('show_result_after', True),
            data.get('show_key_after', False),
            data.get('score_per_correct') or None,
-           room_id, data.get('grade') or None, semester_id), fetch='none')
+           room_id, data.get('grade') or None, semester_id, request.school_id), fetch='none')
     # Assign classes
     for cls in (data.get('class_ids') or []):
         query("INSERT INTO exam_classes (exam_id, class_id) VALUES (%s,%s) ON CONFLICT DO NOTHING",
               (exam_id, cls), fetch='none')
-    log_activity(request.user_id, 'UJIAN_BUAT', f"Buat ujian \"{data.get('title','Ujian Baru')}\"", request.remote_addr)
+    log_activity(request.user_id, 'UJIAN_BUAT', f"Buat ujian \"{data.get('title','Ujian Baru')}\"",
+                request.remote_addr, request.school_id)
     return jsonify({'id': exam_id}), 201
 
 @exams_bp.route('/api/exams/<exam_id>', methods=['GET'])
 @require_guru
 def get_exam(exam_id):
     """Hanya guru/admin yang bisa melihat soal + kunci jawaban."""
-    exam = query("SELECT * FROM exams WHERE id=%s", (exam_id,), fetch='one')
+    exam = query("SELECT * FROM exams WHERE id=%s AND school_id=%s", (exam_id, request.school_id), fetch='one')
     if not exam: return jsonify({'error': 'Tidak ditemukan'}), 404
-    # Guru hanya bisa akses ujian miliknya; admin bisa semua
-    if request.user_role != 'admin' and str(exam['teacher_id']) != request.user_id:
+    # Guru hanya bisa akses ujian miliknya; admin (sekolah yang sama) bisa semua
+    if request.user_role not in ('admin', 'super_admin') and str(exam['teacher_id']) != request.user_id:
         return jsonify({'error': 'Akses ditolak'}), 403
     questions = query("SELECT * FROM questions WHERE exam_id=%s ORDER BY order_num", (exam_id,))
     all_opts = query("""SELECT o.* FROM options o JOIN questions q ON q.id=o.question_id
@@ -136,23 +140,27 @@ def get_exam(exam_id):
 @exams_bp.route('/api/exams/<exam_id>', methods=['PATCH'])
 @require_guru
 def update_exam(exam_id):
-    # Pastikan guru hanya bisa edit ujian miliknya (admin bebas)
-    if request.user_role != 'admin':
-        owner = query("SELECT id FROM exams WHERE id=%s AND teacher_id=%s", (exam_id, request.user_id), fetch='one')
-        if not owner:
-            return jsonify({'error': 'Ujian tidak ditemukan atau bukan milik Anda'}), 403
+    # Pastikan exam ini milik sekolah yang sama, dan guru hanya bisa edit
+    # ujian miliknya sendiri (admin sekolah yang sama bebas).
+    owner_check = "AND teacher_id=%s" if request.user_role not in ('admin', 'super_admin') else ""
+    params = [exam_id, request.school_id] + ([request.user_id] if owner_check else [])
+    owner = query(f"SELECT id FROM exams WHERE id=%s AND school_id=%s {owner_check}", tuple(params), fetch='one')
+    if not owner:
+        return jsonify({'error': 'Ujian tidak ditemukan atau bukan milik Anda'}), 403
     data = request.json or {}
     if 'room_id' in data:
         room_id = data['room_id'] or None
         semester_id = None
         if room_id:
             room = query("SELECT semester_id FROM room_teachers rt JOIN rooms r ON r.id=rt.room_id "
-                        "WHERE rt.room_id=%s AND rt.teacher_id=%s", (room_id, request.user_id), fetch='one')
+                        "WHERE rt.room_id=%s AND rt.teacher_id=%s AND r.school_id=%s",
+                        (room_id, request.user_id, request.school_id), fetch='one')
             if not room:
                 return jsonify({'error': 'Anda belum join room ujian ini'}), 403
             semester_id = room.get('semester_id')
         if not semester_id:
-            active_sem = query("SELECT id FROM semesters WHERE is_active=true LIMIT 1", fetch='one')
+            active_sem = query("SELECT id FROM semesters WHERE is_active=true AND school_id=%s LIMIT 1",
+                               (request.school_id,), fetch='one')
             semester_id = active_sem['id'] if active_sem else None
         query("UPDATE exams SET room_id=%s, semester_id=%s WHERE id=%s", (room_id, semester_id, exam_id), fetch='none')
     allowed = ['title','instructions','duration_minutes','start_at','status',
@@ -168,13 +176,14 @@ def update_exam(exam_id):
     if data.get('status') == 'published':
         title = query("SELECT title FROM exams WHERE id=%s", (exam_id,), fetch='one')
         log_activity(request.user_id, 'UJIAN_PUBLISH',
-                     f"Publish ujian \"{(title or {}).get('title','')}\"", request.remote_addr)
+                     f"Publish ujian \"{(title or {}).get('title','')}\"", request.remote_addr, request.school_id)
     return jsonify({'ok': True})
 
 @exams_bp.route('/api/exams/<exam_id>', methods=['DELETE'])
 @require_guru
 def delete_exam(exam_id):
-    query("DELETE FROM exams WHERE id=%s AND teacher_id=%s", (exam_id, request.user_id), fetch='none')
+    query("DELETE FROM exams WHERE id=%s AND teacher_id=%s AND school_id=%s",
+          (exam_id, request.user_id, request.school_id), fetch='none')
     return jsonify({'ok': True})
 
 # ── Questions ──────────────────────────────────────────────────
@@ -192,16 +201,25 @@ def check_similar_questions():
                    similarity(q.content, %s) as score
             FROM questions q
             JOIN exams e ON e.id = q.exam_id
-            WHERE e.teacher_id = %s AND similarity(q.content, %s) > 0.35
+            WHERE e.teacher_id = %s AND e.school_id = %s AND similarity(q.content, %s) > 0.35
             ORDER BY score DESC LIMIT 5
-        """, (content, request.user_id, content))
+        """, (content, request.user_id, request.school_id, content))
         return jsonify([dict(r) for r in rows])
     except Exception:
         return jsonify([])
 
+def _exam_owner_or_404(exam_id):
+    """Verifikasi exam_id ada & milik sekolah ini, dan (kalau bukan admin)
+    milik guru yang request. Return exam dict atau None."""
+    owner_check = "AND teacher_id=%s" if request.user_role not in ('admin', 'super_admin') else ""
+    params = [exam_id, request.school_id] + ([request.user_id] if owner_check else [])
+    return query(f"SELECT * FROM exams WHERE id=%s AND school_id=%s {owner_check}", tuple(params), fetch='one')
+
 @exams_bp.route('/api/exams/<exam_id>/questions', methods=['POST'])
 @require_guru
 def add_question(exam_id):
+    if not _exam_owner_or_404(exam_id):
+        return jsonify({'error': 'Ujian tidak ditemukan atau bukan milik Anda'}), 404
     data = request.json or {}
     q_id  = str(uuid.uuid4())
     total = query("SELECT COUNT(*) as n FROM questions WHERE exam_id=%s", (exam_id,), fetch='one')['n']
@@ -230,9 +248,19 @@ def add_question(exam_id):
                  f"Tambah soal ke \"{(exam_title or {}).get('title','ujian')}\"", request.remote_addr)
     return jsonify({**dict(q), 'options': [dict(o) for o in opts]}), 201
 
+def _question_owner_or_404(question_id):
+    """Verifikasi question_id ada, exam-nya milik sekolah ini, dan (kalau
+    bukan admin) milik guru yang request."""
+    owner_check = "AND e.teacher_id=%s" if request.user_role not in ('admin', 'super_admin') else ""
+    params = [question_id, request.school_id] + ([request.user_id] if owner_check else [])
+    return query(f"""SELECT q.* FROM questions q JOIN exams e ON e.id=q.exam_id
+                     WHERE q.id=%s AND e.school_id=%s {owner_check}""", tuple(params), fetch='one')
+
 @exams_bp.route('/api/questions/<question_id>', methods=['PATCH'])
 @require_guru
 def update_question(question_id):
+    if not _question_owner_or_404(question_id):
+        return jsonify({'error': 'Soal tidak ditemukan atau bukan milik Anda'}), 404
     data = request.json or {}
     if 'content' in data:
         query("UPDATE questions SET content=%s WHERE id=%s", (data['content'], question_id), fetch='none')
@@ -260,6 +288,8 @@ def update_question(question_id):
 @exams_bp.route('/api/questions/<question_id>', methods=['DELETE'])
 @require_guru
 def delete_question(question_id):
+    if not _question_owner_or_404(question_id):
+        return jsonify({'error': 'Soal tidak ditemukan atau bukan milik Anda'}), 404
     query("DELETE FROM questions WHERE id=%s", (question_id,), fetch='none')
     return jsonify({'ok': True})
 
@@ -268,6 +298,8 @@ def delete_question(question_id):
 @require_guru
 def import_questions(exam_id):
     import traceback, re
+    if not _exam_owner_or_404(exam_id):
+        return jsonify({'error': 'Ujian tidak ditemukan atau bukan milik Anda'}), 404
     try:
         file = request.files.get('file')
         if not file: return jsonify({'error': 'File tidak ada'}), 400
@@ -385,12 +417,14 @@ def join_proctor(exam_id):
     code = (request.json or {}).get('code', '').strip()
     if not code:
         return jsonify({'error': 'Kode wajib diisi'}), 400
-    exam = query("SELECT id, title, teacher_id FROM exams WHERE id=%s", (exam_id,), fetch='one')
+    exam = query("SELECT id, title, teacher_id FROM exams WHERE id=%s AND school_id=%s",
+                (exam_id, request.school_id), fetch='one')
     if not exam:
         return jsonify({'error': 'Ujian tidak ditemukan'}), 404
     if str(exam['teacher_id']) == request.user_id:
         return jsonify({'error': 'Anda pembuat soal ujian ini — sudah otomatis bisa mengawasi tanpa kode'}), 400
-    setting = query("SELECT proctor_code FROM exam_settings LIMIT 1", fetch='one')
+    setting = query("SELECT proctor_code FROM exam_settings WHERE school_id=%s LIMIT 1",
+                    (request.school_id,), fetch='one')
     master_code = (setting or {}).get('proctor_code')
     if not master_code:
         return jsonify({'error': 'Kode pengawas belum diset admin'}), 400
@@ -428,7 +462,7 @@ def _is_exam_proctor(exam, user_id, role):
 @exams_bp.route('/api/exams/<exam_id>/monitor', methods=['GET'])
 @require_guru
 def monitor_exam(exam_id):
-    exam = query("SELECT * FROM exams WHERE id=%s", (exam_id,), fetch='one')
+    exam = query("SELECT * FROM exams WHERE id=%s AND school_id=%s", (exam_id, request.school_id), fetch='one')
     if not exam: return jsonify({'error': 'Tidak ditemukan'}), 404
     if not _is_exam_proctor(exam, request.user_id, request.user_role):
         return jsonify({'error': 'Anda belum menjadi pengawas ujian ini. Masukkan kode pengawas terlebih dahulu.'}), 403
@@ -478,6 +512,8 @@ def monitor_exam(exam_id):
 @exams_bp.route('/api/exams/<exam_id>/results', methods=['GET'])
 @require_guru
 def exam_results(exam_id):
+    if not query("SELECT 1 FROM exams WHERE id=%s AND school_id=%s", (exam_id, request.school_id), fetch='one'):
+        return jsonify({'error': 'Ujian tidak ditemukan'}), 404
     rows = query("""
         SELECT es.id as session_id, u.id as student_id, u.name, u.nisn,
                c.name as class_name, es.submitted_at, es.tab_violations,
@@ -528,6 +564,8 @@ def exam_results(exam_id):
 @exams_bp.route('/api/exams/<exam_id>/student/<student_id>/detail', methods=['GET'])
 @require_guru
 def student_exam_detail(exam_id, student_id):
+    if not query("SELECT 1 FROM exams WHERE id=%s AND school_id=%s", (exam_id, request.school_id), fetch='one'):
+        return jsonify({'error': 'Ujian tidak ditemukan'}), 404
     sess = query("SELECT id FROM exam_sessions WHERE exam_id=%s AND student_id=%s LIMIT 1",
                  (exam_id, student_id), fetch='one')
     if not sess: return jsonify({'error': 'Siswa belum memulai ujian ini'}), 404
@@ -672,7 +710,7 @@ def session_detail(session_id):
 @exams_bp.route('/api/exams/<exam_id>/finish', methods=['POST'])
 @require_guru
 def finish_exam(exam_id):
-    exam = query("SELECT * FROM exams WHERE id=%s", (exam_id,), fetch='one')
+    exam = query("SELECT * FROM exams WHERE id=%s AND school_id=%s", (exam_id, request.school_id), fetch='one')
     if not exam: return jsonify({'error': 'Ujian tidak ditemukan'}), 404
     if not _is_exam_proctor(exam, request.user_id, request.user_role):
         return jsonify({'error': 'Anda bukan pengawas ujian ini'}), 403
@@ -701,7 +739,8 @@ def finish_exam(exam_id):
                   (str(uuid.uuid4()), sid, score, correct, wrong, empty), fetch='none')
 
     query("UPDATE exams SET status='finished' WHERE id=%s", (exam_id,), fetch='none')
-    log_activity(request.user_id, 'UJIAN_SELESAI', f"Selesaikan ujian \"{exam.get('title','')}\"", request.remote_addr)
+    log_activity(request.user_id, 'UJIAN_SELESAI', f"Selesaikan ujian \"{exam.get('title','')}\"",
+                request.remote_addr, request.school_id)
     return jsonify({'ok': True, 'submitted': len(ongoing)})
 
 _QTYPE_LABEL = {'multiple_choice': 'Pilihan Ganda', 'multiple_answer': 'Jawaban Ganda',
@@ -753,9 +792,9 @@ def _doc_write_questions(doc, questions):
 @exams_bp.route('/api/exams/<exam_id>/export-soal', methods=['GET'])
 @require_guru
 def export_soal(exam_id):
-    exam = query("SELECT * FROM exams WHERE id=%s", (exam_id,), fetch='one')
+    exam = query("SELECT * FROM exams WHERE id=%s AND school_id=%s", (exam_id, request.school_id), fetch='one')
     if not exam: return jsonify({'error': 'Ujian tidak ditemukan'}), 404
-    if request.user_role != 'admin' and str(exam['teacher_id']) != request.user_id:
+    if request.user_role not in ('admin', 'super_admin') and str(exam['teacher_id']) != request.user_id:
         return jsonify({'error': 'Akses ditolak'}), 403
 
     qids_param = request.args.get('question_ids')
@@ -790,8 +829,9 @@ def export_soal_bulk():
     id_list = [x for x in ids_param.split(',') if x]
     if not id_list:
         return jsonify({'error': 'exam_ids wajib'}), 400
-    exam_rows = query("SELECT * FROM exams WHERE id=ANY(%s::uuid[]) ORDER BY title", (id_list,))
-    if request.user_role != 'admin':
+    exam_rows = query("SELECT * FROM exams WHERE id=ANY(%s::uuid[]) AND school_id=%s ORDER BY title",
+                      (id_list, request.school_id))
+    if request.user_role not in ('admin', 'super_admin'):
         exam_rows = [e for e in exam_rows if str(e['teacher_id']) == request.user_id]
     if not exam_rows:
         return jsonify({'error': 'Tidak ada ujian yang bisa diakses'}), 404
@@ -814,7 +854,7 @@ def export_soal_bulk():
 @exams_bp.route('/api/exams/<exam_id>/publish-results', methods=['POST'])
 @require_guru
 def publish_results(exam_id):
-    exam = query("SELECT * FROM exams WHERE id=%s", (exam_id,), fetch='one')
+    exam = query("SELECT * FROM exams WHERE id=%s AND school_id=%s", (exam_id, request.school_id), fetch='one')
     if not exam: return jsonify({'error': 'Ujian tidak ditemukan'}), 404
     if not _is_exam_proctor(exam, request.user_id, request.user_role):
         return jsonify({'error': 'Anda bukan pengawas ujian ini'}), 403
@@ -827,6 +867,8 @@ def publish_results(exam_id):
 @require_guru
 def grade_essay(exam_id, session_id):
     """Guru beri nilai untuk jawaban esai/foto satu siswa."""
+    if not query("SELECT 1 FROM exams WHERE id=%s AND school_id=%s", (exam_id, request.school_id), fetch='one'):
+        return jsonify({'error': 'Ujian tidak ditemukan'}), 404
     body  = request.json or {}
     qid   = body.get('question_id')
     score = body.get('score')         # angka 0-100
@@ -879,7 +921,8 @@ def _recalc_with_essay(session_id):
 def export_nilai(exam_id):
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment
-    exam = query("SELECT * FROM exams WHERE id=%s", (exam_id,), fetch='one')
+    exam = query("SELECT * FROM exams WHERE id=%s AND school_id=%s", (exam_id, request.school_id), fetch='one')
+    if not exam: return jsonify({'error': 'Ujian tidak ditemukan'}), 404
     rows = query("""
         SELECT u.name, u.nisn, c.name as class_name, es.submitted_at,
                r.score, r.correct_count, r.wrong_count, r.empty_count, es.tab_violations
@@ -940,10 +983,10 @@ def export_detail(exam_id):
     exam = query("SELECT e.*, u.name as teacher_name, s.name as subject_name "
                  "FROM exams e LEFT JOIN users u ON u.id=e.teacher_id "
                  "LEFT JOIN subjects s ON s.id=e.subject_id "
-                 "WHERE e.id=%s", (exam_id,), fetch='one')
+                 "WHERE e.id=%s AND e.school_id=%s", (exam_id, request.school_id), fetch='one')
     if not exam:
         return jsonify({'error': 'Ujian tidak ditemukan'}), 404
-    if request.user_role != 'admin' and str(exam['teacher_id']) != request.user_id:
+    if request.user_role not in ('admin', 'super_admin') and str(exam['teacher_id']) != request.user_id:
         return jsonify({'error': 'Akses ditolak'}), 403
 
     sessions = query("""

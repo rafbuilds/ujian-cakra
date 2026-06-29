@@ -330,6 +330,12 @@ ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
 ALTER TABLE users ADD CONSTRAINT users_role_check
     CHECK (role IN ('super_admin','admin','guru','guru_pending','siswa'));
 
+-- ── 28. academic_years.name UNIQUE global → per-sekolah ──────────
+-- "2026/2027" tadinya unik secara GLOBAL (bug laten dari era single-tenant)
+-- — begitu 2 sekolah pakai tahun ajaran yang namanya sama, akan bentrok.
+ALTER TABLE academic_years DROP CONSTRAINT IF EXISTS academic_years_name_key;
+ALTER TABLE academic_years ADD CONSTRAINT academic_years_school_name_key UNIQUE (school_id, name);
+
 -- CATATAN PENTING: classes.id masih TEXT bebas (mis. 'x_ipa_1'), bukan
 -- per-sekolah secara skema — kalau 2 sekolah punya kelas dengan id yang
 -- sama persis akan bentrok primary key. Untuk sekarang dihindari lewat
