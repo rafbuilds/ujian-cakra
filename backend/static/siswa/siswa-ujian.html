@@ -841,7 +841,7 @@
       // ── LOGIN — redirect ke index.html ───────────────────────────
       function renderLogin() {
         // Langsung redirect, tidak perlu render halaman login
-        window.location.href = "/index.html";
+        window.location.href = "/";
         return renderLoading("Mengalihkan...");
       }
 
@@ -1211,7 +1211,7 @@
         localStorage.removeItem("ujian_user");
         _token = "";
         user = null;
-        window.location.href = "/index.html";
+        window.location.href = "/";
       }
 
       async function loadExams() {
@@ -1517,9 +1517,9 @@
             if (user.role !== "siswa") {
               const dest =
                 {
-                  admin: "/pages/admin-dashboard.html",
-                  guru: "/pages/guru-dashboard.html",
-                }[user.role] || "/index.html";
+                  admin: "/pages/admin-dashboard",
+                  guru: "/pages/guru-dashboard",
+                }[user.role] || "/";
               window.location.replace(dest);
               return;
             }
@@ -1544,12 +1544,12 @@
             localStorage.removeItem("siswa_token");
             localStorage.removeItem("ujian_token");
             localStorage.removeItem("ujian_user");
-            window.location.replace("/index.html");
+            window.location.replace("/");
             return;
           }
         } else {
           // Belum login
-          window.location.replace("/index.html");
+          window.location.replace("/");
           return;
         }
         render();

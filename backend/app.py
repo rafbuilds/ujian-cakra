@@ -224,7 +224,7 @@ def upload_media(exam_id):
 # Semua request non-API → serve dari folder static/
 # ══════════════════════════════════════════════════════════════
 import pathlib
-from flask import send_from_directory, send_file
+from flask import send_from_directory, send_file, redirect
 
 STATIC_DIR = pathlib.Path(__file__).parent / 'static'
 
@@ -244,6 +244,15 @@ def serve_frontend(path):
     # Jangan intercept API routes
     if path.startswith('api/'):
         return jsonify({'error': 'Not found'}), 404
+
+    # URL bersih: redirect *.html ke versi tanpa ekstensi (index.html -> "/")
+    # supaya address bar tidak pernah menampilkan .html sama sekali.
+    if path.endswith('.html') and (STATIC_DIR / path).is_file():
+        clean = path[:-len('.html')]
+        if clean == 'index':
+            clean = ''
+        qs = request.query_string.decode()
+        return redirect('/' + clean + ('?' + qs if qs else ''), code=301)
 
     # Coba serve file langsung
     target = STATIC_DIR / path

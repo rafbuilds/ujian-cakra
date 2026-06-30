@@ -231,7 +231,7 @@
         </div>
         <div class="sb-nav">
           <div class="sb-section">Menu</div>
-          <a href="dashboard.html" class="sb-item" id="nav-dashboard">
+          <a href="dashboard" class="sb-item" id="nav-dashboard">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path
                 d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"
@@ -246,7 +246,7 @@
             </svg>
             Dashboard
           </a>
-          <a href="ujian.html" class="sb-item active" id="nav-ujian">
+          <a href="ujian" class="sb-item active" id="nav-ujian">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path
                 d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
@@ -255,21 +255,21 @@
             </svg>
             Daftar Ujian
           </a>
-          <a href="bank-soal.html" class="sb-item" id="nav-bank-soal">
+          <a href="bank-soal" class="sb-item" id="nav-bank-soal">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path d="M4 19.5A2.5 2.5 0 016.5 17H20" stroke-linecap="round" />
               <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z" stroke-linecap="round" />
             </svg>
             Bank Soal
           </a>
-          <a href="rooms.html" class="sb-item" id="nav-rooms">
+          <a href="rooms" class="sb-item" id="nav-rooms">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke-linecap="round" />
               <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke-linecap="round" />
             </svg>
             Room Ujian
           </a>
-          <a href="pengawas.html" class="sb-item" id="nav-pengawas">
+          <a href="pengawas" class="sb-item" id="nav-pengawas">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path
                 d="M15 10l4.553-2.069A1 1 0 0121 8.82V15.18a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"
@@ -278,7 +278,7 @@
             </svg>
             Pengawas Live
           </a>
-          <a href="nilai.html" class="sb-item" id="nav-nilai">
+          <a href="nilai" class="sb-item" id="nav-nilai">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <line x1="18" y1="20" x2="18" y2="10" stroke-linecap="round" />
               <line x1="12" y1="20" x2="12" y2="4" stroke-linecap="round" />
@@ -286,7 +286,7 @@
             </svg>
             Nilai & Rekap
           </a>
-          <a href="mapel.html" class="sb-item" id="nav-mapel">
+          <a href="mapel" class="sb-item" id="nav-mapel">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path
                 d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
@@ -295,7 +295,7 @@
             </svg>
             Mata Pelajaran
           </a>
-          <a href="siswa.html" class="sb-item" id="nav-siswa">
+          <a href="siswa" class="sb-item" id="nav-siswa">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path
                 d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"
@@ -309,7 +309,7 @@
             </svg>
             Data Siswa
           </a>
-          <a href="profile.html" class="sb-item" id="nav-profile">
+          <a href="profile" class="sb-item" id="nav-profile">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <circle cx="12" cy="8" r="4" stroke-linecap="round" />
               <path d="M4 21c0-4 3.5-7 8-7s8 3 8 7" stroke-linecap="round" />
@@ -341,7 +341,7 @@
         <div class="topbar">
           <div style="display: flex; align-items: center; gap: 10px">
             <a
-              href="ujian.html"
+              href="ujian"
               style="color: var(--muted); font-size: 13px; font-weight: 500"
               >← Daftar Ujian</a
             >
@@ -562,7 +562,7 @@
 
       const examId = new URLSearchParams(location.search).get("id");
       if (!examId) {
-        location.href = "ujian.html";
+        location.href = "ujian";
         throw new Error();
       }
 
@@ -599,15 +599,15 @@
     <div style="display:flex;gap:8px;align-items:center">
       ${UI.examStatusBadge(exam.status)}
       ${exam.status === "draft" ? `<button class="btn btn-success btn-sm" onclick="publish()">Publish Ujian</button>` : ""}
-      ${exam.status === "published" || exam.status === "ongoing" ? `<a href="pengawas.html?id=${examId}" class="btn btn-secondary btn-sm">👁 Monitor</a>` : ""}
+      ${exam.status === "published" || exam.status === "ongoing" ? `<a href="pengawas?id=${examId}" class="btn btn-secondary btn-sm">👁 Monitor</a>` : ""}
     </div>
   `;
 
         // Topbar actions
         document.getElementById("topbar-actions").innerHTML = `
     ${exam.status === "draft" ? `<button class="btn btn-success btn-sm" onclick="publish()">✓ Publish</button>` : ""}
-    <a href="pengawas.html?id=${examId}" class="btn btn-secondary btn-sm">👁 Monitor</a>
-    <a href="nilai.html?id=${examId}" class="btn btn-secondary btn-sm">📊 Nilai</a>
+    <a href="pengawas?id=${examId}" class="btn btn-secondary btn-sm">👁 Monitor</a>
+    <a href="nilai?id=${examId}" class="btn btn-secondary btn-sm">📊 Nilai</a>
   `;
 
         renderSoal();
@@ -1002,7 +1002,7 @@
                 .map(
                   (m) =>
                     `<div style="margin-top:4px;padding-top:4px;border-top:1px solid #fde68a">
-                      <a href="soal.html?id=${m.exam_id}" target="_blank" style="color:#856404;font-weight:600">${m.exam_title}</a>
+                      <a href="soal?id=${m.exam_id}" target="_blank" style="color:#856404;font-weight:600">${m.exam_title}</a>
                       — "${m.content.slice(0, 80)}${m.content.length > 80 ? "..." : ""}" (${Math.round(m.score * 100)}% mirip)
                     </div>`,
                 )

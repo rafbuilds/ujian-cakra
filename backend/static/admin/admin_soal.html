@@ -209,34 +209,34 @@
         </div>
         <div class="sb-nav">
           <div class="sb-section">MENU</div>
-          <a href="dashboard.html" class="sb-item" id="nav-dashboard">
+          <a href="dashboard" class="sb-item" id="nav-dashboard">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" stroke-linecap="round" />
             </svg>
             Dashboard
           </a>
-          <a href="siswa.html" class="sb-item" id="nav-siswa">
+          <a href="siswa" class="sb-item" id="nav-siswa">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke-linecap="round" />
               <circle cx="9" cy="7" r="4" />
             </svg>
             Data Siswa
           </a>
-          <a href="rooms.html" class="sb-item" id="nav-rooms">
+          <a href="rooms" class="sb-item" id="nav-rooms">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke-linecap="round" />
               <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke-linecap="round" />
             </svg>
             Room Ujian
           </a>
-          <a href="bank-soal.html" class="sb-item active" id="nav-bank-soal">
+          <a href="bank-soal" class="sb-item active" id="nav-bank-soal">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path d="M4 19.5A2.5 2.5 0 016.5 17H20" stroke-linecap="round" />
               <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z" stroke-linecap="round" />
             </svg>
             Bank Soal
           </a>
-          <a href="settings.html" class="sb-item" id="nav-settings">
+          <a href="settings" class="sb-item" id="nav-settings">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <circle cx="12" cy="12" r="3" />
               <path
@@ -271,7 +271,7 @@
         <div class="topbar">
           <div style="display: flex; align-items: center; gap: 10px">
             <a
-              href="bank-soal.html"
+              href="bank-soal"
               onclick="if (document.referrer && document.referrer.includes(location.host)) { history.back(); return false; }"
               style="color: var(--muted); font-size: 13px; font-weight: 500"
               >← Kembali</a
@@ -334,7 +334,7 @@
 
       const examId = new URLSearchParams(location.search).get("id");
       if (!examId) {
-        location.href = "bank-soal.html";
+        location.href = "bank-soal";
         throw new Error();
       }
 
@@ -369,15 +369,15 @@
     <div style="display:flex;gap:8px;align-items:center">
       ${UI.examStatusBadge(exam.status)}
       ${exam.status === "draft" ? `<button class="btn btn-success btn-sm" onclick="publish()">Publish Ujian</button>` : ""}
-      ${exam.status === "published" || exam.status === "ongoing" ? `<a href="../guru/pengawas.html?id=${examId}" class="btn btn-secondary btn-sm">👁 Monitor</a>` : ""}
+      ${exam.status === "published" || exam.status === "ongoing" ? `<a href="../guru/pengawas?id=${examId}" class="btn btn-secondary btn-sm">👁 Monitor</a>` : ""}
     </div>
   `;
 
         // Topbar actions
         document.getElementById("topbar-actions").innerHTML = `
     ${exam.status === "draft" ? `<button class="btn btn-success btn-sm" onclick="publish()">✓ Publish</button>` : ""}
-    <a href="../guru/pengawas.html?id=${examId}" class="btn btn-secondary btn-sm">👁 Monitor</a>
-    <a href="../guru/nilai.html?id=${examId}" class="btn btn-secondary btn-sm">📊 Nilai</a>
+    <a href="../guru/pengawas?id=${examId}" class="btn btn-secondary btn-sm">👁 Monitor</a>
+    <a href="../guru/nilai?id=${examId}" class="btn btn-secondary btn-sm">📊 Nilai</a>
   `;
 
         renderSoal();

@@ -15,30 +15,30 @@
         </div>
         <div class="sb-nav">
           <div class="sb-section">MENU</div>
-          <a href="dashboard.html" class="sb-item"
+          <a href="dashboard" class="sb-item"
             ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" stroke-linecap="round" /></svg
             >Dashboard</a
           >
-          <a href="siswa.html" class="sb-item"
+          <a href="siswa" class="sb-item"
             ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke-linecap="round" />
               <circle cx="9" cy="7" r="4" /></svg
             >Data Siswa</a
           >
-          <a href="rooms.html" class="sb-item"
+          <a href="rooms" class="sb-item"
             ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke-linecap="round" />
               <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke-linecap="round" /></svg
             >Room Ujian</a
           >
-          <a href="bank-soal.html" class="sb-item active"
+          <a href="bank-soal" class="sb-item active"
             ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path d="M4 19.5A2.5 2.5 0 016.5 17H20" stroke-linecap="round" />
               <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z" stroke-linecap="round" /></svg
             >Bank Soal</a
           >
-          <a href="settings.html" class="sb-item"
+          <a href="settings" class="sb-item"
             ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <circle cx="12" cy="12" r="3" />
               <path
@@ -226,7 +226,7 @@
       }
 
       function viewSoal(id) {
-        location.href = "admin_soal.html?id=" + id;
+        location.href = "admin_soal?id=" + id;
       }
 
       // ── Pilih & Download Soal per Ujian ───────────────────────────
@@ -288,7 +288,7 @@
         <div style="padding:.5rem 0;border-bottom:.5px solid var(--border);font-size:12px">
           <span style="font-weight:600;color:var(--green)">${Math.round(m.score * 100)}% mirip</span>
           · ${m.teacher_name || "—"} ·
-          <a href="admin_soal.html?id=${m.exam_id}" target="_blank">${m.exam_title}</a>
+          <a href="admin_soal?id=${m.exam_id}" target="_blank">${m.exam_title}</a>
           <div style="color:var(--muted);margin-top:2px">"${m.content.slice(0, 120)}${m.content.length > 120 ? "..." : ""}"</div>
         </div>`,
             )

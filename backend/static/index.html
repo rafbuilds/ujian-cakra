@@ -386,11 +386,11 @@
     <script src="components/auth.js"></script>
     <script>
       const ROLE_REDIRECT = {
-        super_admin: "/super-admin/dashboard.html",
-        admin: "/admin/dashboard.html",
-        guru: "/guru/dashboard.html",
-        guru_pending: "/guru/pending.html",
-        siswa: "/siswa/siswa-ujian.html",
+        super_admin: "/super-admin/dashboard",
+        admin: "/admin/dashboard",
+        guru: "/guru/dashboard",
+        guru_pending: "/guru/pending",
+        siswa: "/siswa/siswa-ujian",
       };
 
       function setRole(role) {
@@ -442,7 +442,7 @@
               school_name: d.school_name,
             }),
           );
-          window.location.href = ROLE_REDIRECT[d.role] || "/index.html";
+          window.location.href = ROLE_REDIRECT[d.role] || "/";
         } catch (err) {
           showErr(
             err.error ||
@@ -467,7 +467,7 @@
               school_name: d.school_name,
             }),
           );
-          window.location.href = ROLE_REDIRECT[d.role] || "/index.html";
+          window.location.href = ROLE_REDIRECT[d.role] || "/";
         } catch (err) {
           showErr(err.error || "Dev login gagal");
         }
@@ -495,7 +495,7 @@
                   school_name: user.school_name,
                 }),
               );
-              window.location.href = ROLE_REDIRECT[user.role] || "/index.html";
+              window.location.href = ROLE_REDIRECT[user.role] || "/";
               return;
             }
           } catch (_) {

@@ -18,7 +18,7 @@ const Auth = (() => {
   const logout = () => {
     clearToken();
     clearUser();
-    window.location.href = "/index.html";
+    window.location.href = "/";
   };
 
   const requireRole = (allowedRoles) => {
@@ -26,7 +26,7 @@ const Auth = (() => {
     if (!token) {
       // Deteksi base path
 
-      window.location.href = "/index.html";
+      window.location.href = "/";
       return false;
     }
     const user = getUser();
@@ -37,14 +37,14 @@ const Auth = (() => {
           let _b = "";
           for (let i = 0; i < _p.length; i++) {
             if (
-              ["admin", "guru", "siswa", "index.html", ""].includes(_p[i]) &&
+              ["admin", "guru", "siswa", "index", ""].includes(_p[i]) &&
               i > 0
             ) {
               _b = _p.slice(0, i).join("/");
               break;
             }
           }
-          window.location.href = "/index.html";
+          window.location.href = "/";
           return;
         }
         if (!allowedRoles.includes(u.role)) redirectByRole(u.role);
@@ -103,13 +103,13 @@ const Auth = (() => {
 
   const redirectByRole = (role) => {
     const map = {
-      super_admin: "/super-admin/dashboard.html",
-      admin: "/admin/dashboard.html",
-      guru: "/guru/dashboard.html",
-      siswa: "/siswa/siswa-ujian.html",
-      guru_pending: "/guru/pending.html",
+      super_admin: "/super-admin/dashboard",
+      admin: "/admin/dashboard",
+      guru: "/guru/dashboard",
+      siswa: "/siswa/siswa-ujian",
+      guru_pending: "/guru/pending",
     };
-    window.location.href = map[role] || "/index.html";
+    window.location.href = map[role] || "/";
   };
 
   return {
