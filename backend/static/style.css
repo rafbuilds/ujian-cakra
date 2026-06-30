@@ -148,6 +148,18 @@ img { max-width: 100%; }
   padding: 1.375rem 1.25rem 1rem;
   border-bottom: 1px solid rgba(255,255,255,.1);
 }
+.sb-logo-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sb-logo-img {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
 .sb-logo-title {
   font-family: "Playfair Display", serif;
   font-size: 15px;
