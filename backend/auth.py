@@ -69,6 +69,31 @@ def subscription_block_reason(school_id):
             return 'Lisensi sekolah ini sudah kedaluwarsa. Hubungi admin platform untuk perpanjangan.'
     return None
 
+_FEATURE_COLUMNS = {
+    'export':       'feature_export',
+    'bank_soal':    'feature_bank_soal',
+    'upload_media': 'feature_upload_media',
+    'mobile':       'feature_mobile',
+}
+
+def feature_blocked_reason(school_id, feature):
+    """None kalau fitur boleh dipakai; string alasan kalau super_admin sudah
+    mematikan fitur ini untuk sekolah tsb lewat dashboard super admin.
+    school_id None (super_admin sendiri) selalu lolos. Kolom dicek lewat
+    whitelist _FEATURE_COLUMNS (bukan f-string langsung dari caller) supaya
+    tidak ada celah nama kolom sembarangan masuk ke SQL."""
+    if not school_id:
+        return None
+    col = _FEATURE_COLUMNS.get(feature)
+    if not col:
+        return None
+    school = query(f"SELECT {col} FROM schools WHERE id=%s", (school_id,), fetch='one')
+    if not school:
+        return None  # sekolah lama sebelum kolom ini ada — jangan blokir
+    if school.get(col) is False:
+        return 'Fitur ini dinonaktifkan untuk sekolah Anda oleh admin platform.'
+    return None
+
 def validate_email_domain(school_id, email):
     """None kalau email boleh dipakai untuk sekolah ini; string alasan
     kalau ditolak. Hanya berlaku kalau super_admin sudah set

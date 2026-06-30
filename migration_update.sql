@@ -345,6 +345,16 @@ ALTER TABLE academic_years ADD CONSTRAINT academic_years_school_name_key UNIQUE 
 -- tidak cocok, kalau kolom ini sudah diisi).
 ALTER TABLE schools ADD COLUMN IF NOT EXISTS allowed_domain TEXT;
 
+-- ── 30. Toggle fitur per sekolah ──────────────────────────────────
+-- super_admin bisa mematikan fitur tertentu untuk satu sekolah dari
+-- dashboard super admin (mis. sekolah belum bayar fitur tertentu). Default
+-- TRUE semua supaya sekolah lama yang belum pernah disentuh super_admin
+-- tetap dapat semua fitur seperti sebelumnya (backward compatible).
+ALTER TABLE schools ADD COLUMN IF NOT EXISTS feature_export       BOOLEAN DEFAULT TRUE;
+ALTER TABLE schools ADD COLUMN IF NOT EXISTS feature_bank_soal    BOOLEAN DEFAULT TRUE;
+ALTER TABLE schools ADD COLUMN IF NOT EXISTS feature_upload_media BOOLEAN DEFAULT TRUE;
+ALTER TABLE schools ADD COLUMN IF NOT EXISTS feature_mobile       BOOLEAN DEFAULT TRUE;
+
 -- CATATAN PENTING: classes.id masih TEXT bebas (mis. 'x_ipa_1'), bukan
 -- per-sekolah secara skema — kalau 2 sekolah punya kelas dengan id yang
 -- sama persis akan bentrok primary key. Untuk sekarang dihindari lewat

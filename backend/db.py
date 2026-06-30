@@ -108,6 +108,54 @@ def log_activity(user_id, action, detail='', ip='', school_id=None):
     except Exception:
         pass
 
+def delete_school_cascade(school_id):
+    """Hapus SATU sekolah beserta SELURUH data turunannya (guru, siswa,
+    ujian, soal, jawaban, nilai, room, dst) secara PERMANEN dalam SATU
+    transaksi. Dipanggil hanya dari endpoint super_admin setelah pemanggil
+    sudah memverifikasi konfirmasi (lihat routes/super_admin.py) — fungsi
+    ini sendiri tidak tanya konfirmasi apa pun, jadi jangan dipanggil
+    sembarangan.
+
+    Urutan DELETE mengikuti rantai foreign key dari yang paling dalam
+    (jawaban siswa) ke yang paling luar (baris sekolah itu sendiri). Banyak
+    tabel anak sebenarnya sudah ON DELETE CASCADE dari induknya (exams,
+    exam_sessions, questions, rooms, classes, users) jadi tidak perlu
+    dihapus manual di sini — yang DITULIS eksplisit di bawah cuma yang
+    relasinya TIDAK cascade (results, exam_groups.created_by) atau yang
+    funkcijų FK class_id-nya rawan tabrakan lintas-sekolah (lihat catatan
+    'classes.id masih TEXT bebas' di migration_update.sql). Kalau ADA satu
+    saja statement yang gagal, semuanya di-rollback — tidak ada penghapusan
+    sebagian."""
+    conn = get_db()
+    try:
+        cur = conn.cursor()
+        s = (school_id,)
+        statements = [
+            ("DELETE FROM results WHERE session_id IN (SELECT id FROM exam_sessions WHERE school_id=%s)", s),
+            ("DELETE FROM exam_sessions WHERE school_id=%s", s),
+            ("DELETE FROM exams WHERE school_id=%s", s),
+            ("DELETE FROM exam_groups WHERE created_by IN (SELECT id FROM users WHERE school_id=%s)", s),
+            ("DELETE FROM guru_invites WHERE school_id=%s", s),
+            ("DELETE FROM exam_settings WHERE school_id=%s", s),
+            ("DELETE FROM activity_logs WHERE school_id=%s", s),
+            ("DELETE FROM rooms WHERE school_id=%s", s),
+            ("DELETE FROM users WHERE school_id=%s", s),
+            ("DELETE FROM semesters WHERE school_id=%s", s),
+            ("DELETE FROM academic_years WHERE school_id=%s", s),
+            ("DELETE FROM exam_classes WHERE class_id IN (SELECT id FROM classes WHERE school_id=%s)", s),
+            ("DELETE FROM classes WHERE school_id=%s", s),
+            ("DELETE FROM subjects WHERE school_id=%s", s),
+            ("DELETE FROM schools WHERE id=%s", s),
+        ]
+        for sql, params in statements:
+            cur.execute(sql, params)
+        conn.commit()
+        release_db(conn)
+    except Exception:
+        conn.rollback()
+        release_db(conn)
+        raise
+
 def count_correct_wrong(session_id, exam_id):
     """Hitung correct/wrong untuk soal single-choice (answers) + multiple_answer (multi_answers).
     Soal multiple_answer dianggap benar hanya jika pilihan siswa sama persis dengan kunci jawaban."""

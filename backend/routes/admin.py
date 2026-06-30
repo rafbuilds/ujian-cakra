@@ -222,6 +222,10 @@ def siswa_template():
 @admin_bp.route('/api/admin/siswa/export', methods=['GET'])
 @require_admin
 def export_siswa():
+    from auth import feature_blocked_reason
+    blocked = feature_blocked_reason(request.school_id, 'export')
+    if blocked:
+        return jsonify({'error': blocked}), 403
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment
     grade    = request.args.get('grade', '')

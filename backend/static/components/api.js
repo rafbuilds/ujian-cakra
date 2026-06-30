@@ -35,8 +35,12 @@ const API = (() => {
       headers: headers(),
       body: JSON.stringify(body),
     }).then(handle);
-  const del = (path) =>
-    fetch(base() + path, { method: "DELETE", headers: headers() }).then(handle);
+  const del = (path, body) =>
+    fetch(base() + path, {
+      method: "DELETE",
+      headers: headers(),
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    }).then(handle);
 
   const upload = (path, formData) => {
     const h = {};

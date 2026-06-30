@@ -47,6 +47,19 @@
       table.school-table tr:hover td { background:var(--light); }
 
       .stat-pill { font-size:11px; color:var(--muted); }
+
+      .expand-toggle { background:none; border:none; cursor:pointer; font-size:11px;
+        color:var(--muted); margin-right:6px; width:14px; display:inline-block; }
+      .detail-row td { background:var(--light); padding:1rem 1.5rem; }
+      .detail-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:1rem; }
+      .detail-block-title { font-size:11px; font-weight:700; color:var(--muted);
+        text-transform:uppercase; margin-bottom:6px; }
+      .feature-toggle { display:flex; align-items:center; gap:8px; padding:6px 0; cursor:pointer; }
+
+      table.monitor-table { width:100%; border-collapse:collapse; font-size:13px; }
+      table.monitor-table th { text-align:left; padding:.5rem; border-bottom:2px solid var(--border);
+        color:var(--muted); font-weight:700; font-size:11px; text-transform:uppercase; }
+      table.monitor-table td { padding:.5rem; border-bottom:.5px solid var(--border); }
     </style>
   </head>
   <body>
@@ -114,6 +127,7 @@
               <table class="school-table">
                 <thead>
                   <tr>
+                    <th></th>
                     <th>Sekolah</th>
                     <th>Domain Email</th>
                     <th>Plan</th>
@@ -127,7 +141,7 @@
                   </tr>
                 </thead>
                 <tbody id="school-rows">
-                  <tr><td colspan="10" style="text-align:center;padding:2rem;color:var(--muted)">Memuat...</td></tr>
+                  <tr><td colspan="11" style="text-align:center;padding:2rem;color:var(--muted)">Memuat...</td></tr>
                 </tbody>
               </table>
             </div>
@@ -174,9 +188,63 @@
           </label>
         </div>
 
+        <div class="form-group" id="f-features-wrap" style="display:none">
+          <label>Fitur Aktif</label>
+          <label class="feature-toggle">
+            <input type="checkbox" id="f-feat-export" style="width:auto" />
+            Export laporan (Word/Excel)
+          </label>
+          <label class="feature-toggle">
+            <input type="checkbox" id="f-feat-bank-soal" style="width:auto" />
+            Bank Soal & deteksi soal serupa
+          </label>
+          <label class="feature-toggle">
+            <input type="checkbox" id="f-feat-upload-media" style="width:auto" />
+            Upload foto/lampiran soal
+          </label>
+          <label class="feature-toggle">
+            <input type="checkbox" id="f-feat-mobile" style="width:auto" />
+            Aplikasi Mobile (matikan = siswa cuma bisa ujian lewat web)
+          </label>
+        </div>
+
         <div style="display:flex;gap:10px;margin-top:1rem">
           <button class="btn btn-secondary" style="flex:1" onclick="closeModal()">Batal</button>
           <button class="btn btn-primary" style="flex:1" onclick="saveSchool()">Simpan</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Monitor Ujian Real-time -->
+    <div id="modal-monitor" class="modal-overlay">
+      <div class="modal-box" style="max-width:720px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem">
+          <div style="font-weight:700;font-size:18px;color:var(--green)">🔴 Monitor — <span id="monitor-school-name"></span></div>
+          <button onclick="closeMonitorModal()" style="background:none;border:none;font-size:22px;cursor:pointer">✕</button>
+        </div>
+        <div id="monitor-content"></div>
+      </div>
+    </div>
+
+    <!-- Modal Konfirmasi Hapus Sekolah -->
+    <div id="modal-delete" class="modal-overlay">
+      <div class="modal-box">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem">
+          <div style="font-weight:700;font-size:18px;color:var(--red2)">⚠️ Hapus Sekolah Permanen</div>
+          <button onclick="closeDeleteModal()" style="background:none;border:none;font-size:22px;cursor:pointer">✕</button>
+        </div>
+        <div style="font-size:13px;margin-bottom:1rem">
+          Ini akan menghapus <strong id="del-school-name"></strong> beserta <strong>SELURUH</strong> data
+          guru, siswa, ujian, soal, jawaban, dan nilainya — <strong>permanen, tidak bisa dibatalkan</strong>.
+          Kalau cuma mau menonaktifkan sementara, pakai "Edit Sekolah" → matikan Aktif, jangan hapus.
+        </div>
+        <div class="form-group">
+          <label>Ketik ulang nama sekolah untuk konfirmasi</label>
+          <input type="text" class="form-control" id="del-confirm-input" placeholder="" oninput="onDeleteConfirmInput()" />
+        </div>
+        <div style="display:flex;gap:10px;margin-top:1rem">
+          <button class="btn btn-secondary" style="flex:1" onclick="closeDeleteModal()">Batal</button>
+          <button class="btn btn-danger" style="flex:1" id="btn-confirm-delete" disabled onclick="confirmDeleteSchool()">Hapus Permanen</button>
         </div>
       </div>
     </div>
@@ -263,16 +331,21 @@
         return '<span class="badge badge-green">Aktif</span>';
       }
 
+      const expandedIds = new Set();
+      const detailCache = {};
+
       function render() {
         const tbody = document.getElementById("school-rows");
         if (!schools.length) {
-          tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:2rem;color:var(--muted)">Belum ada sekolah</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:2rem;color:var(--muted)">Belum ada sekolah</td></tr>';
           return;
         }
         tbody.innerHTML = schools
-          .map(
-            (s) => `
+          .map((s) => {
+            const isOpen = expandedIds.has(s.id);
+            const mainRow = `
           <tr>
+            <td><button class="expand-toggle" onclick="toggleDetail('${s.id}')">${isOpen ? "▾" : "▸"}</button></td>
             <td><strong>${s.name}</strong><div class="stat-pill">${s.slug}</div></td>
             <td>${s.allowed_domain ? "@" + s.allowed_domain : '<span class="stat-pill">— bebas —</span>'}</td>
             <td><span class="badge badge-gray">${s.plan}</span></td>
@@ -283,12 +356,63 @@
             <td>${s.exam_count}</td>
             <td>${s.active_sessions > 0 ? `<span class="badge badge-red">🔴 ${s.active_sessions} aktif</span>` : '<span class="stat-pill">—</span>'}</td>
             <td style="white-space:nowrap">
+              <button class="btn btn-secondary btn-sm" onclick="openMonitorModal('${s.id}')">Monitor</button>
               <button class="btn btn-secondary btn-sm" onclick="openAdminsModal('${s.id}')">Admin</button>
               <button class="btn btn-secondary btn-sm" onclick="openEditModal('${s.id}')">Edit</button>
+              <button class="btn btn-danger btn-sm" onclick="openDeleteModal('${s.id}')">Hapus</button>
             </td>
-          </tr>`,
-          )
+          </tr>`;
+            const detailRow = isOpen
+              ? `<tr class="detail-row" id="detail-row-${s.id}"><td colspan="11">${renderDetailContent(s.id)}</td></tr>`
+              : "";
+            return mainRow + detailRow;
+          })
           .join("");
+      }
+
+      function renderDetailContent(id) {
+        const d = detailCache[id];
+        if (!d) return '<div style="color:var(--muted);font-size:13px">Memuat detail...</div>';
+        const statusLabel = { draft: "Draft", published: "Terjadwal", ongoing: "Berlangsung", finished: "Selesai" };
+        const examStatusHtml = Object.keys(d.exam_status).length
+          ? Object.entries(d.exam_status).map(([k, v]) => `<div>${statusLabel[k] || k}: <strong>${v}</strong></div>`).join("")
+          : '<div class="stat-pill">Belum ada ujian</div>';
+        const activityHtml = d.recent_activity.length
+          ? d.recent_activity.map((a) => `<div style="margin-bottom:4px">${UI.fmtDate(a.created_at)} — <strong>${a.user_name || "?"}</strong>: ${a.action}</div>`).join("")
+          : '<div class="stat-pill">Belum ada aktivitas tercatat</div>';
+        return `
+          <div class="detail-grid">
+            <div>
+              <div class="detail-block-title">Status Ujian</div>
+              ${examStatusHtml}
+            </div>
+            <div>
+              <div class="detail-block-title">Lainnya</div>
+              <div>Guru Pending: <strong>${d.guru_pending}</strong></div>
+              <div>Jumlah Room: <strong>${d.rooms_count}</strong></div>
+            </div>
+            <div style="grid-column:1/-1">
+              <div class="detail-block-title">Aktivitas Terakhir</div>
+              <div style="font-size:12px;color:var(--muted)">${activityHtml}</div>
+            </div>
+          </div>`;
+      }
+
+      async function toggleDetail(id) {
+        if (expandedIds.has(id)) {
+          expandedIds.delete(id);
+        } else {
+          expandedIds.add(id);
+          if (!detailCache[id]) {
+            render();
+            try {
+              detailCache[id] = await API.get(`/api/super-admin/schools/${id}/detail`);
+            } catch (e) {
+              detailCache[id] = { exam_status: {}, guru_pending: 0, rooms_count: 0, recent_activity: [] };
+            }
+          }
+        }
+        render();
       }
 
       function openCreateModal() {
@@ -299,6 +423,7 @@
         document.getElementById("f-plan").value = "standard";
         document.getElementById("f-paid-until").value = "";
         document.getElementById("f-active-wrap").style.display = "none";
+        document.getElementById("f-features-wrap").style.display = "none";
         document.getElementById("modal-school").classList.add("show");
       }
 
@@ -313,6 +438,11 @@
         document.getElementById("f-paid-until").value = s.paid_until || "";
         document.getElementById("f-active").checked = !!s.is_active;
         document.getElementById("f-active-wrap").style.display = "block";
+        document.getElementById("f-feat-export").checked = s.feature_export !== false;
+        document.getElementById("f-feat-bank-soal").checked = s.feature_bank_soal !== false;
+        document.getElementById("f-feat-upload-media").checked = s.feature_upload_media !== false;
+        document.getElementById("f-feat-mobile").checked = s.feature_mobile !== false;
+        document.getElementById("f-features-wrap").style.display = "block";
         document.getElementById("modal-school").classList.add("show");
       }
 
@@ -335,6 +465,10 @@
         try {
           if (editingId) {
             payload.is_active = document.getElementById("f-active").checked;
+            payload.feature_export = document.getElementById("f-feat-export").checked;
+            payload.feature_bank_soal = document.getElementById("f-feat-bank-soal").checked;
+            payload.feature_upload_media = document.getElementById("f-feat-upload-media").checked;
+            payload.feature_mobile = document.getElementById("f-feat-mobile").checked;
             await API.patch(`/api/super-admin/schools/${editingId}`, payload);
             UI.toast("✅ Sekolah diperbarui", "success");
           } else {
@@ -415,6 +549,96 @@
           loadAdmins();
         } catch (e) {
           UI.toast(e.error || "Gagal membuat admin", "error");
+        }
+      }
+
+      // ── Monitor Ujian Real-time per Sekolah ──────────────────
+      let monitorSchoolId = null;
+      let monitorTimer = null;
+
+      async function openMonitorModal(id) {
+        const s = schools.find((x) => x.id === id);
+        if (!s) return;
+        monitorSchoolId = id;
+        document.getElementById("monitor-school-name").textContent = s.name;
+        document.getElementById("modal-monitor").classList.add("show");
+        await loadMonitor();
+        monitorTimer = setInterval(loadMonitor, 5000);
+      }
+
+      function closeMonitorModal() {
+        document.getElementById("modal-monitor").classList.remove("show");
+        if (monitorTimer) { clearInterval(monitorTimer); monitorTimer = null; }
+        monitorSchoolId = null;
+      }
+
+      async function loadMonitor() {
+        const wrap = document.getElementById("monitor-content");
+        try {
+          const sessions = await API.get(`/api/super-admin/schools/${monitorSchoolId}/monitor`);
+          if (!sessions.length) {
+            wrap.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:1rem 0">Tidak ada siswa yang sedang mengerjakan ujian saat ini.</div>';
+            return;
+          }
+          wrap.innerHTML = `
+            <table class="monitor-table">
+              <thead><tr><th>Siswa</th><th>Kelas</th><th>Ujian</th><th>Progress</th><th>Pelanggaran</th><th>Mulai</th></tr></thead>
+              <tbody>
+                ${sessions
+                  .map(
+                    (s) => `
+                  <tr>
+                    <td>${s.student_name}</td>
+                    <td>${s.class_name || "—"}</td>
+                    <td>${s.exam_title}</td>
+                    <td>${s.answered_count}/${s.total_questions}</td>
+                    <td>${s.tab_violations > 0 ? `<span class="badge badge-amber">${s.tab_violations}x</span>` : "—"}</td>
+                    <td>${UI.fmtDate(s.started_at)}</td>
+                  </tr>`,
+                  )
+                  .join("")}
+              </tbody>
+            </table>`;
+        } catch (e) {
+          wrap.innerHTML = '<div style="color:var(--red2);font-size:13px">Gagal memuat data monitor.</div>';
+        }
+      }
+
+      // ── Hapus Sekolah ─────────────────────────────────────────
+      let deleteSchoolId = null;
+      let deleteSchoolName = null;
+
+      function openDeleteModal(id) {
+        const s = schools.find((x) => x.id === id);
+        if (!s) return;
+        deleteSchoolId = id;
+        deleteSchoolName = s.name;
+        document.getElementById("del-school-name").textContent = s.name;
+        document.getElementById("del-confirm-input").value = "";
+        document.getElementById("del-confirm-input").placeholder = s.name;
+        document.getElementById("btn-confirm-delete").disabled = true;
+        document.getElementById("modal-delete").classList.add("show");
+      }
+
+      function closeDeleteModal() {
+        document.getElementById("modal-delete").classList.remove("show");
+        deleteSchoolId = null;
+        deleteSchoolName = null;
+      }
+
+      function onDeleteConfirmInput() {
+        const val = document.getElementById("del-confirm-input").value;
+        document.getElementById("btn-confirm-delete").disabled = val !== deleteSchoolName;
+      }
+
+      async function confirmDeleteSchool() {
+        try {
+          await API.del(`/api/super-admin/schools/${deleteSchoolId}`, { confirm_name: deleteSchoolName });
+          UI.toast("✅ Sekolah dihapus permanen", "success");
+          closeDeleteModal();
+          load();
+        } catch (e) {
+          UI.toast(e.error || "Gagal menghapus sekolah", "error");
         }
       }
 

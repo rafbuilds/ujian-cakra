@@ -192,6 +192,10 @@ def delete_exam(exam_id):
 def check_similar_questions():
     """Ingatkan guru kalau pernah membuat soal dengan isi mirip (di soal
     miliknya sendiri saja — guru tidak boleh lihat isi soal guru lain)."""
+    from auth import feature_blocked_reason
+    blocked = feature_blocked_reason(request.school_id, 'bank_soal')
+    if blocked:
+        return jsonify({'error': blocked}), 403
     content = (request.json or {}).get('content', '').strip()
     if len(content) < 10:
         return jsonify([])
@@ -298,6 +302,10 @@ def delete_question(question_id):
 @require_guru
 def import_questions(exam_id):
     import traceback, re
+    from auth import feature_blocked_reason
+    blocked = feature_blocked_reason(request.school_id, 'bank_soal')
+    if blocked:
+        return jsonify({'error': blocked}), 403
     if not _exam_owner_or_404(exam_id):
         return jsonify({'error': 'Ujian tidak ditemukan atau bukan milik Anda'}), 404
     try:
@@ -792,6 +800,10 @@ def _doc_write_questions(doc, questions):
 @exams_bp.route('/api/exams/<exam_id>/export-soal', methods=['GET'])
 @require_guru
 def export_soal(exam_id):
+    from auth import feature_blocked_reason
+    blocked = feature_blocked_reason(request.school_id, 'export')
+    if blocked:
+        return jsonify({'error': blocked}), 403
     exam = query("SELECT * FROM exams WHERE id=%s AND school_id=%s", (exam_id, request.school_id), fetch='one')
     if not exam: return jsonify({'error': 'Ujian tidak ditemukan'}), 404
     if request.user_role not in ('admin', 'super_admin') and str(exam['teacher_id']) != request.user_id:
@@ -825,6 +837,10 @@ def export_soal(exam_id):
 @exams_bp.route('/api/exams/export-soal-bulk', methods=['GET'])
 @require_guru
 def export_soal_bulk():
+    from auth import feature_blocked_reason
+    blocked = feature_blocked_reason(request.school_id, 'export')
+    if blocked:
+        return jsonify({'error': blocked}), 403
     ids_param = request.args.get('exam_ids', '')
     id_list = [x for x in ids_param.split(',') if x]
     if not id_list:
@@ -919,6 +935,10 @@ def _recalc_with_essay(session_id):
 @exams_bp.route('/api/exams/<exam_id>/export-nilai', methods=['GET'])
 @require_guru
 def export_nilai(exam_id):
+    from auth import feature_blocked_reason
+    blocked = feature_blocked_reason(request.school_id, 'export')
+    if blocked:
+        return jsonify({'error': blocked}), 403
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment
     exam = query("SELECT * FROM exams WHERE id=%s AND school_id=%s", (exam_id, request.school_id), fetch='one')
@@ -953,6 +973,10 @@ def export_nilai(exam_id):
 @require_guru
 def export_detail(exam_id):
     import io
+    from auth import feature_blocked_reason
+    blocked = feature_blocked_reason(request.school_id, 'export')
+    if blocked:
+        return jsonify({'error': blocked}), 403
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
     from openpyxl.utils import get_column_letter

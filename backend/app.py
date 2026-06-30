@@ -113,6 +113,11 @@ def device_login():
     if not user:
         return jsonify({'error': 'Akun siswa tidak ditemukan atau tidak aktif.\nHubungi admin sekolah.'}), 401
 
+    from auth import feature_blocked_reason
+    school_id_check = str(user['school_id']) if user.get('school_id') else None
+    if feature_blocked_reason(school_id_check, 'mobile'):
+        return jsonify({'error': 'Akses aplikasi mobile dinonaktifkan untuk sekolah ini.\nSilakan ujian lewat web.'}), 403
+
     existing_device = user.get('device_id')
 
     if not existing_device:
@@ -194,6 +199,10 @@ def _ext(filename):
 @require_guru
 def upload_media(exam_id):
     from db import query as dbq
+    from auth import feature_blocked_reason
+    blocked = feature_blocked_reason(request.school_id, 'upload_media')
+    if blocked:
+        return jsonify({'error': blocked}), 403
     owner = dbq("SELECT teacher_id FROM exams WHERE id=%s", (exam_id,), fetch='one')
     if not owner:
         return jsonify({'error': 'Ujian tidak ditemukan'}), 404
