@@ -181,6 +181,37 @@
       </div>
     </div>
 
+    <!-- Modal Kelola Admin Sekolah -->
+    <div id="modal-admins" class="modal-overlay">
+      <div class="modal-box">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem">
+          <div style="font-weight:700;font-size:18px;color:var(--green)">Admin — <span id="admins-school-name"></span></div>
+          <button onclick="closeAdminsModal()" style="background:none;border:none;font-size:22px;cursor:pointer">✕</button>
+        </div>
+
+        <div id="admins-list" style="margin-bottom:1.25rem"></div>
+
+        <div style="font-weight:700;font-size:13px;color:var(--green);margin-bottom:.5rem">+ Tambah Admin Baru</div>
+        <div class="form-group">
+          <label>Nama</label>
+          <input type="text" class="form-control" id="adm-name" placeholder="Nama lengkap admin" />
+        </div>
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" class="form-control" id="adm-email" placeholder="admin@sekolah.sch.id" />
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="text" class="form-control" id="adm-password" placeholder="Minimal 6 karakter" />
+        </div>
+
+        <div style="display:flex;gap:10px;margin-top:1rem">
+          <button class="btn btn-secondary" style="flex:1" onclick="closeAdminsModal()">Tutup</button>
+          <button class="btn btn-primary" style="flex:1" onclick="createAdmin()">Buat Admin</button>
+        </div>
+      </div>
+    </div>
+
     <script src="../components/api.js"></script>
     <script src="../components/auth.js"></script>
     <script src="../components/common.js"></script>
@@ -251,7 +282,10 @@
             <td>${s.siswa_count}</td>
             <td>${s.exam_count}</td>
             <td>${s.active_sessions > 0 ? `<span class="badge badge-red">🔴 ${s.active_sessions} aktif</span>` : '<span class="stat-pill">—</span>'}</td>
-            <td><button class="btn btn-secondary btn-sm" onclick="openEditModal('${s.id}')">Edit</button></td>
+            <td style="white-space:nowrap">
+              <button class="btn btn-secondary btn-sm" onclick="openAdminsModal('${s.id}')">Admin</button>
+              <button class="btn btn-secondary btn-sm" onclick="openEditModal('${s.id}')">Edit</button>
+            </td>
           </tr>`,
           )
           .join("");
@@ -311,6 +345,76 @@
           load();
         } catch (e) {
           UI.toast(e.error || "Gagal menyimpan", "error");
+        }
+      }
+
+      // ── Kelola Admin per Sekolah ─────────────────────────────
+      let adminsSchoolId = null;
+
+      async function openAdminsModal(id) {
+        const s = schools.find((x) => x.id === id);
+        if (!s) return;
+        adminsSchoolId = id;
+        document.getElementById("admins-school-name").textContent = s.name;
+        document.getElementById("adm-name").value = "";
+        document.getElementById("adm-email").value = "";
+        document.getElementById("adm-password").value = "";
+        document.getElementById("modal-admins").classList.add("show");
+        await loadAdmins();
+      }
+
+      function closeAdminsModal() {
+        document.getElementById("modal-admins").classList.remove("show");
+        adminsSchoolId = null;
+      }
+
+      async function loadAdmins() {
+        const wrap = document.getElementById("admins-list");
+        wrap.innerHTML = '<div style="color:var(--muted);font-size:13px">Memuat...</div>';
+        try {
+          const admins = await API.get(`/api/super-admin/schools/${adminsSchoolId}/admins`);
+          if (!admins.length) {
+            wrap.innerHTML = '<div style="color:var(--muted);font-size:13px">Belum ada admin untuk sekolah ini.</div>';
+            return;
+          }
+          wrap.innerHTML = admins
+            .map(
+              (a) => `
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:.5rem 0;border-bottom:.5px solid var(--border)">
+              <div>
+                <div style="font-weight:600;font-size:13px">${a.name}</div>
+                <div style="font-size:12px;color:var(--muted)">${a.email}</div>
+              </div>
+              <span class="badge ${a.is_active ? "badge-green" : "badge-red"}">${a.is_active ? "Aktif" : "Nonaktif"}</span>
+            </div>`,
+            )
+            .join("");
+        } catch (e) {
+          wrap.innerHTML = '<div style="color:var(--red2);font-size:13px">Gagal memuat daftar admin.</div>';
+        }
+      }
+
+      async function createAdmin() {
+        const name = document.getElementById("adm-name").value.trim();
+        const email = document.getElementById("adm-email").value.trim();
+        const password = document.getElementById("adm-password").value.trim();
+        if (!name || !email) {
+          UI.toast("Nama dan email wajib diisi", "warn");
+          return;
+        }
+        if (!password || password.length < 6) {
+          UI.toast("Password minimal 6 karakter", "warn");
+          return;
+        }
+        try {
+          await API.post(`/api/super-admin/schools/${adminsSchoolId}/admins`, { name, email, password });
+          UI.toast("✅ Admin dibuat", "success");
+          document.getElementById("adm-name").value = "";
+          document.getElementById("adm-email").value = "";
+          document.getElementById("adm-password").value = "";
+          loadAdmins();
+        } catch (e) {
+          UI.toast(e.error || "Gagal membuat admin", "error");
         }
       }
 

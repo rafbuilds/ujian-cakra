@@ -112,3 +112,50 @@ def get_school(school_id):
     if not row:
         return jsonify({'error': 'Sekolah tidak ditemukan'}), 404
     return jsonify(dict(row))
+
+
+# ── Admin sekolah ────────────────────────────────────────────────
+# Admin sekolah biasa (require_admin) cuma bisa membuat user UNTUK
+# sekolahnya sendiri — begitu sekolah baru dibuat lewat dashboard ini,
+# belum ada satupun admin di sana, jadi tidak ada yang bisa login untuk
+# membuat admin pertama (ayam-telur). Endpoint ini cuma untuk super_admin,
+# khusus membuat/lihat akun role='admin' di sekolah manapun.
+@super_admin_bp.route('/api/super-admin/schools/<school_id>/admins', methods=['GET'])
+@require_super_admin
+def list_school_admins(school_id):
+    rows = query("""SELECT id, name, email, is_active, created_at
+                     FROM users WHERE school_id=%s AND role='admin' ORDER BY created_at""",
+                 (school_id,))
+    return jsonify([dict(r) for r in rows])
+
+
+@super_admin_bp.route('/api/super-admin/schools/<school_id>/admins', methods=['POST'])
+@require_super_admin
+def create_school_admin(school_id):
+    from auth import hash_password, validate_email_domain
+    school = query("SELECT id FROM schools WHERE id=%s", (school_id,), fetch='one')
+    if not school:
+        return jsonify({'error': 'Sekolah tidak ditemukan'}), 404
+
+    data  = request.json or {}
+    name  = (data.get('name') or '').strip()
+    email = (data.get('email') or '').strip().lower()
+    pw    = (data.get('password') or '').strip()
+    if not name or not email:
+        return jsonify({'error': 'Nama dan email wajib'}), 400
+    if not pw or len(pw) < 6:
+        return jsonify({'error': 'Password minimal 6 karakter'}), 400
+    domain_err = validate_email_domain(school_id, email)
+    if domain_err:
+        return jsonify({'error': domain_err}), 400
+    existing = query("SELECT id FROM users WHERE LOWER(email)=%s", (email,), fetch='one')
+    if existing:
+        return jsonify({'error': 'Email sudah terdaftar'}), 409
+
+    uid = str(uuid.uuid4())
+    dummy_gid = f"manual_{uuid.uuid4().hex[:12]}"
+    query("""INSERT INTO users (id, google_id, email, name, role, password_hash, is_active, school_id)
+             VALUES (%s,%s,%s,%s,'admin',%s,true,%s)""",
+          (uid, dummy_gid, email, name, hash_password(pw), school_id), fetch='none')
+    user = query("SELECT id, name, email, role, is_active, created_at FROM users WHERE id=%s", (uid,), fetch='one')
+    return jsonify(dict(user)), 201
