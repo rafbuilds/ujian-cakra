@@ -8,6 +8,7 @@ from flask import Blueprint, request, jsonify
 import re, uuid
 from db import query
 from auth import require_super_admin
+import storage
 
 super_admin_bp = Blueprint('super_admin', __name__)
 
@@ -27,19 +28,21 @@ def _slugify(name):
 @super_admin_bp.route('/api/super-admin/overview', methods=['GET'])
 @require_super_admin
 def overview():
-    """Ringkasan lintas-sekolah untuk kartu statistik di atas tabel —
-    termasuk beban real-time (siswa yang sedang mengerjakan ujian SEKARANG,
-    dipakai untuk pantau kapasitas server, bukan cuma data historis)."""
+    """Ringkasan lintas-sekolah untuk kartu statistik di atas tabel — guru/
+    siswa per sekolah sudah ada di baris tabelnya masing-masing, jadi di
+    sini cuma angka yang genuinely lintas-sekolah: total sekolah, total
+    ujian, beban real-time (sesi ujian yang sedang berjalan SEKARANG), dan
+    pemakaian Supabase Storage."""
     row = query("""
         SELECT
             (SELECT COUNT(*) FROM schools) as total_schools,
             (SELECT COUNT(*) FROM schools WHERE is_active=true) as active_schools,
-            (SELECT COUNT(*) FROM users WHERE role='guru') as total_guru,
-            (SELECT COUNT(*) FROM users WHERE role='siswa') as total_siswa,
             (SELECT COUNT(*) FROM exams) as total_exams,
             (SELECT COUNT(*) FROM exam_sessions WHERE submitted_at IS NULL AND status='ongoing') as active_sessions
     """, fetch='one')
-    return jsonify(dict(row))
+    result = dict(row)
+    result['storage_bytes'] = storage.get_storage_usage()
+    return jsonify(result)
 
 
 @super_admin_bp.route('/api/super-admin/schools', methods=['GET'])
@@ -49,7 +52,9 @@ def list_schools():
         SELECT s.*,
                (SELECT COUNT(*) FROM users u WHERE u.school_id=s.id AND u.role='guru') as guru_count,
                (SELECT COUNT(*) FROM users u WHERE u.school_id=s.id AND u.role='siswa') as siswa_count,
-               (SELECT COUNT(*) FROM exams e WHERE e.school_id=s.id) as exam_count
+               (SELECT COUNT(*) FROM exams e WHERE e.school_id=s.id) as exam_count,
+               (SELECT COUNT(*) FROM exam_sessions es WHERE es.school_id=s.id
+                  AND es.submitted_at IS NULL AND es.status='ongoing') as active_sessions
         FROM schools s
         ORDER BY s.created_at DESC
     """)

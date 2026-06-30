@@ -76,6 +76,52 @@ def fetch_image_bytes(value):
         return None
 
 
+def get_storage_usage():
+    """Total ukuran semua file di bucket Storage (bytes), dihitung dengan
+    menelusuri seluruh folder secara rekursif lewat Storage List API.
+    None kalau Storage belum dikonfigurasi atau gagal diambil — dipakai di
+    overview super_admin yang bukan rute kritis, jadi aman gagal diam-diam."""
+    if not is_configured():
+        return None
+    try:
+        total = 0
+        headers = {
+            "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
+            "apikey": SUPABASE_SERVICE_KEY,
+        }
+
+        def _walk(prefix=''):
+            nonlocal total
+            offset = 0
+            while True:
+                resp = requests.post(
+                    f"{SUPABASE_URL}/storage/v1/object/list/{BUCKET}",
+                    headers=headers,
+                    json={"prefix": prefix, "limit": 1000, "offset": offset,
+                          "sortBy": {"column": "name", "order": "asc"}},
+                    timeout=20,
+                )
+                resp.raise_for_status()
+                items = resp.json()
+                if not items:
+                    break
+                for item in items:
+                    meta = item.get('metadata')
+                    if meta is None:
+                        # Entri tanpa metadata = folder, bukan file — telusuri isinya.
+                        _walk(f"{prefix}{item['name']}/")
+                    else:
+                        total += meta.get('size', 0) or 0
+                if len(items) < 1000:
+                    break
+                offset += 1000
+
+        _walk()
+        return total
+    except Exception:
+        return None
+
+
 def is_image_ref(value):
     """True kalau value kemungkinan gambar (bukan PDF/lampiran lain)."""
     if not value:

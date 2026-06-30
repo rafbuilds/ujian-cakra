@@ -19,9 +19,8 @@
       .card { background:#fff; border-radius:12px; padding:1rem 1.125rem;
         box-shadow:0 1px 4px rgba(0,0,0,.07); border:.5px solid var(--border); }
 
-      .dash-stats { display:grid; grid-template-columns:repeat(5,1fr); gap:.75rem; margin-bottom:1rem; }
-      @media(max-width:1100px){ .dash-stats{ grid-template-columns:repeat(3,1fr); } }
-      @media(max-width:700px){ .dash-stats{ grid-template-columns:repeat(2,1fr); } }
+      .dash-stats { display:grid; grid-template-columns:repeat(4,1fr); gap:.75rem; margin-bottom:1rem; }
+      @media(max-width:900px){ .dash-stats{ grid-template-columns:repeat(2,1fr); } }
       .stat-card { background:#fff; border-radius:12px; padding:1rem .875rem;
         box-shadow:0 1px 4px rgba(0,0,0,.07); border:.5px solid var(--border);
         display:flex; flex-direction:column; gap:4px; }
@@ -94,14 +93,6 @@
               <div class="stat-label">🏫 Total Sekolah</div>
               <div class="stat-sub" id="st-schools-sub"></div>
             </div>
-            <div class="stat-card blue">
-              <div class="stat-num" id="st-guru">—</div>
-              <div class="stat-label">👨‍🏫 Total Guru</div>
-            </div>
-            <div class="stat-card teal">
-              <div class="stat-num" id="st-siswa">—</div>
-              <div class="stat-label">🎓 Total Siswa</div>
-            </div>
             <div class="stat-card amber">
               <div class="stat-num" id="st-exams">—</div>
               <div class="stat-label">📋 Total Ujian Dibuat</div>
@@ -110,6 +101,11 @@
               <div class="stat-num" id="st-active">—</div>
               <div class="stat-label">🔴 Sedang Berlangsung Sekarang</div>
               <div class="stat-sub">Beban real-time semua sekolah</div>
+            </div>
+            <div class="stat-card blue">
+              <div class="stat-num" id="st-storage">—</div>
+              <div class="stat-label">💾 Penyimpanan Terpakai</div>
+              <div class="stat-sub">Foto/lampiran di Supabase Storage</div>
             </div>
           </div>
 
@@ -126,11 +122,12 @@
                     <th>Guru</th>
                     <th>Siswa</th>
                     <th>Ujian</th>
+                    <th>Beban Aktif</th>
                     <th></th>
                   </tr>
                 </thead>
                 <tbody id="school-rows">
-                  <tr><td colspan="9" style="text-align:center;padding:2rem;color:var(--muted)">Memuat...</td></tr>
+                  <tr><td colspan="10" style="text-align:center;padding:2rem;color:var(--muted)">Memuat...</td></tr>
                 </tbody>
               </table>
             </div>
@@ -204,16 +201,23 @@
         loadOverview();
       }
 
+      function fmtBytes(n) {
+        if (n === null || n === undefined) return "—";
+        if (n === 0) return "0 B";
+        const units = ["B", "KB", "MB", "GB", "TB"];
+        const i = Math.floor(Math.log(n) / Math.log(1024));
+        return `${(n / Math.pow(1024, i)).toFixed(1)} ${units[i]}`;
+      }
+
       async function loadOverview() {
         try {
           const o = await API.get("/api/super-admin/overview");
           document.getElementById("st-schools").textContent = o.total_schools;
           document.getElementById("st-schools-sub").textContent =
             `${o.active_schools} aktif · ${o.total_schools - o.active_schools} disuspend`;
-          document.getElementById("st-guru").textContent = o.total_guru;
-          document.getElementById("st-siswa").textContent = o.total_siswa;
           document.getElementById("st-exams").textContent = o.total_exams;
           document.getElementById("st-active").textContent = o.active_sessions;
+          document.getElementById("st-storage").textContent = fmtBytes(o.storage_bytes);
         } catch (e) {
           // Ringkasan gagal dimuat bukan blocker — tabel sekolah tetap berguna sendirian.
         }
@@ -231,7 +235,7 @@
       function render() {
         const tbody = document.getElementById("school-rows");
         if (!schools.length) {
-          tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:2rem;color:var(--muted)">Belum ada sekolah</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:2rem;color:var(--muted)">Belum ada sekolah</td></tr>';
           return;
         }
         tbody.innerHTML = schools
@@ -246,6 +250,7 @@
             <td>${s.guru_count}</td>
             <td>${s.siswa_count}</td>
             <td>${s.exam_count}</td>
+            <td>${s.active_sessions > 0 ? `<span class="badge badge-red">🔴 ${s.active_sessions} aktif</span>` : '<span class="stat-pill">—</span>'}</td>
             <td><button class="btn btn-secondary btn-sm" onclick="openEditModal('${s.id}')">Edit</button></td>
           </tr>`,
           )
