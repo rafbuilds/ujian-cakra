@@ -51,8 +51,8 @@
         z-index: 1;
       }
       .brand-logo {
-        width: 72px;
-        height: 72px;
+        width: 192px;
+        height: 192px;
         margin-bottom: 1rem;
         object-fit: contain;
       }
@@ -277,9 +277,7 @@
         <div class="brand">
           <img class="brand-logo" src="assets/logo.png" alt="Logo CAKRA" />
           <div class="brand-name">CAKRA</div>
-          <div class="brand-sub">
-            Pusat Kendali Ujian Digital
-          </div>
+          <div class="brand-sub">Pusat Kendali Ujian Digital</div>
         </div>
         <div>
           <div class="feat">
@@ -439,7 +437,12 @@
           localStorage.setItem("ujian_token", d.token);
           localStorage.setItem(
             "ujian_user",
-            JSON.stringify({ role: d.role, name: d.name, id: d.id, school_name: d.school_name }),
+            JSON.stringify({
+              role: d.role,
+              name: d.name,
+              id: d.id,
+              school_name: d.school_name,
+            }),
           );
           window.location.href = ROLE_REDIRECT[d.role] || "/index.html";
         } catch (err) {
@@ -460,7 +463,11 @@
           localStorage.setItem("ujian_token", d.token);
           localStorage.setItem(
             "ujian_user",
-            JSON.stringify({ role: d.role, name: d.name, school_name: d.school_name }),
+            JSON.stringify({
+              role: d.role,
+              name: d.name,
+              school_name: d.school_name,
+            }),
           );
           window.location.href = ROLE_REDIRECT[d.role] || "/index.html";
         } catch (err) {
@@ -483,7 +490,12 @@
               // super_admin), bikin pingpong antar halaman.
               localStorage.setItem(
                 "ujian_user",
-                JSON.stringify({ role: user.role, name: user.name, id: user.id, school_name: user.school_name }),
+                JSON.stringify({
+                  role: user.role,
+                  name: user.name,
+                  id: user.id,
+                  school_name: user.school_name,
+                }),
               );
               window.location.href = ROLE_REDIRECT[user.role] || "/index.html";
               return;
