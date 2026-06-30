@@ -36,6 +36,18 @@ DEV_MODE     = os.environ.get('DEV_MODE', 'false').lower() == 'true'
 def index():
     return jsonify({'status': 'ok', 'service': 'CAKRA', 'dev_mode': DEV_MODE})
 
+@app.errorhandler(Exception)
+def handle_unexpected_error(e):
+    # Tanpa ini, exception tak tertangani di endpoint /api/* menghasilkan
+    # halaman error HTML default Flask — frontend gagal parse JSON-nya dan
+    # cuma menampilkan pesan generik "Gagal menyimpan/memuat" tanpa info apa
+    # pun, dan tracebacknya tidak pernah terlihat selain lewat log server.
+    import traceback
+    traceback.print_exc()
+    if request.path.startswith('/api/'):
+        return jsonify({'error': f'{type(e).__name__}: {e}'}), 500
+    raise e
+
 def _school_name(school_id):
     """Nama sekolah untuk ditampilkan di sidebar — beda-beda per tenant,
     bukan hardcode satu sekolah lagi. None untuk super_admin (school_id None)."""
