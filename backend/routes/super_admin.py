@@ -24,6 +24,24 @@ def _slugify(name):
     return slug
 
 
+@super_admin_bp.route('/api/super-admin/overview', methods=['GET'])
+@require_super_admin
+def overview():
+    """Ringkasan lintas-sekolah untuk kartu statistik di atas tabel —
+    termasuk beban real-time (siswa yang sedang mengerjakan ujian SEKARANG,
+    dipakai untuk pantau kapasitas server, bukan cuma data historis)."""
+    row = query("""
+        SELECT
+            (SELECT COUNT(*) FROM schools) as total_schools,
+            (SELECT COUNT(*) FROM schools WHERE is_active=true) as active_schools,
+            (SELECT COUNT(*) FROM users WHERE role='guru') as total_guru,
+            (SELECT COUNT(*) FROM users WHERE role='siswa') as total_siswa,
+            (SELECT COUNT(*) FROM exams) as total_exams,
+            (SELECT COUNT(*) FROM exam_sessions WHERE submitted_at IS NULL AND status='ongoing') as active_sessions
+    """, fetch='one')
+    return jsonify(dict(row))
+
+
 @super_admin_bp.route('/api/super-admin/schools', methods=['GET'])
 @require_super_admin
 def list_schools():
