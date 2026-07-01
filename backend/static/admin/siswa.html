@@ -111,6 +111,7 @@
         <div class="topbar">
           <div class="topbar-title">Data Siswa</div>
           <div class="topbar-right" style="gap:6px">
+            <button class="btn btn-primary btn-sm" onclick="openCreate()" title="Tambah satu siswa manual">+ Tambah Siswa</button>
             <button class="btn btn-secondary btn-sm" onclick="downloadTemplate()" title="Download template import">📄 Template</button>
             <button class="btn btn-secondary btn-sm" onclick="document.getElementById('imp').click()" title="Import dari Excel atau Word">⬆ Import</button>
             <button class="btn btn-primary btn-sm" onclick="exportSiswa()" title="Export sesuai filter aktif">⬇ Export</button>
@@ -188,6 +189,10 @@
           <input class="form-control" id="edit-name" placeholder="Nama lengkap siswa" />
         </div>
         <div class="form-group">
+          <label>Email</label>
+          <input class="form-control" id="edit-email" type="email" placeholder="email@sekolah.sch.id (opsional)" />
+        </div>
+        <div class="form-group">
           <label>NISN</label>
           <input class="form-control" id="edit-nisn" placeholder="Nomor Induk Siswa Nasional" />
         </div>
@@ -211,6 +216,41 @@
       </div>
     </div>
 
+    <!-- Modal Tambah Siswa Manual -->
+    <div id="modal-create" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:center;justify-content:center;padding:1rem;backdrop-filter:blur(4px)">
+      <div style="background:#fff;border-radius:18px;padding:2rem;max-width:440px;width:100%">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem">
+          <div style="font-weight:700;font-size:18px;color:var(--green)">+ Tambah Siswa</div>
+          <button onclick="closeCreate()" style="background:none;border:none;font-size:22px;cursor:pointer">✕</button>
+        </div>
+        <div class="form-group">
+          <label>Nama Lengkap *</label>
+          <input class="form-control" id="create-name" placeholder="Nama lengkap siswa" />
+        </div>
+        <div class="form-group">
+          <label>Email</label>
+          <input class="form-control" id="create-email" type="email" placeholder="email@sekolah.sch.id (opsional)" />
+        </div>
+        <div class="form-group">
+          <label>NISN</label>
+          <input class="form-control" id="create-nisn" placeholder="Nomor Induk Siswa Nasional" />
+        </div>
+        <div class="form-group">
+          <label>Kelas</label>
+          <select class="form-control" id="create-class">
+            <option value="">— Pilih kelas —</option>
+          </select>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:.5rem">
+          Siswa login pakai email + perangkat HP-nya sendiri (tanpa password) — kalau email dikosongkan, siswa belum bisa login sampai emailnya diisi lewat Edit.
+        </div>
+        <div style="display:flex;gap:10px;margin-top:1rem">
+          <button class="btn btn-secondary" style="flex:1" onclick="closeCreate()">Batal</button>
+          <button class="btn btn-primary" style="flex:1" onclick="createSiswa()" id="create-submit">💾 Simpan</button>
+        </div>
+      </div>
+    </div>
+
     <script src="../config.js"></script>
     <script src="../components/api.js"></script>
     <script src="../components/auth.js"></script>
@@ -225,9 +265,11 @@
         allKelas = await API.get('/api/classes');
         const selF = document.getElementById('fc');
         const selE = document.getElementById('edit-class');
+        const selC = document.getElementById('create-class');
         const opts = allKelas.map(k => `<option value="${k.id}">${k.name}</option>`).join('');
         selF.innerHTML = '<option value="">Semua Kelas</option>' + opts;
         selE.innerHTML = '<option value="">— Pilih kelas —</option>' + opts;
+        selC.innerHTML = '<option value="">— Pilih kelas —</option>' + opts;
         load();
       }
 
@@ -315,6 +357,7 @@
       function openEdit(s) {
         document.getElementById('edit-id').value     = s.id;
         document.getElementById('edit-name').value   = s.name   || '';
+        document.getElementById('edit-email').value  = s.email  || '';
         document.getElementById('edit-nisn').value   = s.nisn   || '';
         document.getElementById('edit-class').value  = s.class_id || '';
         document.getElementById('edit-active').value = s.is_active ? 'true' : 'false';
@@ -326,14 +369,50 @@
         const id = document.getElementById('edit-id').value;
         const name = document.getElementById('edit-name').value.trim();
         if (!name) { UI.toast('Nama tidak boleh kosong', 'warn'); return; }
-        await API.patch('/api/admin/siswa/' + id, {
-          name,
-          nisn:      document.getElementById('edit-nisn').value.trim() || null,
-          class_id:  document.getElementById('edit-class').value || null,
-          is_active: document.getElementById('edit-active').value === 'true',
-        });
-        UI.toast('✅ Data diperbarui', 'success');
-        closeEdit(); load();
+        try {
+          await API.patch('/api/admin/siswa/' + id, {
+            name,
+            email:     document.getElementById('edit-email').value.trim() || null,
+            nisn:      document.getElementById('edit-nisn').value.trim() || null,
+            class_id:  document.getElementById('edit-class').value || null,
+            is_active: document.getElementById('edit-active').value === 'true',
+          });
+          UI.toast('✅ Data diperbarui', 'success');
+          closeEdit(); load();
+        } catch (e) {
+          UI.toast(e.error || 'Gagal menyimpan', 'error');
+        }
+      }
+
+      // ── Tambah Siswa Manual ──────────────────────────────────────
+      function openCreate() {
+        document.getElementById('create-name').value  = '';
+        document.getElementById('create-email').value = '';
+        document.getElementById('create-nisn').value  = '';
+        document.getElementById('create-class').value = '';
+        document.getElementById('modal-create').style.display = 'flex';
+      }
+      function closeCreate() { document.getElementById('modal-create').style.display = 'none'; }
+
+      async function createSiswa() {
+        const name = document.getElementById('create-name').value.trim();
+        if (!name) { UI.toast('Nama tidak boleh kosong', 'warn'); return; }
+        const btn = document.getElementById('create-submit');
+        btn.textContent = 'Menyimpan...'; btn.disabled = true;
+        try {
+          await API.post('/api/admin/siswa', {
+            name,
+            email:    document.getElementById('create-email').value.trim() || null,
+            nisn:     document.getElementById('create-nisn').value.trim() || null,
+            class_id: document.getElementById('create-class').value || null,
+          });
+          UI.toast('✅ Siswa ditambahkan', 'success');
+          closeCreate(); load();
+        } catch (e) {
+          UI.toast(e.error || 'Gagal menambah siswa', 'error');
+        } finally {
+          btn.textContent = '💾 Simpan'; btn.disabled = false;
+        }
       }
 
       // ── Toggle aktif/nonaktif ────────────────────────────────────

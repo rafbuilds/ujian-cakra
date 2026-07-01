@@ -128,10 +128,53 @@ def get_siswa():
 
     return jsonify({'data': [dict(r) for r in rows], 'total': total, 'page': page})
 
+@admin_bp.route('/api/admin/siswa', methods=['POST'])
+@require_admin
+def create_siswa():
+    from auth import validate_email_domain
+    data     = request.json or {}
+    name     = data.get('name', '').strip()
+    email    = (data.get('email') or '').strip().lower()
+    nisn     = (data.get('nisn') or '').strip()
+    class_id = data.get('class_id') or None
+    if not name:
+        return jsonify({'error': 'Nama wajib diisi'}), 400
+    if email:
+        domain_err = validate_email_domain(request.school_id, email)
+        if domain_err:
+            return jsonify({'error': domain_err}), 400
+        existing = query("SELECT id FROM users WHERE LOWER(email)=%s", (email,), fetch='one')
+        if existing:
+            return jsonify({'error': 'Email sudah dipakai akun lain'}), 409
+    dummy_gid = f"manual_{uuid.uuid4().hex[:12]}"
+    uid = str(uuid.uuid4())
+    query("""INSERT INTO users (id, google_id, email, name, nisn, class_id, role, is_active, school_id)
+             VALUES (%s,%s,%s,%s,%s,%s,'siswa',true,%s)""",
+          (uid, dummy_gid, email or None, name, nisn or None, class_id, request.school_id), fetch='none')
+    user = query("""
+        SELECT u.id, u.name, u.email, u.nisn, u.class_id, c.name as class_name, c.grade,
+               u.device_id, u.device_info, u.last_login, u.is_active
+        FROM users u LEFT JOIN classes c ON c.id=u.class_id WHERE u.id=%s
+    """, (uid,), fetch='one')
+    return jsonify(dict(user)), 201
+
 @admin_bp.route('/api/admin/siswa/<siswa_id>', methods=['PATCH'])
 @require_admin
 def update_siswa(siswa_id):
+    from auth import validate_email_domain
     data = request.json or {}
+    if 'email' in data:
+        email = (data['email'] or '').strip().lower()
+        if email:
+            domain_err = validate_email_domain(request.school_id, email)
+            if domain_err:
+                return jsonify({'error': domain_err}), 400
+            existing = query("SELECT id FROM users WHERE LOWER(email)=%s AND id!=%s",
+                             (email, siswa_id), fetch='one')
+            if existing:
+                return jsonify({'error': 'Email sudah dipakai akun lain'}), 409
+        query("UPDATE users SET email=%s WHERE id=%s AND role='siswa' AND school_id=%s",
+              (email or None, siswa_id, request.school_id), fetch='none')
     allowed = ['name', 'nisn', 'class_id', 'is_active']
     for f in [k for k in data if k in allowed]:
         query(f"UPDATE users SET {f}=%s WHERE id=%s AND role='siswa' AND school_id=%s",
