@@ -40,6 +40,13 @@
       .badge-red   { background:#fde8e8; color:#b91c1c; }
       .badge-amber { background:#fff3cd; color:#856404; }
       .badge-gray  { background:#f3f4f6; color:#6b7280; }
+      .badge-blue  { background:#e6f1fb; color:#185fa5; }
+      .badge-gold  { background:#fdf1d8; color:#8a5a00; }
+
+      .countdown       { font-size:10px; font-weight:600; margin-top:2px; }
+      .countdown.ok     { color:#3b6d11; }
+      .countdown.soon   { color:#856404; }
+      .countdown.over   { color:#b91c1c; }
 
       table.school-table { width:100%; border-collapse:collapse; font-size:13px; }
       table.school-table th { text-align:left; padding:.6rem .5rem; border-bottom:2px solid var(--border);
@@ -181,6 +188,9 @@
         <div class="form-group">
           <label>Lisensi Berlaku Hingga (opsional)</label>
           <input type="date" class="form-control" id="f-paid-until" />
+          <div style="font-size:11px;color:var(--muted);margin-top:4px">
+            Kosongkan untuk default otomatis: Trial 14 hari, Standard/Pro 30 hari sejak hari ini.
+          </div>
         </div>
         <div class="form-group" id="f-active-wrap" style="display:none">
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
@@ -332,6 +342,28 @@
         return '<span class="badge badge-green">Aktif</span>';
       }
 
+      // Tanda plan trial/standard/pro — biar kelihatan bedanya sekilas dari warna badge.
+      function planBadge(plan) {
+        const map = {
+          trial:    { cls: 'badge-amber', label: '🎟 Trial' },
+          standard: { cls: 'badge-blue',  label: 'Standard' },
+          pro:      { cls: 'badge-gold',  label: '⭐ Pro' },
+        };
+        const p = map[plan] || { cls: 'badge-gray', label: plan };
+        return `<span class="badge ${p.cls}">${p.label}</span>`;
+      }
+
+      // Countdown sisa hari lisensi — dihitung dari paid_until, dipisah dari
+      // statusBadge supaya bisa tampil bersamaan dengan tanggalnya di kolom.
+      function licenseCountdown(paidUntil) {
+        if (!paidUntil) return '';
+        const days = Math.ceil((new Date(paidUntil) - new Date(new Date().toDateString())) / 86400000);
+        if (days < 0)  return `<div class="countdown over">Habis ${Math.abs(days)} hari lalu</div>`;
+        if (days === 0) return `<div class="countdown over">Habis hari ini</div>`;
+        const cls = days <= 7 ? 'soon' : 'ok';
+        return `<div class="countdown ${cls}">${days} hari lagi</div>`;
+      }
+
       const expandedIds = new Set();
       const detailCache = {};
 
@@ -349,9 +381,9 @@
             <td><button class="expand-toggle" onclick="toggleDetail('${s.id}')">${isOpen ? "▾" : "▸"}</button></td>
             <td><strong>${s.name}</strong><div class="stat-pill">${s.slug}</div></td>
             <td>${s.allowed_domain ? "@" + s.allowed_domain : '<span class="stat-pill">— bebas —</span>'}</td>
-            <td><span class="badge badge-gray">${s.plan}</span></td>
+            <td>${planBadge(s.plan)}</td>
             <td>${statusBadge(s)}</td>
-            <td>${s.paid_until ? UI.fmtDate(s.paid_until) : '<span class="stat-pill">—</span>'}</td>
+            <td>${s.paid_until ? UI.fmtDate(s.paid_until) + licenseCountdown(s.paid_until) : '<span class="stat-pill">—</span>'}</td>
             <td>${s.guru_count}</td>
             <td>${s.siswa_count}</td>
             <td>${s.exam_count}</td>

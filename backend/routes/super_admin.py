@@ -6,6 +6,7 @@
 # lain.
 from flask import Blueprint, request, jsonify
 import re, uuid
+from datetime import date, timedelta
 from db import query, delete_school_cascade
 from auth import require_super_admin
 import storage
@@ -25,6 +26,14 @@ def _slugify(name):
         n += 1
         slug = f"{base}-{n}"
     return slug
+
+
+def _default_paid_until(plan):
+    """Kalau admin tidak menentukan tanggal lisensi: trial otomatis 14 hari,
+    plan lain (standard/pro) otomatis 30 hari dari sekarang — supaya tiap
+    sekolah selalu punya tanggal berlaku untuk ditampilkan countdown-nya."""
+    days = 14 if plan == 'trial' else 30
+    return (date.today() + timedelta(days=days)).isoformat()
 
 
 @super_admin_bp.route('/api/super-admin/overview', methods=['GET'])
@@ -72,7 +81,7 @@ def create_school():
         return jsonify({'error': 'Nama sekolah wajib'}), 400
     allowed_domain = (data.get('allowed_domain') or '').strip().lower() or None
     plan = (data.get('plan') or 'standard').strip()
-    paid_until = data.get('paid_until') or None
+    paid_until = data.get('paid_until') or _default_paid_until(plan)
     slug = _slugify(name)
     school_id = str(uuid.uuid4())
     query("""INSERT INTO schools (id, name, slug, plan, is_active, paid_until, allowed_domain)
@@ -97,7 +106,17 @@ def update_school(school_id):
     if 'is_active' in data:
         fields.append('is_active=%s'); vals.append(bool(data['is_active']))
     if 'paid_until' in data:
-        fields.append('paid_until=%s'); vals.append(data['paid_until'] or None)
+        paid_until = data['paid_until'] or None
+        if not paid_until:
+            # Tanggal dikosongkan — default berdasarkan plan yang berlaku
+            # (plan baru dari request ini kalau ikut diubah, atau plan
+            # sekolah saat ini kalau tidak).
+            plan_for_default = (data.get('plan') or '').strip()
+            if not plan_for_default:
+                existing = query("SELECT plan FROM schools WHERE id=%s", (school_id,), fetch='one')
+                plan_for_default = (existing or {}).get('plan') or 'standard'
+            paid_until = _default_paid_until(plan_for_default)
+        fields.append('paid_until=%s'); vals.append(paid_until)
     for f in _FEATURE_FIELDS:
         if f in data:
             fields.append(f'{f}=%s'); vals.append(bool(data[f]))
