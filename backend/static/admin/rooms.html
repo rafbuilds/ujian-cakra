@@ -101,6 +101,25 @@
           width: 100%;
         }
       }
+
+      @media (max-width: 640px) {
+        .uj-stat-grid {
+          grid-template-columns: repeat(2, 1fr) !important;
+        }
+        .uj-filter-bar {
+          flex-direction: column;
+          align-items: stretch;
+        }
+        .uj-filter-bar select,
+        .uj-filter-bar input {
+          max-width: none !important;
+          width: 100% !important;
+        }
+        .uj-filter-bar #uj-count {
+          margin-left: 0 !important;
+          align-self: flex-end;
+        }
+      }
     </style>
   </head>
   <body>
@@ -266,6 +285,7 @@
           <!-- ── TAB SEMUA UJIAN ── -->
           <div id="tab-content-allujian" style="display: none">
             <div
+              class="uj-stat-grid"
               style="
                 display: grid;
                 grid-template-columns: repeat(4, 1fr);
@@ -293,6 +313,7 @@
               </div>
             </div>
             <div
+              class="uj-filter-bar"
               style="
                 display: flex;
                 gap: 8px;
@@ -362,13 +383,13 @@
                 "
               />
               <div
+                id="uj-count"
                 style="
                   margin-left: auto;
                   align-self: center;
                   font-size: 13px;
                   color: var(--muted);
                 "
-                id="uj-count"
               ></div>
             </div>
             <div class="card" style="padding: 0; overflow: hidden">
@@ -417,11 +438,14 @@
           "
         >
           <div>
-            <div
-              style="font-weight: 700; font-size: 20px; color: #fff"
-              id="dp-name"
-            >
-              Room
+            <div style="display: flex; align-items: center; gap: 8px">
+              <div
+                style="font-weight: 700; font-size: 20px; color: #fff"
+                id="dp-name"
+              >
+                Room
+              </div>
+              <span id="dp-status-badge" style="padding: 2px 9px; border-radius: 20px; font-size: 11px; font-weight: 600; flex-shrink: 0"></span>
             </div>
             <div
               style="
@@ -585,6 +609,7 @@
             border-top: 0.5px solid var(--border);
             display: flex;
             gap: 8px;
+            flex-wrap: wrap;
           "
         >
           <button
@@ -594,6 +619,7 @@
           >
             ✏️ Edit Room
           </button>
+          <button id="dp-toggle-status-btn" class="btn btn-secondary" style="flex: 1" onclick="toggleRoomStatus()"></button>
           <button class="btn btn-danger" onclick="deleteRoom()">
             🗑 Hapus
           </button>
@@ -876,7 +902,7 @@
       <div class="room-card" onclick="openDetail('${r.id}')">
         <div style="display:flex;align-items:flex-start;justify-content:space-between">
           <div style="font-weight:700;font-size:16px">${r.name}</div>
-          <span style="background:${r.is_active ? "#eaf3de" : "var(--light)"};color:${r.is_active ? "#3b6d11" : "var(--muted)"};padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;flex-shrink:0">${r.is_active ? "Aktif" : "Nonaktif"}</span>
+          <span style="background:${r.is_active ? "#eaf3de" : "#faeeda"};color:${r.is_active ? "#3b6d11" : "#854f0b"};padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;flex-shrink:0">${r.is_active ? "🟢 Aktif" : "✅ Selesai"}</span>
         </div>
         ${r.description ? `<div style="font-size:12px;color:var(--muted)">${r.description}</div>` : ""}
         ${r.semester_name ? `<div style="font-size:12px;color:var(--green);font-weight:600">📅 ${r.semester_name}${r.academic_year_name ? " " + r.academic_year_name : ""}</div>` : ""}
@@ -918,6 +944,12 @@
           document.getElementById("dp-semester").textContent = room.semester_name
             ? `📅 ${room.semester_name}${room.academic_year_name ? " " + room.academic_year_name : ""}`
             : "";
+          const statusBadge = document.getElementById("dp-status-badge");
+          statusBadge.textContent = room.is_active ? "🟢 Aktif" : "✅ Selesai";
+          statusBadge.style.background = room.is_active ? "rgba(76,175,80,.25)" : "rgba(212,175,55,.25)";
+          statusBadge.style.color = room.is_active ? "#c8f0cc" : "#f0dfa0";
+          const toggleBtn = document.getElementById("dp-toggle-status-btn");
+          toggleBtn.textContent = room.is_active ? "✅ Tandai Selesai" : "🔄 Aktifkan Kembali";
           document.getElementById("dp-teacher-count").textContent =
             room.teachers.length;
           document.getElementById("dp-class-count").textContent =
@@ -1231,6 +1263,21 @@
           loadRooms();
           if (r.id) openDetail(r.id);
         }
+      }
+
+      async function toggleRoomStatus() {
+        if (!currentRoom) return;
+        const willActivate = !currentRoom.is_active;
+        const title = willActivate ? "Aktifkan Kembali Room" : "Tandai Room Selesai";
+        const msg = willActivate
+          ? `Aktifkan kembali <strong>${currentRoom.name}</strong>? Guru bisa join room ini lagi.`
+          : `Tandai <strong>${currentRoom.name}</strong> selesai? Room tidak akan muncul lagi di pilihan room aktif untuk guru, tapi data ujian &amp; nilai tetap tersimpan.`;
+        UI.confirm(title, msg, async () => {
+          await API.patch("/api/admin/rooms/" + currentRoomId, { is_active: willActivate });
+          UI.toast(willActivate ? "✅ Room diaktifkan kembali" : "✅ Room ditandai selesai", "success");
+          openDetail(currentRoomId);
+          loadRooms();
+        });
       }
 
       async function deleteRoom() {
