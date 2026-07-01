@@ -99,11 +99,11 @@ def get_siswa():
     grade    = request.args.get('grade', '')
     class_id = request.args.get('class_id', '')
     search   = request.args.get('search', '')
+    device   = request.args.get('device', '')  # 'yes' | 'no' | ''
     page     = int(request.args.get('page', 1))
-    # Cap dinaikkan dari 200 ke 5000 — sekolah dengan >200 siswa sebelumnya
-    # kepotong diam-diam di halaman Data Siswa (cuma 200 pertama kebaca),
-    # padahal dashboard admin sudah benar hitung COUNT(*) semua siswa.
-    per_page = min(int(request.args.get('per_page', 50)), 5000)
+    # Pagination asli (Prev/Next) — bukan fetch semua siswa sekaligus lagi,
+    # supaya sekolah dengan siswa ribuan tidak berat di halaman Data Siswa.
+    per_page = min(int(request.args.get('per_page', 25)), 200)
 
     where = ["u.role='siswa'", "u.school_id=%s"]
     params = [request.school_id]
@@ -112,10 +112,27 @@ def get_siswa():
     if search:   where.append("u.name ILIKE %s"); params.append(f'%{search}%')
 
     where_sql = ' AND '.join(where)
+
+    # Stat ringkasan dihitung dari filter grade/class/search SAJA (tidak ikut
+    # filter device) — supaya kartu statistik tetap merepresentasikan seluruh
+    # siswa yang cocok, terlepas dari toggle device yang cuma mempengaruhi
+    # daftar/tabel di bawahnya.
+    stats = query(f"""
+        SELECT COUNT(*) as total,
+               COUNT(*) FILTER (WHERE u.device_id IS NOT NULL) as device_count,
+               COUNT(*) FILTER (WHERE u.last_login IS NOT NULL) as login_count,
+               COUNT(*) FILTER (WHERE u.is_active=false) as inactive_count
+        FROM users u
+        LEFT JOIN classes c ON c.id=u.class_id
+        WHERE {where_sql}
+    """, params, fetch='one')
+
+    list_where = where + (["u.device_id IS NOT NULL"] if device == 'yes' else ["u.device_id IS NULL"] if device == 'no' else [])
+    list_where_sql = ' AND '.join(list_where)
     total = query(f"""
         SELECT COUNT(*) as n FROM users u
         LEFT JOIN classes c ON c.id=u.class_id
-        WHERE {where_sql}
+        WHERE {list_where_sql}
     """, params, fetch='one')['n']
 
     rows = query(f"""
@@ -124,12 +141,16 @@ def get_siswa():
                u.device_id, u.device_info, u.last_login, u.is_active
         FROM users u
         LEFT JOIN classes c ON c.id=u.class_id
-        WHERE {where_sql}
+        WHERE {list_where_sql}
         ORDER BY c.grade, LENGTH(c.id), c.id, u.name
         LIMIT %s OFFSET %s
     """, params + [per_page, (page-1)*per_page])
 
-    return jsonify({'data': [dict(r) for r in rows], 'total': total, 'page': page})
+    return jsonify({
+        'data': [dict(r) for r in rows],
+        'total': total, 'page': page, 'per_page': per_page,
+        'stats': dict(stats),
+    })
 
 @admin_bp.route('/api/admin/siswa', methods=['POST'])
 @require_admin

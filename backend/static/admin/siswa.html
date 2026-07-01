@@ -173,6 +173,25 @@
             </div>
           </div>
 
+          <!-- Pagination -->
+          <div style="display:flex;align-items:center;gap:10px;margin-top:.875rem;flex-wrap:wrap">
+            <div style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)">
+              Tampilkan
+              <select id="pg-size" onchange="onPageSizeChange()" class="form-control" style="width:auto;padding:6px 10px">
+                <option value="10">10</option>
+                <option value="25" selected>25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+              </select>
+              siswa
+            </div>
+            <div id="pg-info" style="font-size:13px;color:var(--muted)"></div>
+            <div class="pagination" style="margin:0;margin-left:auto">
+              <button class="page-btn" id="pg-prev" onclick="changePage(-1)">‹ Prev</button>
+              <button class="page-btn" id="pg-next" onclick="changePage(1)">Next ›</button>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>
@@ -261,6 +280,7 @@
       UI.initSidebar();
 
       let allKelas = [], _data = [];
+      let currentPage = 1, pageSize = 25, totalCount = 0;
 
       async function init() {
         allKelas = await API.get('/api/classes');
@@ -274,36 +294,41 @@
         load();
       }
 
-      function onFilterChange() { load(); }
+      function onFilterChange() { currentPage = 1; load(); }
+      function onPageSizeChange() {
+        pageSize = parseInt(document.getElementById('pg-size').value) || 25;
+        currentPage = 1;
+        load();
+      }
+      function changePage(delta) {
+        const maxPage = Math.max(1, Math.ceil(totalCount / pageSize));
+        const next = currentPage + delta;
+        if (next < 1 || next > maxPage) return;
+        currentPage = next;
+        load();
+      }
 
       async function load() {
         const grade  = document.getElementById('fg').value;
         const cls    = document.getElementById('fc').value;
         const search = document.getElementById('fs').value;
+        const device = document.getElementById('fd').value;
         const tbody  = document.getElementById('tbody');
         tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:2rem"><div class="loading-spinner" style="margin:auto"></div></td></tr>';
         try {
-          const p = new URLSearchParams({ grade, class_id: cls, search, per_page: 5000 });
+          const p = new URLSearchParams({ grade, class_id: cls, search, device, page: currentPage, per_page: pageSize });
           const r = await API.get('/api/admin/siswa?' + p);
-          _data = r.data || r || [];
+          _data = r.data || [];
+          totalCount = r.total || 0;
 
-          // Jaga-jaga: kalau suatu saat jumlah siswa lewat batas per_page lagi,
-          // kasih tahu daripada diam-diam kepotong seperti sebelumnya.
-          if (r.total && _data.length < r.total) {
-            UI.toast(`Menampilkan ${_data.length} dari ${r.total} siswa — sebagian belum termuat`, 'warn');
-          }
-
-          // Device filter (client-side)
-          const devF = document.getElementById('fd').value;
-          let filtered = _data;
-          if (devF === 'yes') filtered = _data.filter(s => s.device_id);
-          if (devF === 'no')  filtered = _data.filter(s => !s.device_id);
-
-          // Update stat cards
-          document.getElementById('st-total').textContent    = filtered.length;
-          document.getElementById('st-device').textContent   = filtered.filter(s => s.device_id).length;
-          document.getElementById('st-login').textContent    = filtered.filter(s => s.last_login).length;
-          document.getElementById('st-inactive').textContent = filtered.filter(s => !s.is_active).length;
+          // Stat ringkasan (dari backend — mengikuti grade/kelas/search, TIDAK
+          // ikut filter device, jadi tetap merepresentasikan semua siswa yang
+          // cocok terlepas dari toggle device di bawahnya).
+          const st = r.stats || {};
+          document.getElementById('st-total').textContent    = st.total ?? 0;
+          document.getElementById('st-device').textContent   = st.device_count ?? 0;
+          document.getElementById('st-login').textContent    = st.login_count ?? 0;
+          document.getElementById('st-inactive').textContent = st.inactive_count ?? 0;
 
           // Label filter
           const parts = [];
@@ -311,14 +336,21 @@
           const kelasObj = allKelas.find(k => k.id === cls);
           if (kelasObj) parts.push(kelasObj.name);
           if (search) parts.push('"' + search + '"');
-          document.getElementById('filter-info').textContent = filtered.length + ' siswa' + (parts.length ? ' · ' + parts.join(', ') : '');
+          document.getElementById('filter-info').textContent = totalCount + ' siswa' + (parts.length ? ' · ' + parts.join(', ') : '');
 
-          if (!filtered.length) {
+          // Pagination Prev/Next
+          const start = totalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+          const end   = Math.min(currentPage * pageSize, totalCount);
+          document.getElementById('pg-info').textContent = `${start}–${end} dari ${totalCount} siswa`;
+          document.getElementById('pg-prev').disabled = currentPage <= 1;
+          document.getElementById('pg-next').disabled = currentPage * pageSize >= totalCount;
+
+          if (!_data.length) {
             tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--muted)">Tidak ada siswa ditemukan</td></tr>';
             return;
           }
 
-          tbody.innerHTML = filtered.map((s, i) => {
+          tbody.innerHTML = _data.map((s, i) => {
             const deviceBadge = s.device_id
               ? `<div style="max-width:180px">
                    <div style="font-size:12px;font-weight:600;color:#1a6b35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${(s.device_info||'').replace(/"/g,'&quot;')}">
@@ -334,7 +366,7 @@
               ? `<button class="btn btn-secondary btn-sm" onclick="resetDev('${s.id}','${esc(s.name)}','${esc(s.device_info||s.device_id)}')" title="Reset: ${esc(s.device_info||'—')}">📱 Reset HP</button>`
               : `<button class="btn btn-secondary btn-sm" style="opacity:.4;cursor:not-allowed" disabled title="Belum login">📱 Reset HP</button>`;
             return `<tr>
-              <td style="color:var(--muted)">${i + 1}</td>
+              <td style="color:var(--muted)">${(currentPage - 1) * pageSize + i + 1}</td>
               <td>
                 <div style="font-weight:500;font-size:13px">${s.name || ''}</div>
                 <div style="font-size:11px;color:var(--muted)">${s.email || ''}</div>
