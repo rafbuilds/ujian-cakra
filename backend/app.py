@@ -148,6 +148,14 @@ def auth_me():
     if not user: return jsonify({'error': 'User tidak ditemukan'}), 404
     result = dict(user)
     result['school_name'] = _school_name(request.school_id)
+    # Info plan/lisensi sekolah — dipakai frontend untuk tampilkan tanda
+    # "masih trial" di sidebar, supaya guru/admin tidak kira server error
+    # kalau fiturnya diblokir begitu masa trial habis.
+    if request.school_id:
+        school = query("SELECT plan, paid_until FROM schools WHERE id=%s", (request.school_id,), fetch='one')
+        if school:
+            result['school_plan'] = school['plan']
+            result['school_paid_until'] = str(school['paid_until']) if school['paid_until'] else None
     return jsonify(result)
 
 @app.route('/api/auth/change-password', methods=['POST'])

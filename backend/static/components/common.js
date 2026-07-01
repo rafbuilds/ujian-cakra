@@ -187,6 +187,40 @@ const UI = (() => {
     if (el) el.classList.add("active");
   };
 
+  // Tanda "masih masa trial" di sidebar — supaya kalau fitur/data mendadak
+  // gagal dimuat gara-gara lisensi trial habis (lihat showBlockedBanner),
+  // guru/admin sudah tahu duluan ini soal trial, bukan server error.
+  const _renderTrialBadge = (user) => {
+    const existing = document.getElementById("_trial_badge");
+    if (existing) existing.remove();
+    if (!["admin", "guru"].includes(user.role)) return;
+    if (user.school_plan !== "trial") return;
+    const logoBox = document.querySelector(".sb-logo");
+    if (!logoBox) return;
+
+    let daysText = "";
+    let urgent = false;
+    if (user.school_paid_until) {
+      const days = Math.ceil(
+        (new Date(user.school_paid_until) - new Date(new Date().toDateString())) / 86400000
+      );
+      urgent = days <= 3;
+      daysText = days < 0 ? `Habis ${Math.abs(days)} hari lalu`
+        : days === 0 ? "Habis hari ini"
+        : `${days} hari lagi`;
+    }
+    const badge = document.createElement("div");
+    badge.id = "_trial_badge";
+    badge.style.cssText = `
+      margin: 8px 1.25rem 0; padding: 5px 10px; border-radius: 8px;
+      font-size: 11px; font-weight: 700; text-align: center;
+      background: ${urgent ? "rgba(239,68,68,.18)" : "rgba(239,159,39,.18)"};
+      color: ${urgent ? "#fca5a5" : "#fbbf24"};
+    `;
+    badge.textContent = `🎟 Masa Trial${daysText ? " · " + daysText : ""}`;
+    logoBox.appendChild(badge);
+  };
+
   // Init user info di sidebar + mobile responsive
   const initSidebar = () => {
     const user = Auth.getUser();
@@ -200,6 +234,7 @@ const UI = (() => {
       guru_pending: "Menunggu Approval", siswa: "Siswa",
     }[user.role] || user.role;
     if (avatarEl) avatarEl.textContent = (user.name || "?")[0].toUpperCase();
+    _renderTrialBadge(user);
 
     const isAdminPage = window.location.pathname.includes("/admin/");
     const isGuruPage  = window.location.pathname.includes("/guru/");
