@@ -283,9 +283,15 @@
         const tbody  = document.getElementById('tbody');
         tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:2rem"><div class="loading-spinner" style="margin:auto"></div></td></tr>';
         try {
-          const p = new URLSearchParams({ grade, class_id: cls, search, per_page: 200 });
+          const p = new URLSearchParams({ grade, class_id: cls, search, per_page: 5000 });
           const r = await API.get('/api/admin/siswa?' + p);
           _data = r.data || r || [];
+
+          // Jaga-jaga: kalau suatu saat jumlah siswa lewat batas per_page lagi,
+          // kasih tahu daripada diam-diam kepotong seperti sebelumnya.
+          if (r.total && _data.length < r.total) {
+            UI.toast(`Menampilkan ${_data.length} dari ${r.total} siswa — sebagian belum termuat`, 'warn');
+          }
 
           // Device filter (client-side)
           const devF = document.getElementById('fd').value;

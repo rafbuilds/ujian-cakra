@@ -100,7 +100,10 @@ def get_siswa():
     class_id = request.args.get('class_id', '')
     search   = request.args.get('search', '')
     page     = int(request.args.get('page', 1))
-    per_page = min(int(request.args.get('per_page', 50)), 200)
+    # Cap dinaikkan dari 200 ke 5000 — sekolah dengan >200 siswa sebelumnya
+    # kepotong diam-diam di halaman Data Siswa (cuma 200 pertama kebaca),
+    # padahal dashboard admin sudah benar hitung COUNT(*) semua siswa.
+    per_page = min(int(request.args.get('per_page', 50)), 5000)
 
     where = ["u.role='siswa'", "u.school_id=%s"]
     params = [request.school_id]
