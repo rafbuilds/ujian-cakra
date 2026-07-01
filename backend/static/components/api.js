@@ -17,7 +17,15 @@ const API = (() => {
 
   const handle = async (res) => {
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw { ...data, status: res.status };
+    if (!res.ok) {
+      // Sekolah disuspend / lisensi habis — backend menolak SEMUA endpoint
+      // dengan code ini. Tampilkan banner sekali per halaman supaya user
+      // langsung tahu kenapa, bukan cuma lihat tumpukan "Gagal memuat X".
+      if (data.code === "subscription_blocked" && typeof UI !== "undefined" && UI.showBlockedBanner) {
+        UI.showBlockedBanner(data.error);
+      }
+      throw { ...data, status: res.status };
+    }
     return data;
   };
 

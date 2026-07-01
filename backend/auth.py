@@ -148,7 +148,7 @@ def require_auth(f):
         request.school_id = payload.get("school_id")
         blocked = subscription_block_reason(request.school_id)
         if blocked:
-            return jsonify({"error": blocked}), 403
+            return jsonify({"error": blocked, "code": "subscription_blocked"}), 403
         return f(*args, **kwargs)
     return wrapper
 
@@ -170,7 +170,7 @@ def require_guru(f):
         request.school_id = payload.get("school_id")
         blocked = subscription_block_reason(request.school_id)
         if blocked:
-            return jsonify({"error": blocked}), 403
+            return jsonify({"error": blocked, "code": "subscription_blocked"}), 403
         return f(*args, **kwargs)
     return wrapper
 
@@ -192,7 +192,7 @@ def require_admin(f):
         request.school_id = payload.get("school_id")
         blocked = subscription_block_reason(request.school_id)
         if blocked:
-            return jsonify({"error": blocked}), 403
+            return jsonify({"error": blocked, "code": "subscription_blocked"}), 403
         return f(*args, **kwargs)
     return wrapper
 

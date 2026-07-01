@@ -38,6 +38,30 @@ const UI = (() => {
     }, duration);
   };
 
+  // Banner suspend/lisensi habis — dipasang sekali per halaman oleh api.js
+  // begitu backend menolak request dengan code "subscription_blocked", supaya
+  // user tahu KENAPA semua data gagal dimuat (bukan cuma toast per-widget
+  // yang gampang kelewat kalau ada banyak widget gagal bersamaan).
+  const showBlockedBanner = (message) => {
+    if (document.getElementById("_blocked_banner")) return;
+    const bar = document.createElement("div");
+    bar.id = "_blocked_banner";
+    bar.style.cssText = `
+      position:fixed;top:0;left:0;right:0;z-index:10000;
+      background:#7f1d1d;color:#fff;padding:.75rem 1.25rem;
+      font-size:13px;font-weight:600;font-family:'Plus Jakarta Sans',sans-serif;
+      display:flex;align-items:center;justify-content:center;gap:12px;
+      text-align:center;box-shadow:0 2px 16px rgba(0,0,0,.3);
+    `;
+    bar.innerHTML = `
+      <span>⛔ ${message}</span>
+      <button id="_blocked_banner_close" style="background:rgba(255,255,255,.2);border:none;color:#fff;
+        width:22px;height:22px;border-radius:50%;cursor:pointer;font-size:13px;flex-shrink:0;line-height:1">✕</button>
+    `;
+    document.body.appendChild(bar);
+    document.getElementById("_blocked_banner_close").onclick = () => bar.remove();
+  };
+
   // Loading overlay
   const loading = (show, text = "Memuat...") => {
     let el = document.getElementById("_loading");
@@ -298,6 +322,7 @@ const UI = (() => {
     toast,
     loading,
     confirm,
+    showBlockedBanner,
     fmtDate,
     fmtTime,
     fmtDT,
