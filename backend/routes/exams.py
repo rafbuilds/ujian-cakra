@@ -602,7 +602,7 @@ def exam_results(exam_id):
         elif s>=60: dist['c']+=1
         else: dist['d']+=1
     q_stats = []
-    session_scope = f"(SELECT id FROM exam_sessions es JOIN users u ON u.id=es.student_id WHERE es.exam_id=%s{class_filter})"
+    session_scope = f"(SELECT es.id FROM exam_sessions es JOIN users u ON u.id=es.student_id WHERE es.exam_id=%s{class_filter})"
     questions = query(f"""
         SELECT q.id, q.content,
                COUNT(a.id) FILTER (WHERE o.is_correct=true) as correct,

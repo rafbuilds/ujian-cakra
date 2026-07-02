@@ -187,6 +187,56 @@
         background: linear-gradient(135deg, #cd7f32, #b8600b);
         color: #fff;
       }
+      .kelas-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 0.75rem;
+      }
+      .kelas-card {
+        background: #fff;
+        border: 0.5px solid var(--border);
+        border-radius: 14px;
+        padding: 1rem 0.875rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        text-align: center;
+      }
+      .kelas-card:hover {
+        border-color: var(--green3);
+        box-shadow: 0 4px 20px rgba(15, 76, 53, 0.1);
+        transform: translateY(-2px);
+      }
+      .kelas-card .kc-icon {
+        font-size: 26px;
+        margin-bottom: 4px;
+      }
+      .kelas-card .kc-name {
+        font-weight: 700;
+        font-size: 15px;
+      }
+      .kelas-card .kc-info {
+        font-size: 11px;
+        color: var(--muted);
+        margin-top: 2px;
+      }
+      .jenjang-section {
+        margin-bottom: 1.5rem;
+      }
+      .jenjang-title {
+        font-weight: 700;
+        font-size: 14px;
+        color: var(--green);
+        margin-bottom: 0.625rem;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .day-tabs {
+        display: flex;
+        gap: 5px;
+        flex-wrap: wrap;
+        margin-bottom: 0.75rem;
+      }
       @media (max-width: 768px) {
         .sebaran-grid {
           grid-template-columns: 1fr !important;
@@ -346,15 +396,27 @@
             </div>
           </div>
 
-          <div class="card" id="class-folder-view">
-            <div style="font-weight: 700; font-size: 14px; margin-bottom: 0.75rem; color: var(--green)">
-              📁 Pilih Kelas
-            </div>
+          <div id="class-folder-view">
             <div id="class-folders">
               <div class="loading-spinner" style="margin: 1rem auto"></div>
             </div>
             <div style="font-size: 11px; color: var(--muted); margin-top: 0.5rem">
               Hanya menampilkan ujian dari Tahun Ajaran & Semester yang dipilih di atas — pilih semester lain untuk lihat ujian periode sebelumnya.
+            </div>
+          </div>
+
+          <!-- Detail kelas: tombol kembali, tanda hari, dropdown mapel -->
+          <div id="kelas-detail" style="display: none">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem">
+              <div style="font-weight: 700; font-size: 16px; color: var(--green)" id="kelas-detail-title"></div>
+              <button class="btn btn-secondary btn-sm" onclick="backToFolders()">‹ Kembali</button>
+            </div>
+            <div class="card">
+              <div id="kelas-day-tabs" class="day-tabs"></div>
+              <label style="font-size: 11px; color: var(--muted); display: block; margin-bottom: 4px">Pilih Mapel / Ujian</label>
+              <select class="form-control" id="mapel-select" onchange="onMapelChange(this.value)">
+                <option value="">— Pilih mapel —</option>
+              </select>
             </div>
           </div>
 
@@ -373,15 +435,6 @@
               />
               <button class="btn btn-primary btn-sm" onclick="joinByCode()">Masuk</button>
             </div>
-          </div>
-
-          <!-- Konteks kelas yang sedang dilihat -->
-          <div
-            id="class-context-bar"
-            style="display: none; align-items: center; justify-content: space-between; background: #eaf3de; border-radius: 10px; padding: 0.75rem 1rem; margin-bottom: 1.25rem"
-          >
-            <div style="font-size: 13px; font-weight: 600; color: #3b6d11" id="class-context-text"></div>
-            <button class="btn btn-secondary btn-sm" onclick="backToFolders()">‹ Ganti Kelas</button>
           </div>
 
           <div id="nilai-content" style="display: none">
@@ -695,15 +748,22 @@
         if (id) {
           // Ujian spesifik diminta lewat URL (misal dari Daftar Ujian) — cari
           // semester-nya dulu supaya folder kelas ikut menyesuaikan.
+          let exam = null;
           try {
-            const exam = await API.get(`/api/exams/${id}`);
+            exam = await API.get(`/api/exams/${id}`);
             if (exam.semester_id) {
               document.getElementById("f-semester").value = exam.semester_id;
               await buildClassFolders();
             }
           } catch {}
-          // Tanpa kelas spesifik — tampilkan semua kelas ujian ini sekaligus.
-          loadNilai(id, null);
+          const firstClassId = allExams.find((e) => e.id === id)?.classes?.[0]?.id;
+          if (firstClassId) {
+            enterKelas(firstClassId);
+            document.getElementById("mapel-select").value = id;
+            loadNilai(id, firstClassId);
+          } else {
+            loadNilai(id, null);
+          }
         }
       }
 
@@ -740,24 +800,26 @@
       }
 
       const isLocked = (e) => !isAdminUser && !e.is_mine && !unlockedIds.has(e.id);
+      const dayKey = (e) => (e.start_at ? new Date(e.start_at).toDateString() : null);
 
-      // Susun folder Jenjang → Kelas dari SEMUA ujian di semester terpilih —
+      // Susun kotak Jenjang → Kelas dari SEMUA ujian di semester terpilih —
       // punya sendiri, sudah di-unlock sebagai pengawas, ATAU masih terkunci
       // milik guru lain (tetap kelihatan bertanda 🔒, bukan hilang sampai
       // di-unlock) — guru pilih KELAS, bukan cari-cari judul ujian.
+      let _classMap = {};
       async function buildClassFolders() {
         const semId = document.getElementById("f-semester")?.value || "";
         allExams = await API.get(`/api/exams/all-for-proctor${semId ? `?semester_id=${semId}` : ""}`);
 
-        const classMap = {};
+        _classMap = {};
         allExams.forEach((e) => {
           (e.classes || []).forEach((c) => {
-            if (!classMap[c.id]) classMap[c.id] = { cls: c, exams: [] };
-            classMap[c.id].exams.push(e);
+            if (!_classMap[c.id]) _classMap[c.id] = { cls: c, exams: [] };
+            _classMap[c.id].exams.push(e);
           });
         });
         const gradeGroups = {};
-        Object.values(classMap).forEach((entry) => {
+        Object.values(_classMap).forEach((entry) => {
           const g = entry.cls.grade || 0;
           if (!gradeGroups[g]) gradeGroups[g] = [];
           gradeGroups[g].push(entry);
@@ -777,61 +839,120 @@
               a.cls.name.localeCompare(b.cls.name, "id", { numeric: true }),
             );
             return `
-        <div style="margin-bottom:1rem;border:.5px solid var(--border2);border-radius:14px;overflow:hidden">
-          <div style="background:linear-gradient(135deg,#0f4c35,#1a6b4a);padding:.75rem 1rem;display:flex;align-items:center;gap:10px">
-            <div style="font-size:18px">📁</div>
-            <div style="flex:1">
-              <div style="font-size:13px;font-weight:700;color:#fff">${GRADE_LABEL[g] || "Tanpa Jenjang"}</div>
-              <div style="font-size:10px;color:rgba(255,255,255,.65)">${entries.length} kelas</div>
-            </div>
-          </div>
-          <div style="padding:.25rem .75rem">
-            ${entries.map((en) => renderClassRow(en)).join("")}
+        <div class="jenjang-section">
+          <div class="jenjang-title">📁 ${GRADE_LABEL[g] || "Tanpa Jenjang"}</div>
+          <div class="kelas-grid">
+            ${entries.map((en) => renderKelasCard(en)).join("")}
           </div>
         </div>`;
           })
           .join("");
       }
 
-      function renderClassRow(entry) {
+      function renderKelasCard(entry) {
         const { cls, exams } = entry;
+        const anyLocked = exams.some((e) => isLocked(e));
+        return `
+      <div class="kelas-card" onclick="enterKelas('${cls.id}')">
+        <div class="kc-icon">📊</div>
+        <div class="kc-name">${cls.name}${anyLocked ? " 🔒" : ""}</div>
+        <div class="kc-info">${exams.length} ujian</div>
+      </div>`;
+      }
+
+      // ── Masuk satu kelas: tanda hari + dropdown mapel ────────────────
+      function enterKelas(classId) {
+        currentClassId = classId;
+        document.getElementById("class-folder-view").style.display = "none";
+        document.getElementById("kelas-detail").style.display = "block";
+        document.getElementById("nilai-content").style.display = "none";
+        document.getElementById("export-wrap").style.display = "none";
+        document.getElementById("code-prompt").style.display = "none";
+
+        const entry = _classMap[classId];
+        const cls = entry?.cls;
+        document.getElementById("kelas-detail-title").textContent = `📍 Kelas ${cls ? cls.name : ""}`;
+        renderDayTabs(entry?.exams || []);
+        populateMapelSelect(entry?.exams || []);
+      }
+
+      // Tanda "Hari 1", "Hari 2", dst — diurutkan dari tanggal start_at,
+      // sama seperti pola yang sudah dipakai di Room Ujian admin.
+      function renderDayTabs(exams) {
+        window._kelasExams = exams;
+        const dayKeys = [...new Set(exams.map(dayKey).filter(Boolean))].sort(
+          (a, b) => new Date(a) - new Date(b),
+        );
+        const hasNoDate = exams.some((e) => !e.start_at);
+        const wrap = document.getElementById("kelas-day-tabs");
+        if (dayKeys.length <= 1 && !(dayKeys.length && hasNoDate)) {
+          wrap.innerHTML = "";
+          return;
+        }
+        wrap.innerHTML =
+          `<button onclick="filterKelasDay('all')" id="kd-all" class="btn btn-primary btn-sm" style="font-size:11px;padding:3px 9px">Semua Hari</button>` +
+          dayKeys
+            .map((dk, i) => {
+              const tgl = new Date(dk).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
+              const cnt = exams.filter((e) => dayKey(e) === dk).length;
+              return `<button onclick="filterKelasDay('${dk}')" id="kd-${i}" class="btn btn-secondary btn-sm" style="font-size:11px;padding:3px 9px">Hari ${i + 1} · ${tgl} (${cnt})</button>`;
+            })
+            .join("") +
+          (hasNoDate
+            ? `<button onclick="filterKelasDay('no-date')" id="kd-nodate" class="btn btn-secondary btn-sm" style="font-size:11px;padding:3px 9px">Tanpa Tanggal (${exams.filter((e) => !e.start_at).length})</button>`
+            : "");
+      }
+
+      function filterKelasDay(dayValue) {
+        document.querySelectorAll('[id^="kd-"]').forEach((b) => {
+          b.className = "btn btn-secondary btn-sm";
+          b.style.cssText = "font-size:11px;padding:3px 9px";
+        });
+        const dayKeys = [...new Set(window._kelasExams.map(dayKey).filter(Boolean))].sort((a, b) => new Date(a) - new Date(b));
+        const btn = document.getElementById(dayValue === "all" ? "kd-all" : dayValue === "no-date" ? "kd-nodate" : "kd-" + dayKeys.indexOf(dayValue));
+        if (btn) { btn.className = "btn btn-primary btn-sm"; btn.style.cssText = "font-size:11px;padding:3px 9px"; }
+        const filtered =
+          dayValue === "all"
+            ? window._kelasExams
+            : dayValue === "no-date"
+              ? window._kelasExams.filter((e) => !e.start_at)
+              : window._kelasExams.filter((e) => dayKey(e) === dayValue);
+        populateMapelSelect(filtered);
+      }
+
+      function populateMapelSelect(exams) {
         const sorted = [...exams].sort(
           (a, b) =>
             (STATUS_PRIORITY[a.status] ?? 9) - (STATUS_PRIORITY[b.status] ?? 9) ||
             new Date(b.start_at || 0) - new Date(a.start_at || 0),
         );
-        const single = sorted.length === 1;
-        const lockIcon = (e) => (isLocked(e) ? "🔒 " : "");
-        return `
-      <div style="display:flex;align-items:center;gap:10px;padding:.625rem .25rem;border-bottom:.5px solid var(--border)">
-        <div style="font-weight:700;font-size:13px;width:60px;flex-shrink:0">${cls.name}</div>
-        <div style="flex:1;min-width:0">
-          ${
-            single
-              ? `<div style="font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${lockIcon(sorted[0])}${STATUS_ICON[sorted[0].status] || ""} ${sorted[0].title}${!sorted[0].is_mine ? " · " + (sorted[0].teacher_name || "—") : ""}</div>`
-              : `<select class="form-control" style="font-size:12px;padding:5px 8px" id="pick-${cls.id}">
-                 ${sorted.map((e) => `<option value="${e.id}">${lockIcon(e)}${STATUS_ICON[e.status] || ""} ${e.title}${!e.is_mine ? " (" + (e.teacher_name || "—") + ")" : ""}</option>`).join("")}
-               </select>`
-          }
-        </div>
-        <button class="btn btn-primary btn-sm" onclick="enterClass('${cls.id}','${single ? sorted[0].id : ""}')">📊 Lihat Nilai</button>
-      </div>`;
+        const sel = document.getElementById("mapel-select");
+        sel.innerHTML =
+          '<option value="">— Pilih mapel —</option>' +
+          sorted
+            .map(
+              (e) =>
+                `<option value="${e.id}">${isLocked(e) ? "🔒 " : ""}${STATUS_ICON[e.status] || ""} ${e.title}${!e.is_mine ? " (" + (e.teacher_name || "—") + ")" : ""}</option>`,
+            )
+            .join("");
+        if (sorted.length) {
+          sel.value = sorted[0].id;
+          onMapelChange(sorted[0].id);
+        } else {
+          document.getElementById("nilai-content").style.display = "none";
+          document.getElementById("code-prompt").style.display = "none";
+        }
       }
 
-      function enterClass(classId, singleExamId) {
-        const examId = singleExamId || document.getElementById("pick-" + classId).value;
-        if (!examId) {
-          UI.toast("Pilih ujian dulu", "warn");
-          return;
-        }
-        loadNilai(examId, classId);
+      function onMapelChange(examId) {
+        loadNilai(examId, currentClassId);
       }
 
       function backToFolders() {
         currentExamId = null;
         currentClassId = null;
         document.getElementById("nilai-content").style.display = "none";
-        document.getElementById("class-context-bar").style.display = "none";
+        document.getElementById("kelas-detail").style.display = "none";
         document.getElementById("code-prompt").style.display = "none";
         document.getElementById("export-wrap").style.display = "none";
         document.getElementById("class-folder-view").style.display = "block";
@@ -851,6 +972,8 @@
           UI.toast("✅ Berhasil masuk sebagai pengawas", "success");
           document.getElementById("code-prompt").style.display = "none";
           buildClassFolders();
+          populateMapelSelect(window._kelasExams || []);
+          document.getElementById("mapel-select").value = currentExamId;
           loadNilai(currentExamId, currentClassId);
         } catch (e) {
           UI.toast(e.error || "Kode tidak valid", "error");
@@ -867,11 +990,6 @@
         const exam = allExams.find((e) => e.id === examId);
         currentExamTitle = exam?.title || "";
 
-        // Sembunyikan folder begitu masuk ke satu ujian — folder + konten
-        // tampil bersamaan cuma bikin halaman terasa penuh/ribet.
-        document.getElementById("class-folder-view").style.display = "none";
-        document.getElementById("class-context-bar").style.display = "none";
-
         if (exam && isLocked(exam)) {
           document.getElementById("nilai-content").style.display = "none";
           document.getElementById("export-wrap").style.display = "none";
@@ -880,13 +998,6 @@
           return;
         }
         document.getElementById("code-prompt").style.display = "none";
-
-        const cls = classId ? (exam?.classes || []).find((c) => c.id === classId) : null;
-        const ownerNote = exam && !exam.is_mine ? ` · ${exam.teacher_name || "guru lain"}` : "";
-        document.getElementById("class-context-text").textContent = cls
-          ? `📍 Kelas ${cls.name} — ${currentExamTitle}${ownerNote}`
-          : `📍 Semua Kelas — ${currentExamTitle}${ownerNote}`;
-        document.getElementById("class-context-bar").style.display = "flex";
 
         UI.loading(true, "Memuat...");
         try {
