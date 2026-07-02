@@ -999,7 +999,9 @@
         }
         document.getElementById("code-prompt").style.display = "none";
 
-        UI.loading(true, "Memuat...");
+        // Tidak pakai UI.loading() di sini — overlay layar penuh bikin
+        // "kedip" tiap ganti hari/mapel. Pengawas Live juga tidak pakai
+        // overlay pas refresh, cukup render langsung begitu data datang.
         try {
           const classQ = classId ? `?class_id=${classId}` : "";
           const [r, mon] = await Promise.all([
@@ -1016,8 +1018,6 @@
           renderCards(nilaiData);
         } catch (e) {
           UI.toast("Gagal memuat nilai", "error");
-        } finally {
-          UI.loading(false);
         }
       }
 
