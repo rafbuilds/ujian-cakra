@@ -1151,21 +1151,33 @@
       function renderClassFolder(entry) {
         const { cls, exams } = entry;
         const live = exams.filter(e => e.status === 'ongoing').length;
+        const cid = cls.id || '_none';
         return `
           <div style="margin-bottom:.75rem;border:.5px solid var(--border);border-radius:12px;overflow:hidden">
-            <!-- Header kelas -->
-            <div style="background:var(--light);padding:.625rem .875rem;display:flex;align-items:center;gap:10px;border-bottom:.5px solid var(--border)">
+            <!-- Header kelas — klik untuk buka/tutup, supaya daftar ujian tidak
+                 langsung numpuk semua & bikin scroll panjang kalau ujiannya banyak -->
+            <div style="background:var(--light);padding:.625rem .875rem;display:flex;align-items:center;gap:10px;cursor:pointer" onclick="toggleClassFolder('${cid}')">
               <div style="width:32px;height:32px;border-radius:50%;background:var(--green);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:13px;flex-shrink:0">${(cls.name || '?')[0]}</div>
               <div style="flex:1;min-width:0">
                 <div style="font-size:13px;font-weight:700">${cls.name}</div>
                 <div style="font-size:10px;color:var(--muted)">${exams.length} ujian${live ? ` · <span style="color:#3b6d11;font-weight:600">🟢 ${live} live</span>` : ''}</div>
               </div>
+              <div id="chev-${cid}" style="color:var(--muted);font-size:11px;flex-shrink:0">▸</div>
             </div>
-            <!-- Daftar ujian kelas ini -->
-            <div style="padding:.5rem .75rem">
+            <!-- Daftar ujian kelas ini — tersembunyi sampai headernya diklik -->
+            <div id="cls-exams-${cid}" style="display:none;padding:.5rem .75rem;border-top:.5px solid var(--border)">
               ${exams.map(e => renderOneExam(e, cls.id)).join('')}
             </div>
           </div>`;
+      }
+
+      function toggleClassFolder(classId) {
+        const body = document.getElementById('cls-exams-' + classId);
+        const chev = document.getElementById('chev-' + classId);
+        if (!body) return;
+        const show = body.style.display === 'none';
+        body.style.display = show ? 'block' : 'none';
+        if (chev) chev.textContent = show ? '▾' : '▸';
       }
 
       function renderOneExam(e, classId) {
