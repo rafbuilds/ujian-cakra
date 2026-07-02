@@ -258,3 +258,71 @@ def create_school_admin(school_id):
           (uid, dummy_gid, email, name, hash_password(pw), school_id), fetch='none')
     user = query("SELECT id, name, email, role, is_active, created_at FROM users WHERE id=%s", (uid,), fetch='one')
     return jsonify(dict(user)), 201
+
+
+@super_admin_bp.route('/api/super-admin/schools/<school_id>/admins/<admin_id>', methods=['PATCH'])
+@require_super_admin
+def update_school_admin(school_id, admin_id):
+    """Admin sekolah tidak bisa diedit oleh sesama admin (lihat admin.py) —
+    ini jalur resminya, khusus Super Admin, untuk ubah nama/email/status
+    aktif satu akun admin di sekolah tertentu."""
+    admin = query("SELECT id FROM users WHERE id=%s AND school_id=%s AND role='admin'",
+                 (admin_id, school_id), fetch='one')
+    if not admin:
+        return jsonify({'error': 'Admin tidak ditemukan'}), 404
+    data = request.json or {}
+    fields, vals = [], []
+    if 'name' in data:
+        name = (data['name'] or '').strip()
+        if not name:
+            return jsonify({'error': 'Nama tidak boleh kosong'}), 400
+        fields.append('name=%s'); vals.append(name)
+    if 'email' in data:
+        email = (data['email'] or '').strip().lower()
+        if not email:
+            return jsonify({'error': 'Email tidak boleh kosong'}), 400
+        existing = query("SELECT id FROM users WHERE LOWER(email)=%s AND id!=%s", (email, admin_id), fetch='one')
+        if existing:
+            return jsonify({'error': 'Email sudah dipakai akun lain'}), 409
+        fields.append('email=%s'); vals.append(email)
+    if 'is_active' in data:
+        fields.append('is_active=%s'); vals.append(bool(data['is_active']))
+    if not fields:
+        return jsonify({'error': 'Tidak ada field yang diubah'}), 400
+    query(f"UPDATE users SET {', '.join(fields)} WHERE id=%s", vals + [admin_id], fetch='none')
+    user = query("SELECT id, name, email, role, is_active, created_at FROM users WHERE id=%s", (admin_id,), fetch='one')
+    return jsonify(dict(user))
+
+
+@super_admin_bp.route('/api/super-admin/schools/<school_id>/admins/<admin_id>/reset-password', methods=['POST'])
+@require_super_admin
+def reset_school_admin_password(school_id, admin_id):
+    from auth import hash_password
+    admin = query("SELECT id FROM users WHERE id=%s AND school_id=%s AND role='admin'",
+                 (admin_id, school_id), fetch='one')
+    if not admin:
+        return jsonify({'error': 'Admin tidak ditemukan'}), 404
+    pw = (request.json or {}).get('password', '').strip()
+    if not pw or len(pw) < 6:
+        return jsonify({'error': 'Password minimal 6 karakter'}), 400
+    query("UPDATE users SET password_hash=%s WHERE id=%s", (hash_password(pw), admin_id), fetch='none')
+    return jsonify({'ok': True})
+
+
+@super_admin_bp.route('/api/super-admin/schools/<school_id>/admins/<admin_id>', methods=['DELETE'])
+@require_super_admin
+def delete_school_admin(school_id, admin_id):
+    """Ini satu-satunya jalur untuk hapus akun admin (admin sekolah sengaja
+    tidak boleh saling hapus, lihat admin.py delete_user). Ditolak kalau
+    ini admin TERAKHIR di sekolah itu — jangan sampai sekolah kehilangan
+    akses admin sama sekali."""
+    admin = query("SELECT id, name FROM users WHERE id=%s AND school_id=%s AND role='admin'",
+                 (admin_id, school_id), fetch='one')
+    if not admin:
+        return jsonify({'error': 'Admin tidak ditemukan'}), 404
+    remaining = query("SELECT COUNT(*) as n FROM users WHERE school_id=%s AND role='admin' AND id!=%s",
+                      (school_id, admin_id), fetch='one')['n']
+    if remaining == 0:
+        return jsonify({'error': 'Tidak bisa hapus — ini satu-satunya admin sekolah ini. Buat admin lain dulu.'}), 400
+    query("DELETE FROM users WHERE id=%s", (admin_id,), fetch='none')
+    return jsonify({'ok': True})

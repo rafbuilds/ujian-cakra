@@ -453,7 +453,9 @@
             <div style="display:flex;gap:5px;flex-shrink:0">
               <button class="btn btn-secondary btn-sm" onclick="openEditModal('${u.id}')">✏️ Edit</button>
               <button class="btn btn-secondary btn-sm" onclick="openPwModal('${u.id}','${esc(u.name)}')">🔑 Password</button>
-              <button class="btn btn-danger btn-sm" onclick="deleteUser('${u.id}','${esc(u.name)}')">🗑</button>
+              ${u.role === 'admin'
+                ? `<button class="btn btn-secondary btn-sm" disabled title="Akun admin cuma bisa dihapus oleh Super Admin" style="opacity:.5;cursor:not-allowed">🗑</button>`
+                : `<button class="btn btn-danger btn-sm" onclick="deleteUser('${u.id}','${esc(u.name)}')">🗑</button>`}
             </div>
           </div>`).join('');
       }
@@ -560,9 +562,13 @@
 
       async function deleteUser(id, name) {
         UI.confirm('Hapus Akun', 'Hapus akun <strong>' + name + '</strong>?', async () => {
-          await API.del('/api/admin/users/' + id);
-          UI.toast('Akun dihapus', 'success');
-          loadStaff();
+          try {
+            await API.del('/api/admin/users/' + id);
+            UI.toast('Akun dihapus', 'success');
+            loadStaff();
+          } catch (e) {
+            UI.toast(e.error || 'Gagal menghapus akun', 'error');
+          }
         });
       }
 

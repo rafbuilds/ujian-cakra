@@ -291,6 +291,39 @@
       </div>
     </div>
 
+    <!-- Modal Edit Admin -->
+    <div id="modal-edit-admin" class="modal-overlay">
+      <div class="modal-box">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem">
+          <div style="font-weight:700;font-size:18px;color:var(--green)">Edit Admin</div>
+          <button onclick="closeEditAdminModal()" style="background:none;border:none;font-size:22px;cursor:pointer">✕</button>
+        </div>
+        <div class="form-group">
+          <label>Nama</label>
+          <input type="text" class="form-control" id="edit-adm-name" />
+        </div>
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" class="form-control" id="edit-adm-email" />
+        </div>
+        <div class="form-group">
+          <label>Status</label>
+          <select class="form-control" id="edit-adm-active">
+            <option value="true">Aktif</option>
+            <option value="false">Nonaktif</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Reset Password (opsional)</label>
+          <input type="text" class="form-control" id="edit-adm-password" placeholder="Kosongkan jika tidak diubah" />
+        </div>
+        <div style="display:flex;gap:10px;margin-top:1rem">
+          <button class="btn btn-secondary" style="flex:1" onclick="closeEditAdminModal()">Batal</button>
+          <button class="btn btn-primary" style="flex:1" onclick="saveEditAdmin()">Simpan</button>
+        </div>
+      </div>
+    </div>
+
     <script src="../components/api.js"></script>
     <script src="../components/auth.js"></script>
     <script src="../components/common.js"></script>
@@ -517,6 +550,17 @@
 
       // ── Kelola Admin per Sekolah ─────────────────────────────
       let adminsSchoolId = null;
+      let currentAdmins = [];
+      let editAdminId = null;
+
+      function esc(s) {
+        return (s || "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
 
       async function openAdminsModal(id) {
         const s = schools.find((x) => x.id === id);
@@ -540,6 +584,7 @@
         wrap.innerHTML = '<div style="color:var(--muted);font-size:13px">Memuat...</div>';
         try {
           const admins = await API.get(`/api/super-admin/schools/${adminsSchoolId}/admins`);
+          currentAdmins = admins;
           if (!admins.length) {
             wrap.innerHTML = '<div style="color:var(--muted);font-size:13px">Belum ada admin untuk sekolah ini.</div>';
             return;
@@ -549,10 +594,14 @@
               (a) => `
             <div style="display:flex;justify-content:space-between;align-items:center;padding:.5rem 0;border-bottom:.5px solid var(--border)">
               <div>
-                <div style="font-weight:600;font-size:13px">${a.name}</div>
-                <div style="font-size:12px;color:var(--muted)">${a.email}</div>
+                <div style="font-weight:600;font-size:13px">${esc(a.name)}</div>
+                <div style="font-size:12px;color:var(--muted)">${esc(a.email)}</div>
               </div>
-              <span class="badge ${a.is_active ? "badge-green" : "badge-red"}">${a.is_active ? "Aktif" : "Nonaktif"}</span>
+              <div style="display:flex;align-items:center;gap:6px">
+                <span class="badge ${a.is_active ? "badge-green" : "badge-red"}">${a.is_active ? "Aktif" : "Nonaktif"}</span>
+                <button class="btn btn-secondary btn-sm" onclick="openEditAdminModal('${a.id}')">✏️</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteSchoolAdmin('${a.id}')">🗑</button>
+              </div>
             </div>`,
             )
             .join("");
@@ -583,6 +632,62 @@
         } catch (e) {
           UI.toast(e.error || "Gagal membuat admin", "error");
         }
+      }
+
+      function openEditAdminModal(id) {
+        const a = currentAdmins.find((x) => x.id === id);
+        if (!a) return;
+        editAdminId = id;
+        document.getElementById("edit-adm-name").value = a.name;
+        document.getElementById("edit-adm-email").value = a.email;
+        document.getElementById("edit-adm-active").value = String(a.is_active);
+        document.getElementById("edit-adm-password").value = "";
+        document.getElementById("modal-edit-admin").classList.add("show");
+      }
+
+      function closeEditAdminModal() {
+        document.getElementById("modal-edit-admin").classList.remove("show");
+        editAdminId = null;
+      }
+
+      async function saveEditAdmin() {
+        const name = document.getElementById("edit-adm-name").value.trim();
+        const email = document.getElementById("edit-adm-email").value.trim();
+        const is_active = document.getElementById("edit-adm-active").value === "true";
+        const password = document.getElementById("edit-adm-password").value.trim();
+        if (!name || !email) {
+          UI.toast("Nama dan email wajib diisi", "warn");
+          return;
+        }
+        if (password && password.length < 6) {
+          UI.toast("Password minimal 6 karakter", "warn");
+          return;
+        }
+        try {
+          await API.patch(`/api/super-admin/schools/${adminsSchoolId}/admins/${editAdminId}`, { name, email, is_active });
+          if (password) {
+            await API.post(`/api/super-admin/schools/${adminsSchoolId}/admins/${editAdminId}/reset-password`, { password });
+          }
+          UI.toast("✅ Admin diperbarui", "success");
+          closeEditAdminModal();
+          loadAdmins();
+        } catch (e) {
+          UI.toast(e.error || "Gagal memperbarui admin", "error");
+        }
+      }
+
+      function deleteSchoolAdmin(id) {
+        const a = currentAdmins.find((x) => x.id === id);
+        if (!a) return;
+        UI.confirm("Hapus Admin", `Hapus akun admin <strong>${esc(a.name)}</strong>?`, async () => {
+          try {
+            await API.del(`/api/super-admin/schools/${adminsSchoolId}/admins/${id}`);
+            UI.toast("Admin dihapus", "success");
+            loadAdmins();
+          } catch (e) {
+            UI.toast(e.error || "Gagal menghapus admin", "error");
+          }
+        });
       }
 
       // ── Monitor Ujian Real-time per Sekolah ──────────────────

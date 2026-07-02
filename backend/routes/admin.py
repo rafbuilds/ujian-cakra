@@ -88,8 +88,19 @@ def create_user():
 @admin_bp.route('/api/admin/users/<user_id>', methods=['DELETE'])
 @require_admin
 def delete_user(user_id):
-    query("DELETE FROM users WHERE id=%s AND role!='admin' AND school_id=%s",
-          (user_id, request.school_id), fetch='none')
+    # Admin sekolah SENGAJA tidak boleh hapus sesama admin dari sini (biar
+    # 1 admin tidak bisa sendirian menyingkirkan admin lain / kunci akses
+    # sekolah) — sebelumnya endpoint ini diam-diam no-op untuk role admin
+    # (query WHERE role!='admin') tapi tetap balas {'ok':True}, jadi UI
+    # nampilin "Akun dihapus" padahal tidak terjadi apa-apa. Sekarang balas
+    # error yang jelas; penghapusan akun admin cuma bisa lewat Super Admin.
+    target = query("SELECT role FROM users WHERE id=%s AND school_id=%s",
+                   (user_id, request.school_id), fetch='one')
+    if not target:
+        return jsonify({'error': 'Akun tidak ditemukan'}), 404
+    if target['role'] == 'admin':
+        return jsonify({'error': 'Akun admin tidak bisa dihapus dari sini — hubungi Super Admin.'}), 403
+    query("DELETE FROM users WHERE id=%s AND school_id=%s", (user_id, request.school_id), fetch='none')
     return jsonify({'ok': True})
 
 # ── Siswa ──────────────────────────────────────────────────────
