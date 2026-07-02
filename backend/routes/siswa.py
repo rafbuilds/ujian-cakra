@@ -265,34 +265,21 @@ def save_multi_answer(session_id):
               (str(uuid.uuid4()), session_id, question_id, opt_id), fetch='none')
     return jsonify({'ok': True})
 
-# ── Violation ──────────────────────────────────────────────────
-@siswa_bp.route('/api/student/sessions/<session_id>/violation', methods=['POST'])
-@require_auth
-def record_violation(session_id):
-    query("""UPDATE exam_sessions SET tab_violations=tab_violations+1
-             WHERE id=%s AND student_id=%s""", (session_id, request.user_id), fetch='none')
-    sess = query("SELECT tab_violations FROM exam_sessions WHERE id=%s", (session_id,), fetch='one')
-    settings = query("SELECT max_violations FROM exam_settings WHERE school_id=%s LIMIT 1",
-                     (request.school_id,), fetch='one')
-    max_v = settings['max_violations'] if settings else 5
-    return jsonify({'violations': sess['tab_violations'] if sess else 0, 'max': max_v})
-
-# ── Submit ─────────────────────────────────────────────────────
-@siswa_bp.route('/api/student/sessions/<session_id>/submit', methods=['POST'])
-@require_auth
-def submit_exam(session_id):
-    data        = request.json or {}
-    auto_submit = data.get('auto_submit', False)
+def _finalize_submission(session_id, student_id, school_id, auto_submit):
+    """Logika submit sesungguhnya (skor, results) — dipakai endpoint /submit
+    BIASA maupun auto-submit paksa dari server saat pelanggaran sudah lewat
+    batas (lihat record_violation). Return None kalau sesi tidak ada atau
+    sudah pernah disubmit (idempotent, aman dipanggil dobel)."""
     sess = query("SELECT * FROM exam_sessions WHERE id=%s AND student_id=%s",
-                 (session_id, request.user_id), fetch='one')
-    if not sess: return jsonify({'error': 'Sesi tidak ditemukan'}), 404
-    if sess.get('submitted_at'): return jsonify({'error': 'Sudah dikumpulkan'}), 400
+                 (session_id, student_id), fetch='one')
+    if not sess or sess.get('submitted_at'):
+        return None
 
     query("UPDATE exam_sessions SET submitted_at=NOW(), auto_submitted=%s WHERE id=%s",
           (auto_submit, session_id), fetch='none')
 
     exam_data = query("SELECT * FROM exams WHERE id=%s AND school_id=%s",
-                     (sess['exam_id'], request.school_id), fetch='one')
+                     (sess['exam_id'], school_id), fetch='one')
     total_q = query("SELECT COUNT(*) as n FROM questions WHERE exam_id=%s",
                     (sess['exam_id'],), fetch='one')['n']
     correct, wrong = count_correct_wrong(session_id, sess['exam_id'])
@@ -313,6 +300,54 @@ def submit_exam(session_id):
     if exam_data.get('show_result_after') and result:
         resp.update({'score': float(result['score']), 'correct_count': result['correct_count'],
                      'wrong_count': result['wrong_count'], 'empty_count': result['empty_count']})
+    return resp
+
+# ── Violation ──────────────────────────────────────────────────
+@siswa_bp.route('/api/student/sessions/<session_id>/violation', methods=['POST'])
+@require_auth
+def record_violation(session_id):
+    sess = query("SELECT tab_violations, submitted_at FROM exam_sessions WHERE id=%s AND student_id=%s",
+                 (session_id, request.user_id), fetch='one')
+    if not sess:
+        return jsonify({'error': 'Sesi tidak ditemukan'}), 404
+    settings = query("SELECT max_violations, auto_submit_on_violation FROM exam_settings WHERE school_id=%s LIMIT 1",
+                     (request.school_id,), fetch='one')
+    max_v = settings['max_violations'] if settings else 5
+    auto_on = settings.get('auto_submit_on_violation', True) if settings else True
+
+    if sess.get('submitted_at'):
+        # Sudah kesubmit duluan (mis. race dengan tab lain) — jangan tambah lagi.
+        return jsonify({'violations': sess['tab_violations'], 'max': max_v, 'auto_submitted': False})
+
+    query("""UPDATE exam_sessions SET tab_violations=tab_violations+1
+             WHERE id=%s AND student_id=%s""", (session_id, request.user_id), fetch='none')
+    updated = query("SELECT tab_violations FROM exam_sessions WHERE id=%s", (session_id,), fetch='one')
+    count = updated['tab_violations'] if updated else 0
+
+    # Penegakan di server — sebelumnya auto-submit-setelah-N-pelanggaran cuma
+    # jalan di JS klien, jadi siswa yang utak-atik console/devtools bisa
+    # mematikan logikanya sendiri dan lolos dari batas pelanggaran. Sekarang
+    # begitu hitungan tembus batas, server LANGSUNG submit sesi ini sendiri
+    # (idempotent lewat _finalize_submission), tidak bisa dicegah dari klien.
+    resp_extra = {}
+    if auto_on and count >= max_v:
+        result = _finalize_submission(session_id, request.user_id, request.school_id, auto_submit=True)
+        if result:
+            resp_extra = {**result, 'auto_submitted': True}
+    return jsonify({'violations': count, 'max': max_v, 'auto_submitted': False, **resp_extra})
+
+# ── Submit ─────────────────────────────────────────────────────
+@siswa_bp.route('/api/student/sessions/<session_id>/submit', methods=['POST'])
+@require_auth
+def submit_exam(session_id):
+    data        = request.json or {}
+    auto_submit = data.get('auto_submit', False)
+    resp = _finalize_submission(session_id, request.user_id, request.school_id, auto_submit)
+    if resp is None:
+        sess = query("SELECT id FROM exam_sessions WHERE id=%s AND student_id=%s",
+                     (session_id, request.user_id), fetch='one')
+        if not sess: return jsonify({'error': 'Sesi tidak ditemukan'}), 404
+        return jsonify({'error': 'Sudah dikumpulkan'}), 400
     return jsonify(resp)
 
 # ── Check Exit ─────────────────────────────────────────────────

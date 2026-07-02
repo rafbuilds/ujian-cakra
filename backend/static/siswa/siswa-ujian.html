@@ -712,7 +712,8 @@
         multiAnswers = {},  // { qid: Set<optionId> }
         violations = 0,
         showViolation = false,
-        showSubmit = false;
+        showSubmit = false,
+        showFullscreenPrompt = false;
       let timeLeft = 0,
         result = null,
         submitting = false,
@@ -924,6 +925,7 @@
           timeLeft > 300 ? "ok" : timeLeft > 60 ? "warn" : "danger";
         return `
     ${showViolation ? `<div class="violation-toast">⚠️ Jangan berpindah tab!<span class="viol-count">${violations}/5 peringatan</span></div>` : ""}
+    ${showFullscreenPrompt ? fullscreenPromptModal() : ""}
     ${showSubmit ? submitModal(answered, total) : ""}
     <div class="exam-page">
       <div class="exam-topbar">
@@ -966,6 +968,17 @@
       </div>
     </div>
   `;
+      }
+
+      function fullscreenPromptModal() {
+        return `<div class="modal-ov" style="z-index:1000">
+    <div class="modal-box">
+      <div class="modal-icon">🚫</div>
+      <div class="modal-title">Anda keluar dari mode layar penuh</div>
+      <div class="modal-sub">Ini sudah tercatat sebagai pelanggaran (${violations}/5) dan guru pengawas langsung diberi tahu. Klik tombol di bawah untuk kembali ke ujian.</div>
+      <button style="width:100%;padding:12px;background:var(--green);color:#fff;border:none;border-radius:11px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit" id="btn-reenter-fullscreen">⛶ Kembali ke Layar Penuh</button>
+    </div>
+  </div>`;
       }
 
       function submitModal(answered, total) {
@@ -1199,6 +1212,13 @@
         document
           .getElementById("btn-confirm-submit")
           ?.addEventListener("click", () => submitExam());
+        document
+          .getElementById("btn-reenter-fullscreen")
+          ?.addEventListener("click", () => {
+            showFullscreenPrompt = false;
+            document.documentElement.requestFullscreen?.().catch(() => {});
+            render();
+          });
         // Result
         document
           .getElementById("btn-home")
@@ -1224,6 +1244,11 @@
       }
 
       async function startExam(id) {
+        // Fullscreen HARUS diminta di sini (paling awal, masih dalam "user
+        // gesture" dari klik tombol Mulai) — kalau ditunda sampai setelah
+        // await, browser modern menolak requestFullscreen() karena dianggap
+        // tidak lagi terpicu langsung oleh aksi user.
+        document.documentElement.requestFullscreen?.().catch(() => {});
         document.getElementById("root").innerHTML =
           renderLoading("Menyiapkan soal...");
         try {
@@ -1254,6 +1279,7 @@
           violations = 0;
           showViolation = false;
           showSubmit = false;
+          showFullscreenPrompt = false;
           _exitedGracefully = false;
           render();
           startTimer();
@@ -1362,21 +1388,58 @@
         if (page === 'exam' && sessionData) syncAllAnswers();
       });
 
+      // Debounce bersama — alt-tab keluar dari mode layar penuh kadang
+      // memicu visibilitychange DAN fullscreenchange nyaris bersamaan;
+      // tanpa ini bisa kehitung 2 pelanggaran untuk 1 kejadian yang sama.
+      let _lastViolationAt = 0;
+      async function _reportViolation(kind) {
+        const now = Date.now();
+        if (now - _lastViolationAt < 1200) return;
+        _lastViolationAt = now;
+        violations++;
+        if (kind === "fullscreen") {
+          showFullscreenPrompt = true;
+        } else {
+          showViolation = true;
+          setTimeout(() => {
+            showViolation = false;
+            render();
+          }, 4000);
+        }
+        render();
+        try {
+          const res = await apiFetch(
+            `/api/student/sessions/${sessionData.session_id}/violation`,
+            { method: "POST" },
+          );
+          // Server yang menentukan kapan batas pelanggaran tercapai (dan
+          // langsung submit sendiri di sana) — bukan hitungan lokal, supaya
+          // tidak bisa dicurangi lewat console/devtools. Kalau server sudah
+          // submit, langsung pindah ke halaman hasil pakai data dari respons
+          // ini (jangan panggil submitExam lagi, sesi sudah tertutup).
+          if (res && res.auto_submitted) {
+            clearInterval(timerInterval);
+            clearInterval(saveInterval);
+            result = res;
+            page = "result";
+            showFullscreenPrompt = false;
+            if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+            render();
+            return;
+          }
+        } catch {}
+        // Fallback kalau request ke server gagal (offline dsb) — tetap
+        // auto-submit dari sisi klien supaya siswa tidak nyangkut di ujian.
+        if (violations >= 5 && page === "exam") submitExam(true);
+      }
+
       function startAntiCheat() {
         document.addEventListener("visibilitychange", () => {
-          if (document.hidden && !_exitedGracefully) {
-            violations++;
-            apiFetch(
-              `/api/student/sessions/${sessionData.session_id}/violation`,
-              { method: "POST" },
-            ).catch(() => {});
-            showViolation = true;
-            render();
-            setTimeout(() => {
-              showViolation = false;
-              render();
-            }, 4000);
-            if (violations >= 5) submitExam(true);
+          if (document.hidden && !_exitedGracefully) _reportViolation("tab");
+        });
+        document.addEventListener("fullscreenchange", () => {
+          if (!document.fullscreenElement && !_exitedGracefully && page === "exam") {
+            _reportViolation("fullscreen");
           }
         });
         document.addEventListener("contextmenu", (e) => e.preventDefault());
@@ -1464,9 +1527,11 @@
             },
           );
           page = "result";
+          if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
           render();
         } catch {
           page = "result";
+          if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
           result = { score: null };
           render();
         } finally {

@@ -549,11 +549,30 @@
         soundOn = true,
         isAdminUser = false,
         allExamsForProctor = [],
-        unlockedIds = new Set();
+        unlockedIds = new Set(),
+        _audioCtx = null;
       const prevViolations = {};
+
+      // Browser menahan AudioContext baru sampai ada interaksi user (kalau
+      // dibuat langsung tiap kali ada pelanggaran, bunyi "beep" pertama bisa
+      // gagal diam-diam). Jadi dibuat & di-resume SEKALI saat guru pertama
+      // kali klik apa pun di halaman ini, lalu dipakai ulang terus.
+      document.addEventListener(
+        "click",
+        () => {
+          try {
+            _audioCtx = _audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+            if (_audioCtx.state === "suspended") _audioCtx.resume();
+          } catch {}
+        },
+        { once: true },
+      );
 
       async function init() {
         isAdminUser = Auth.getUser()?.role === "admin";
+        if (window.Notification && Notification.permission === "default") {
+          Notification.requestPermission().catch(() => {});
+        }
         try {
           const [all, unlocked] = await Promise.all([
             API.get("/api/exams/all-for-proctor"),
@@ -785,7 +804,9 @@
         }
         document.getElementById("monitor-content").style.display = "block";
         loadMonitor();
-        autoRefresh = setInterval(loadMonitor, 5000);
+        // Dipercepat dari 5 detik ke 2.5 detik supaya notifikasi pelanggaran
+        // ke guru terasa hampir instan tanpa perlu infrastruktur push baru.
+        autoRefresh = setInterval(loadMonitor, 2500);
       }
 
       async function loadMonitor() {
@@ -834,6 +855,7 @@
           const prev = prevViolations[s.student_id] || 0;
           if (s.tab_violations > prev) {
             playAlert();
+            notifyViolation(s);
             prevViolations[s.student_id] = s.tab_violations;
           }
         });
@@ -842,7 +864,8 @@
       function playAlert() {
         if (!soundOn) return;
         try {
-          const ctx = new (window.AudioContext || window.webkitAudioContext)();
+          const ctx = _audioCtx || (_audioCtx = new (window.AudioContext || window.webkitAudioContext)());
+          if (ctx.state === "suspended") ctx.resume();
           [0, 0.2, 0.4].forEach((t) => {
             const o = ctx.createOscillator(),
               g = ctx.createGain();
@@ -858,6 +881,20 @@
             o.start(ctx.currentTime + t);
             o.stop(ctx.currentTime + t + 0.15);
           });
+        } catch {}
+      }
+
+      // Notifikasi desktop browser — muncul walau guru sedang buka tab/app
+      // lain, tidak cuma bunyi doang yang gampang tidak kedengaran kalau
+      // laptopnya di-silent atau guru lagi jauh dari meja.
+      function notifyViolation(s) {
+        if (!window.Notification || Notification.permission !== "granted") return;
+        try {
+          const n = new Notification("⚠️ Pelanggaran terdeteksi", {
+            body: `${s.name} (${s.class_name || "—"}) — ${s.tab_violations}x pelanggaran`,
+            tag: "cakra-violation-" + s.student_id,
+          });
+          n.onclick = () => { window.focus(); n.close(); };
         } catch {}
       }
       function toggleSound() {
