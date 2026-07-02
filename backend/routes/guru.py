@@ -1,7 +1,8 @@
 # backend/routes/guru.py
 from flask import Blueprint, request, jsonify
-import uuid
-from db import query
+import uuid, random, string
+from datetime import datetime, timezone, timedelta
+from db import query, log_activity
 from auth import require_guru, require_auth
 
 guru_bp = Blueprint('guru', __name__)
@@ -132,6 +133,45 @@ def get_guru_siswa():
 
     students = [dict(r) for r in rows]
     return jsonify({'students': students, 'total': len(students)})
+
+# ── Token Darurat ────────────────────────────────────────────────
+# Jalur khusus untuk siswa yang HP-nya bermasalah (mati/rusak/cuma iPhone
+# padahal app mobile Android-only) tapi harus tetap ujian lewat web tanpa
+# tahu password akun siswa itu. Guru pengawas pilih SATU siswa spesifik
+# dari roster yang sedang dipantau, sistem generate kode 6-digit valid 15
+# menit — disampaikan LISAN ke siswa (bukan lewat link/chat). Sekali dipakai
+# untuk login, kode langsung invalid (lihat /api/auth/emergency-login di
+# app.py) — tidak bisa dipakai ulang di PC lain.
+@guru_bp.route('/api/guru/emergency-token', methods=['POST'])
+@require_guru
+def create_emergency_token():
+    data = request.json or {}
+    student_id = data.get('student_id')
+    if not student_id:
+        return jsonify({'error': 'student_id wajib'}), 400
+    student = query("SELECT id, name FROM users WHERE id=%s AND role='siswa' AND school_id=%s",
+                    (student_id, request.school_id), fetch='one')
+    if not student:
+        return jsonify({'error': 'Siswa tidak ditemukan'}), 404
+
+    # Batalkan token aktif lama siswa ini kalau ada — cuma boleh 1 token
+    # hidup per siswa supaya tidak ada kode nyasar yang masih valid.
+    query("""UPDATE emergency_tokens SET used_at=NOW()
+             WHERE student_id=%s AND used_at IS NULL AND expires_at>NOW()""",
+          (student_id,), fetch='none')
+
+    code = ''.join(random.choices(string.digits, k=6))
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=15)
+    token_id = str(uuid.uuid4())
+    query("""INSERT INTO emergency_tokens (id, code, student_id, created_by, school_id, expires_at)
+             VALUES (%s,%s,%s,%s,%s,%s)""",
+          (token_id, code, student_id, request.user_id, request.school_id, expires_at), fetch='none')
+
+    log_activity(request.user_id, 'TOKEN_DARURAT',
+                 f"Buat token darurat untuk siswa \"{student['name']}\"",
+                 request.remote_addr, request.school_id)
+
+    return jsonify({'code': code, 'expires_at': expires_at.isoformat(), 'student_name': student['name']}), 201
 
 @guru_bp.route('/api/guru/siswa/import', methods=['POST'])
 @require_guru

@@ -333,6 +333,9 @@
             <button class="btn btn-secondary btn-sm" onclick="loadMonitor()">
               ↺ Refresh
             </button>
+            <button class="btn btn-secondary btn-sm" onclick="openEmergencyModal()" title="Untuk siswa yang HP-nya bermasalah tapi harus tetap ujian lewat web">
+              🆘 Token Darurat
+            </button>
           </div>
         </div>
 
@@ -531,6 +534,17 @@
         <div style="padding:.875rem 1.5rem;border-top:.5px solid var(--border);display:flex;justify-content:flex-end">
           <button class="btn btn-secondary btn-sm" onclick="closeReopenModal()">Batal</button>
         </div>
+      </div>
+    </div>
+
+    <!-- Modal Token Darurat -->
+    <div id="emergency-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;align-items:center;justify-content:center;padding:1rem;backdrop-filter:blur(4px)">
+      <div style="background:#fff;border-radius:20px;width:420px;max-width:97vw;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.2)">
+        <div style="background:linear-gradient(135deg,var(--green),#1a6b4a);padding:1.25rem 1.5rem;display:flex;justify-content:space-between;align-items:center">
+          <div style="font-weight:700;font-size:16px;color:#fff">🆘 Token Darurat</div>
+          <button onclick="closeEmergencyModal()" style="background:rgba(255,255,255,.15);border:none;color:#fff;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:14px">✕</button>
+        </div>
+        <div style="padding:1.5rem" id="emergency-modal-body"></div>
       </div>
     </div>
 
@@ -1069,6 +1083,103 @@
       function closeReopenModal() {
         document.getElementById('reopen-modal').style.display = 'none';
         _reopenSid = null;
+      }
+
+      // ── Modal Token Darurat ───────────────────────────────────────
+      function openEmergencyModal() {
+        renderEmergencyPickerView();
+        document.getElementById('emergency-modal').style.display = 'flex';
+      }
+      function closeEmergencyModal() {
+        document.getElementById('emergency-modal').style.display = 'none';
+        clearInterval(window._emergencyCountdownTimer);
+      }
+
+      function renderEmergencyPickerView() {
+        clearInterval(window._emergencyCountdownTimer);
+        const students = [...(monitorData?.students || [])]
+          .filter((s) => s.status !== 'submitted')
+          .sort((a, b) => a.name.localeCompare(b.name, 'id'));
+        const options = students
+          .map((s) => `<option value="${s.student_id}" data-name="${(s.name || '').replace(/"/g, '&quot;')}">${s.name} (${s.class_name || '—'})</option>`)
+          .join('');
+        document.getElementById('emergency-modal-body').innerHTML = `
+          <div style="font-size:12px;color:var(--muted);margin-bottom:1rem;line-height:1.5">
+            Untuk siswa yang HP-nya mati/rusak atau cuma punya iPhone (app mobile Android-only) tapi harus tetap ujian lewat web. Kode 6-digit berlaku <strong>15 menit</strong> dan <strong>sekali pakai</strong> — sampaikan LISAN, jangan lewat chat/link.
+          </div>
+          ${
+            students.length
+              ? `<div class="form-group">
+                  <label style="font-size:12px;font-weight:600;color:var(--muted)">Pilih Siswa (dari kelas yang sedang dipantau)</label>
+                  <select class="form-control" id="emergency-student-select">
+                    <option value="">— Pilih siswa —</option>
+                    ${options}
+                  </select>
+                </div>
+                <button class="btn btn-primary" style="width:100%;margin-top:.5rem" onclick="generateEmergencyToken()">Buat Kode</button>`
+              : `<div style="text-align:center;padding:1rem 0;color:var(--muted);font-size:13px">
+                  📭 Belum ada siswa untuk dipilih. Buka dulu kelas &amp; mapel yang mau dipantau di Pengawas Live.
+                </div>`
+          }
+        `;
+      }
+
+      async function generateEmergencyToken() {
+        const sel = document.getElementById('emergency-student-select');
+        const studentId = sel?.value;
+        if (!studentId) {
+          UI.toast('Pilih siswa dulu', 'warn');
+          return;
+        }
+        const studentName = sel.options[sel.selectedIndex].dataset.name;
+        try {
+          const r = await API.post('/api/guru/emergency-token', { student_id: studentId });
+          renderEmergencyCodeView(r, studentName);
+        } catch (e) {
+          UI.toast(e.error || 'Gagal membuat token', 'error');
+        }
+      }
+
+      function renderEmergencyCodeView(data, studentName) {
+        const expiresAt = new Date(data.expires_at).getTime();
+        document.getElementById('emergency-modal-body').innerHTML = `
+          <div style="text-align:center">
+            <div style="font-size:13px;color:var(--muted);margin-bottom:.5rem">Kode untuk <strong>${studentName}</strong></div>
+            <div style="font-size:40px;font-weight:800;letter-spacing:8px;color:var(--green);font-family:monospace;margin-bottom:.5rem">${data.code}</div>
+            <div style="font-size:12px;color:var(--red2);font-weight:600;margin-bottom:1rem" id="emergency-countdown">Berlaku 15:00 lagi</div>
+            <div style="font-size:11px;color:var(--muted);margin-bottom:1.25rem;line-height:1.5">
+              Sampaikan kode ini LISAN ke siswa. Siswa masuk lewat halaman login → "🆘 Masuk pakai Token Darurat" → masukkan email + kode ini.
+            </div>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-secondary" style="flex:1" onclick="renderEmergencyPickerView()">‹ Buat untuk siswa lain</button>
+              <button class="btn btn-primary" style="flex:1" onclick="copyEmergencyCode('${data.code}')">📋 Salin Kode</button>
+            </div>
+          </div>
+        `;
+        clearInterval(window._emergencyCountdownTimer);
+        window._emergencyCountdownTimer = setInterval(() => {
+          const remain = Math.max(0, Math.round((expiresAt - Date.now()) / 1000));
+          const el = document.getElementById('emergency-countdown');
+          if (!el) {
+            clearInterval(window._emergencyCountdownTimer);
+            return;
+          }
+          if (remain <= 0) {
+            el.textContent = 'Kode sudah kedaluwarsa';
+            clearInterval(window._emergencyCountdownTimer);
+            return;
+          }
+          const mm = String(Math.floor(remain / 60)).padStart(2, '0');
+          const ss = String(remain % 60).padStart(2, '0');
+          el.textContent = `Berlaku ${mm}:${ss} lagi`;
+        }, 1000);
+      }
+
+      function copyEmergencyCode(code) {
+        navigator.clipboard
+          ?.writeText(code)
+          .then(() => UI.toast('✅ Kode disalin', 'success'))
+          .catch(() => {});
       }
 
       async function doReopen(mode) {

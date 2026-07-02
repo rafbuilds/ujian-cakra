@@ -327,7 +327,7 @@
                 required
               />
             </div>
-            <div class="form-group">
+            <div class="form-group" id="pw-group">
               <label class="form-label">Password</label>
               <div class="pw-wrap">
                 <input
@@ -348,10 +348,32 @@
                 </button>
               </div>
             </div>
+            <div class="form-group" id="token-group" style="display: none">
+              <label class="form-label">Kode Token Darurat</label>
+              <input
+                type="text"
+                id="inp-token"
+                class="form-input"
+                placeholder="6 digit dari guru pengawas"
+                maxlength="6"
+                inputmode="numeric"
+                autocomplete="one-time-code"
+                style="letter-spacing: 4px; font-weight: 700; text-align: center"
+              />
+            </div>
             <button type="submit" class="btn-login" id="btn-login">
               Masuk
             </button>
           </form>
+          <div style="text-align: center; margin-top: 0.75rem">
+            <a
+              href="#"
+              onclick="toggleEmergencyMode(event)"
+              id="emergency-toggle-link"
+              style="font-size: 12px; color: var(--muted)"
+              >🆘 HP bermasalah? Masuk pakai Token Darurat dari guru</a
+            >
+          </div>
 
           <!-- DEV MODE -->
           <div class="dev-section" id="dev-section" style="display: none">
@@ -423,16 +445,40 @@
         }
       }
 
+      // Token darurat — jalur khusus siswa yang HP-nya bermasalah, dapat
+      // kode 6-digit dari guru pengawas (lihat tombol "🆘 Token Darurat" di
+      // Pengawas Live) alih-alih pakai password akunnya sendiri.
+      let emergencyMode = false;
+      function toggleEmergencyMode(e) {
+        if (e) e.preventDefault();
+        emergencyMode = !emergencyMode;
+        document.getElementById("pw-group").style.display = emergencyMode ? "none" : "block";
+        document.getElementById("token-group").style.display = emergencyMode ? "block" : "none";
+        document.getElementById("inp-pw").required = !emergencyMode;
+        document.getElementById("inp-token").required = emergencyMode;
+        document.getElementById("emergency-toggle-link").textContent = emergencyMode
+          ? "← Kembali ke login biasa"
+          : "🆘 HP bermasalah? Masuk pakai Token Darurat dari guru";
+        hideErr();
+      }
+
       async function doLogin(e) {
         e.preventDefault();
         hideErr();
         const email = document.getElementById("inp-email").value.trim();
-        const pw = document.getElementById("inp-pw").value;
         const btn = document.getElementById("btn-login");
         btn.disabled = true;
         btn.textContent = "Memproses...";
         try {
-          const d = await API.post("/api/auth/login", { email, password: pw });
+          const d = emergencyMode
+            ? await API.post("/api/auth/emergency-login", {
+                email,
+                code: document.getElementById("inp-token").value.trim(),
+              })
+            : await API.post("/api/auth/login", {
+                email,
+                password: document.getElementById("inp-pw").value,
+              });
           localStorage.setItem("ujian_token", d.token);
           localStorage.setItem(
             "ujian_user",
@@ -448,7 +494,7 @@
           showErr(
             err.error ||
               err.message ||
-              "Login gagal. Periksa email dan password.",
+              (emergencyMode ? "Kode salah atau kedaluwarsa." : "Login gagal. Periksa email dan password."),
           );
           btn.disabled = false;
           btn.textContent = "Masuk";

@@ -139,6 +139,48 @@ def device_login():
         'school_name': _school_name(school_id),
     })
 
+@app.route('/api/auth/emergency-login', methods=['POST'])
+def emergency_login():
+    """Login siswa pakai kode darurat 6-digit dari guru pengawas (lihat
+    POST /api/guru/emergency-token) — untuk siswa yang HP-nya bermasalah
+    tapi harus tetap ujian lewat web tanpa tahu password akunnya. Kode
+    SEKALI PAKAI: begitu login berhasil, used_at langsung diisi supaya
+    tidak bisa dipakai ulang di PC lain."""
+    from db import query, log_activity
+    body  = request.json or {}
+    email = (body.get('email') or '').strip().lower()
+    code  = (body.get('code') or '').strip()
+    if not email or not code:
+        return jsonify({'error': 'Email dan kode wajib diisi'}), 400
+
+    user = query("SELECT * FROM users WHERE LOWER(email)=%s AND role='siswa' AND is_active=true",
+                 (email,), fetch='one')
+    if not user:
+        return jsonify({'error': 'Email tidak ditemukan atau akun nonaktif'}), 401
+
+    token_row = query("""
+        SELECT id FROM emergency_tokens
+        WHERE student_id=%s AND code=%s AND used_at IS NULL AND expires_at>NOW()
+        ORDER BY created_at DESC LIMIT 1
+    """, (user['id'], code), fetch='one')
+    if not token_row:
+        return jsonify({'error': 'Kode salah atau sudah kedaluwarsa. Minta guru buatkan kode baru.'}), 401
+
+    query("UPDATE emergency_tokens SET used_at=NOW() WHERE id=%s", (token_row['id'],), fetch='none')
+    query("UPDATE users SET last_login=NOW() WHERE id=%s", (user['id'],), fetch='none')
+
+    school_id = str(user['school_id']) if user.get('school_id') else None
+    log_activity(str(user['id']), 'LOGIN_TOKEN_DARURAT', f"{user['name']} login pakai token darurat",
+                 request.remote_addr, school_id)
+    token = create_token(str(user['id']), user['role'], school_id)
+    return jsonify({
+        'token': token,
+        'role':  user['role'],
+        'name':  user['name'],
+        'id':    str(user['id']),
+        'school_name': _school_name(school_id),
+    })
+
 @app.route('/api/auth/me')
 @require_auth
 def auth_me():

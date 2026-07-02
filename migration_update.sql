@@ -362,6 +362,25 @@ ALTER TABLE schools ADD COLUMN IF NOT EXISTS feature_mobile       BOOLEAN DEFAUL
 -- BUKAN lewat constraint database — perlu diperhatikan manual sampai
 -- nanti diperbaiki jadi composite key (school_id, id) kalau diperlukan.
 
+-- ── 31. Token darurat — akses web sementara utk siswa HP bermasalah ──
+-- Siswa yang HP-nya mati/rusak (atau cuma punya iPhone, app mobile hanya
+-- Android) tapi harus tetap ujian: guru pengawas generate kode 6-digit dari
+-- Pengawas Live untuk SATU siswa spesifik, valid 15 menit, SEKALI PAKAI —
+-- begitu dipakai login (di /api/auth/emergency-login), used_at langsung
+-- keisi jadi tidak bisa dipakai ulang di PC lain. created_by dicatat untuk
+-- jejak audit siapa guru yang mengizinkan.
+CREATE TABLE IF NOT EXISTS emergency_tokens (
+    id          UUID PRIMARY KEY,
+    code        TEXT NOT NULL,
+    student_id  UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_by  UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    school_id   UUID NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+    expires_at  TIMESTAMPTZ NOT NULL,
+    used_at     TIMESTAMPTZ,
+    created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_emergency_tokens_student ON emergency_tokens(student_id);
+
 -- ── Selesai ───────────────────────────────────────────────────
 -- Verifikasi: SELECT table_name FROM information_schema.tables
 --             WHERE table_schema='public' ORDER BY table_name;
