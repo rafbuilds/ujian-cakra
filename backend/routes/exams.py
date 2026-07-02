@@ -50,14 +50,22 @@ def get_exams_for_proctor():
     """Semua ujian dari semua guru pada periode (tahun ajaran/semester) yang sedang aktif saja —
     untuk dropdown Pengawas Live universal. Ujian dari semester yang sudah 'Selesai' tidak tampil
     di sini lagi (tetap jadi jejak/record, hanya tidak aktif untuk pengawasan live).
-    Hanya metadata, TIDAK termasuk soal/kunci jawaban."""
+    Hanya metadata, TIDAK termasuk soal/kunci jawaban.
+
+    'classes' berisi daftar kelas peserta per ujian (id/name/grade) — dipakai
+    frontend Pengawas Live untuk menyusun folder Jenjang → Kelas, supaya guru
+    bisa masuk langsung ke kelas yang dia awasi alih-alih milih dari dropdown
+    ujian yang datar."""
     active_id = _active_semester_id()
     rows = query("""
         SELECT e.id, e.title, e.status, e.start_at, e.teacher_id,
                (e.teacher_id = %s) as is_mine,
                s.name as subject_name, u.name as teacher_name,
                (SELECT STRING_AGG(c.name,', ') FROM exam_classes ec
-                JOIN classes c ON c.id=ec.class_id WHERE ec.exam_id=e.id) as class_names
+                JOIN classes c ON c.id=ec.class_id WHERE ec.exam_id=e.id) as class_names,
+               (SELECT json_agg(json_build_object('id', c.id, 'name', c.name, 'grade', c.grade)
+                                ORDER BY c.grade, LENGTH(c.id), c.id)
+                FROM exam_classes ec JOIN classes c ON c.id=ec.class_id WHERE ec.exam_id=e.id) as classes
         FROM exams e
         LEFT JOIN subjects s ON s.id=e.subject_id
         LEFT JOIN users u ON u.id=e.teacher_id
@@ -65,7 +73,12 @@ def get_exams_for_proctor():
           AND e.semester_id=%s AND e.school_id=%s
         ORDER BY e.start_at DESC
     """, (request.user_id, active_id, request.school_id))
-    return jsonify([dict(r) for r in rows])
+    result = []
+    for r in rows:
+        d = dict(r)
+        d['classes'] = d['classes'] or []
+        result.append(d)
+    return jsonify(result)
 
 @exams_bp.route('/api/exams', methods=['POST'])
 @require_guru
@@ -474,15 +487,35 @@ def monitor_exam(exam_id):
     if not exam: return jsonify({'error': 'Tidak ditemukan'}), 404
     if not _is_exam_proctor(exam, request.user_id, request.user_role):
         return jsonify({'error': 'Anda belum menjadi pengawas ujian ini. Masukkan kode pengawas terlebih dahulu.'}), 403
-    sessions = query("""SELECT es.*, u.name, u.avatar_url, c.name as class_name
-                        FROM exam_sessions es
-                        JOIN users u ON u.id=es.student_id
-                        LEFT JOIN classes c ON c.id=u.class_id
-                        WHERE es.exam_id=%s ORDER BY u.name""", (exam_id,))
+
+    # Filter opsional ke SATU kelas — dipakai saat guru masuk lewat folder
+    # kelas di Pengawas Live (bukan pilih ujian langsung), supaya cuma
+    # roster kelas itu yang ditampilkan walau ujiannya lintas-kelas.
+    class_id = request.args.get('class_id')
+
+    # Roster LENGKAP siswa di kelas peserta ujian ini (LEFT JOIN exam_sessions)
+    # — sebelumnya cuma siswa yang SUDAH mulai yang muncul, jadi siswa yang
+    # belum login sama sekali tidak kelihatan di layar pengawas (seolah tidak
+    # ada), padahal guru justru perlu tahu itu.
+    class_filter = "AND ec.class_id=%s" if class_id else ""
+    params = [exam_id, exam_id] + ([class_id] if class_id else [])
+    roster = query(f"""
+        SELECT u.id as student_id, u.name, c.id as class_id, c.name as class_name,
+               es.id as session_id, es.submitted_at, es.tab_violations,
+               es.exit_allowed, es.exit_code
+        FROM exam_classes ec
+        JOIN classes c ON c.id=ec.class_id
+        JOIN users u ON u.class_id=c.id AND u.role='siswa'
+        LEFT JOIN exam_sessions es ON es.exam_id=%s AND es.student_id=u.id
+        WHERE ec.exam_id=%s {class_filter}
+        ORDER BY c.grade, LENGTH(c.id), c.id, u.name
+    """, params)
+
     total_q = query("SELECT COUNT(*) as n FROM questions WHERE exam_id=%s", (exam_id,), fetch='one')['n']
+    started = [r for r in roster if r['session_id']]
     answered_map = {}
-    if sessions:
-        session_ids = [str(s['id']) for s in sessions]
+    if started:
+        session_ids = [str(r['session_id']) for r in started]
         # Gabungkan jawaban single-choice, esai, dan multi-jawaban — supaya
         # progress siswa yang menjawab soal esai/multi tidak terhitung 0.
         answered_rows = query("""
@@ -496,25 +529,34 @@ def monitor_exam(exam_id):
             GROUP BY session_id
         """, (session_ids, session_ids, session_ids))
         answered_map = {str(r['session_id']): r['n'] for r in answered_rows}
+
     students = []
-    for s in sessions:
-        answered = answered_map.get(str(s['id']), 0)
+    for r in roster:
+        has_session = bool(r['session_id'])
+        answered = answered_map.get(str(r['session_id']), 0) if has_session else 0
+        status = 'submitted' if r.get('submitted_at') else ('ongoing' if has_session else 'not_started')
         students.append({
-            'session_id': str(s['id']),
-            'student_id': str(s['student_id']),
-            'name': s['name'],
-            'class_name': s['class_name'],
-            'status': 'submitted' if s.get('submitted_at') else 'ongoing',
+            'session_id': str(r['session_id']) if has_session else None,
+            'student_id': str(r['student_id']),
+            'name': r['name'],
+            'class_id': str(r['class_id']),
+            'class_name': r['class_name'],
+            'status': status,
             'answered': answered,
             'total': total_q,
-            'tab_violations': s.get('tab_violations',0),
-            'submitted_at': s['submitted_at'].isoformat() if s.get('submitted_at') else None,
-            'exit_allowed': bool(s.get('exit_allowed')),
-            'exit_code': s.get('exit_code'),
+            'tab_violations': r.get('tab_violations', 0) or 0,
+            'submitted_at': r['submitted_at'].isoformat() if r.get('submitted_at') else None,
+            'exit_allowed': bool(r.get('exit_allowed')),
+            'exit_code': r.get('exit_code'),
         })
-    submitted = sum(1 for s in students if s['status']=='submitted')
-    return jsonify({'exam': dict(exam), 'students': students,
-                    'submitted': submitted, 'ongoing': len(students)-submitted})
+    submitted   = sum(1 for s in students if s['status'] == 'submitted')
+    not_started = sum(1 for s in students if s['status'] == 'not_started')
+    ongoing     = len(students) - submitted - not_started
+    return jsonify({
+        'exam': dict(exam), 'students': students,
+        'submitted': submitted, 'ongoing': ongoing, 'not_started': not_started,
+        'total_registered': len(students),
+    })
 
 # ── Results ────────────────────────────────────────────────────
 @exams_bp.route('/api/exams/<exam_id>/results', methods=['GET'])

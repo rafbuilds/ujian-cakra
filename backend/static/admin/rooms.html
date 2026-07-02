@@ -1364,9 +1364,9 @@
             (data.exam?.subject_name || '') + ' · ' + (data.exam?.teacher_name || '');
 
           const students = data.students || [];
-          const aktif    = students.filter(s => !s.submitted_at).length;
-          const selesai  = students.filter(s =>  s.submitted_at).length;
-          const belum    = (data.total_registered || 0) - students.length;
+          const aktif    = students.filter(s => s.status === 'ongoing').length;
+          const selesai  = students.filter(s => s.status === 'submitted' || s.submitted_at).length;
+          const belum    = students.filter(s => s.status === 'not_started').length;
           const viol     = students.reduce((a,s) => a + (s.tab_violations||0), 0);
 
           document.getElementById('mm-aktif').textContent   = aktif;
@@ -1381,26 +1381,29 @@
           }
 
           // Monitor API: { session_id, name, class_name, status, answered, total, tab_violations, submitted_at }
+          // status bisa 'submitted' | 'ongoing' | 'not_started' (belum login sama sekali — session_id null)
           document.getElementById('mm-body').innerHTML = students.map(s => {
-            const pct      = (s.total > 0) ? Math.round((s.answered||0) / s.total * 100) : 0;
-            const done     = s.status === 'submitted' || !!s.submitted_at;
-            const autoSub  = !!s.auto_submitted;
-            const vBadge   = (s.tab_violations||0) > 0
+            const pct        = (s.total > 0) ? Math.round((s.answered||0) / s.total * 100) : 0;
+            const done       = s.status === 'submitted' || !!s.submitted_at;
+            const notStarted = s.status === 'not_started';
+            const autoSub    = !!s.auto_submitted;
+            const vBadge     = (s.tab_violations||0) > 0
               ? `<span style="background:#fde8e8;color:#b91c1c;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:700">${s.tab_violations}× pelanggaran</span>` : '';
 
             // Status badge
             let statusBg, statusColor, statusLabel;
-            if (done && autoSub)      { statusBg='#fff3cd'; statusColor='#856404'; statusLabel='⚠️ Auto-submit'; }
-            else if (done)            { statusBg='#e6f1fb'; statusColor='#185fa5'; statusLabel='✅ Selesai'; }
-            else                      { statusBg='#eaf3de'; statusColor='#3b6d11'; statusLabel='🟢 Mengerjakan'; }
+            if (notStarted)            { statusBg='var(--light)'; statusColor='#6b7280'; statusLabel='⭕ Belum Login'; }
+            else if (done && autoSub)  { statusBg='#fff3cd'; statusColor='#856404'; statusLabel='⚠️ Auto-submit'; }
+            else if (done)             { statusBg='#e6f1fb'; statusColor='#185fa5'; statusLabel='✅ Selesai'; }
+            else                       { statusBg='#eaf3de'; statusColor='#3b6d11'; statusLabel='🟢 Mengerjakan'; }
 
-            // Tombol aksi
-            const btnExit   = !done ? `<button class="btn btn-sm" style="font-size:10px;padding:2px 8px;background:var(--light)" onclick="allowExit('${s.session_id}')">Izinkan Keluar</button>` : '';
+            // Tombol aksi — siswa yang belum login tidak punya session_id, jadi tidak ada aksi
+            const btnExit   = (!done && !notStarted) ? `<button class="btn btn-sm" style="font-size:10px;padding:2px 8px;background:var(--light)" onclick="allowExit('${s.session_id}')">Izinkan Keluar</button>` : '';
             const btnReopen = done   ? `<button class="btn btn-primary btn-sm" style="font-size:10px;padding:2px 8px" onclick="openReopenModal('${s.session_id}','${(s.name||'').replace(/'/g,"\\'")}')">🔓 Buka Ulang</button>` : '';
 
             return `
               <div style="display:flex;align-items:center;gap:10px;padding:.625rem 0;border-bottom:.5px solid var(--border)">
-                <div style="width:32px;height:32px;border-radius:50%;background:${done?'#6b7280':'var(--green)'};display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:13px;flex-shrink:0">${(s.name||'?')[0]}</div>
+                <div style="width:32px;height:32px;border-radius:50%;background:${notStarted?'#b4b2a9':done?'#6b7280':'var(--green)'};display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:13px;flex-shrink:0">${(s.name||'?')[0]}</div>
                 <div style="flex:1;min-width:0">
                   <div style="font-size:13px;font-weight:500;display:flex;align-items:center;gap:5px;flex-wrap:wrap">
                     <span>${s.name}</span>
@@ -1408,7 +1411,7 @@
                     ${vBadge}
                   </div>
                   <div style="font-size:11px;color:var(--muted)">${s.class_name||'—'}</div>
-                  ${!done ? `<div style="display:flex;align-items:center;gap:6px;margin-top:4px">
+                  ${notStarted ? '' : !done ? `<div style="display:flex;align-items:center;gap:6px;margin-top:4px">
                     <div style="height:5px;background:#e5e7eb;border-radius:3px;flex:1"><div style="height:100%;width:${pct}%;background:var(--green);border-radius:3px;transition:width .3s"></div></div>
                     <span style="font-size:10px;color:var(--muted);white-space:nowrap">${s.answered||0}/${s.total||0} soal</span>
                   </div>` : `<div style="font-size:10px;color:var(--muted);margin-top:2px">Submit: ${s.submitted_at ? new Date(s.submitted_at).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'}) : '—'}</div>`}

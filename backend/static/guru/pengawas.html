@@ -287,8 +287,25 @@
         </div>
 
         <div class="page-main">
-          <!-- Pilih ujian (semua ujian, dari semua guru) -->
-          <div class="select-exam">
+          <!-- Folder Jenjang → Kelas — pilihan utama, langsung tampilkan
+               seluruh siswa kelas yang dipilih walau belum login. -->
+          <div class="card" id="class-folder-view">
+            <div style="font-weight: 700; font-size: 14px; margin-bottom: 0.75rem; color: var(--green)">
+              📁 Pilih Kelas yang Diawasi
+            </div>
+            <div id="class-folders">
+              <div class="loading-spinner" style="margin: 1rem auto"></div>
+            </div>
+          </div>
+
+          <div style="text-align: center; margin: 0.75rem 0">
+            <button class="btn btn-secondary btn-sm" onclick="toggleFlatSelect()" id="toggle-flat-btn">
+              📋 Atau pilih ujian langsung dari daftar
+            </button>
+          </div>
+
+          <!-- Pilih ujian (semua ujian, dari semua guru) — fallback lama, disembunyikan default -->
+          <div class="select-exam" id="flat-select-wrap" style="display: none">
             <div
               style="
                 font-size: 13px;
@@ -309,6 +326,15 @@
             >
               <option value="">— Pilih ujian —</option>
             </select>
+          </div>
+
+          <!-- Konteks kelas yang sedang dipantau — muncul kalau masuk lewat folder kelas -->
+          <div
+            id="class-context-bar"
+            style="display: none; align-items: center; justify-content: space-between; background: #eaf3de; border-radius: 10px; padding: 0.75rem 1rem; margin-bottom: 1.25rem"
+          >
+            <div style="font-size: 13px; font-weight: 600; color: #3b6d11" id="class-context-text"></div>
+            <button class="btn btn-secondary btn-sm" onclick="backToFolders()">‹ Ganti Kelas</button>
           </div>
 
           <!-- Banner kepemilikan — muncul kalau ujian yang dipilih buatan sendiri -->
@@ -503,6 +529,7 @@
       UI.initSidebar();
 
       let currentExamId = null,
+        currentClassId = null,
         monitorData = null,
         autoRefresh = null,
         soundOn = true,
@@ -521,6 +548,7 @@
           allExamsForProctor = Array.isArray(all) ? all : [];
           unlockedIds = new Set(Array.isArray(unlocked) ? unlocked : []);
           renderExamSelect();
+          buildClassFolders();
 
           // URL param
           const id = new URLSearchParams(location.search).get("id");
@@ -531,6 +559,122 @@
         } catch {
           UI.toast("Gagal memuat ujian", "error");
         }
+      }
+
+      function toggleFlatSelect() {
+        const wrap = document.getElementById("flat-select-wrap");
+        const show = wrap.style.display === "none";
+        wrap.style.display = show ? "block" : "none";
+        document.getElementById("toggle-flat-btn").textContent = show
+          ? "📁 Kembali ke tampilan folder kelas"
+          : "📋 Atau pilih ujian langsung dari daftar";
+      }
+
+      const GRADE_LABEL = { 10: "Kelas X", 11: "Kelas XI", 12: "Kelas XII" };
+      const STATUS_ICON = { ongoing: "🟢", published: "📋", finished: "✅" };
+      const STATUS_PRIORITY = { ongoing: 0, published: 1, finished: 2 };
+
+      // Susun folder Jenjang → Kelas dari daftar ujian yang guru ini boleh
+      // lihat (miliknya sendiri + yang sudah di-unlock kodenya + semua kalau
+      // admin) — supaya guru langsung pilih KELAS yang diawasi, bukan
+      // mencari-cari judul ujian di dropdown datar.
+      function buildClassFolders() {
+        const visible = allExamsForProctor.filter(
+          (e) => isAdminUser || e.is_mine || unlockedIds.has(e.id),
+        );
+        const classMap = {};
+        visible.forEach((e) => {
+          (e.classes || []).forEach((c) => {
+            if (!classMap[c.id]) classMap[c.id] = { cls: c, exams: [] };
+            classMap[c.id].exams.push(e);
+          });
+        });
+        const gradeGroups = {};
+        Object.values(classMap).forEach((entry) => {
+          const g = entry.cls.grade || 0;
+          if (!gradeGroups[g]) gradeGroups[g] = [];
+          gradeGroups[g].push(entry);
+        });
+
+        const wrap = document.getElementById("class-folders");
+        const grades = [10, 11, 12, 0].filter((g) => gradeGroups[g]);
+        if (!grades.length) {
+          wrap.innerHTML =
+            '<div class="empty-state" style="padding:2rem"><div class="empty-icon">📭</div><div class="empty-text">Belum ada ujian yang bisa dipantau di periode ini</div></div>';
+          return;
+        }
+        wrap.innerHTML = grades
+          .map((g) => {
+            const entries = gradeGroups[g].sort((a, b) =>
+              a.cls.name.localeCompare(b.cls.name, "id", { numeric: true }),
+            );
+            const liveCount = entries.filter((en) =>
+              en.exams.some((e) => e.status === "ongoing"),
+            ).length;
+            return `
+        <div style="margin-bottom:1rem;border:.5px solid var(--border2);border-radius:14px;overflow:hidden">
+          <div style="background:linear-gradient(135deg,#0f4c35,#1a6b4a);padding:.75rem 1rem;display:flex;align-items:center;gap:10px">
+            <div style="font-size:18px">📁</div>
+            <div style="flex:1">
+              <div style="font-size:13px;font-weight:700;color:#fff">${GRADE_LABEL[g] || "Tanpa Jenjang"}</div>
+              <div style="font-size:10px;color:rgba(255,255,255,.65)">${entries.length} kelas${liveCount ? ` · 🟢 ${liveCount} live` : ""}</div>
+            </div>
+          </div>
+          <div style="padding:.25rem .75rem">
+            ${entries.map((en) => renderClassRow(en)).join("")}
+          </div>
+        </div>`;
+          })
+          .join("");
+      }
+
+      function renderClassRow(entry) {
+        const { cls, exams } = entry;
+        const sorted = [...exams].sort(
+          (a, b) =>
+            (STATUS_PRIORITY[a.status] ?? 9) - (STATUS_PRIORITY[b.status] ?? 9) ||
+            new Date(b.start_at || 0) - new Date(a.start_at || 0),
+        );
+        const single = sorted.length === 1;
+        return `
+      <div style="display:flex;align-items:center;gap:10px;padding:.625rem .25rem;border-bottom:.5px solid var(--border)">
+        <div style="font-weight:700;font-size:13px;width:60px;flex-shrink:0">${cls.name}</div>
+        <div style="flex:1;min-width:0">
+          ${
+            single
+              ? `<div style="font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${STATUS_ICON[sorted[0].status] || ""} ${sorted[0].title}${!sorted[0].is_mine ? " · " + (sorted[0].teacher_name || "—") : ""}</div>`
+              : `<select class="form-control" style="font-size:12px;padding:5px 8px" id="pick-${cls.id}">
+                 ${sorted
+                   .map(
+                     (e) =>
+                       `<option value="${e.id}">${STATUS_ICON[e.status] || ""} ${e.title}${!e.is_mine ? " (" + (e.teacher_name || "—") + ")" : ""}</option>`,
+                   )
+                   .join("")}
+               </select>`
+          }
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="enterClass('${cls.id}','${single ? sorted[0].id : ""}')">👁 Pantau</button>
+      </div>`;
+      }
+
+      function enterClass(classId, singleExamId) {
+        const examId = singleExamId || document.getElementById("pick-" + classId).value;
+        if (!examId) {
+          UI.toast("Pilih ujian dulu", "warn");
+          return;
+        }
+        document.getElementById("exam-select").value = examId;
+        onExamSelect(examId, classId);
+      }
+
+      function backToFolders() {
+        currentExamId = null;
+        currentClassId = null;
+        clearInterval(autoRefresh);
+        document.getElementById("monitor-content").style.display = "none";
+        document.getElementById("class-context-bar").style.display = "none";
+        document.getElementById("own-exam-banner").style.display = "none";
+        document.getElementById("exam-select").value = "";
       }
 
       function renderExamSelect() {
@@ -572,20 +716,25 @@
           UI.toast("✅ Berhasil masuk sebagai pengawas", "success");
           document.getElementById("code-prompt").style.display = "none";
           renderExamSelect();
+          buildClassFolders();
           document.getElementById("exam-select").value = currentExamId;
-          onExamSelect(currentExamId);
+          // currentClassId sudah kesimpen dari sebelum prompt kode muncul —
+          // dipakai lagi di sini supaya konteks kelas yang dipilih tidak hilang.
+          onExamSelect(currentExamId, currentClassId);
         } catch (e) {
           UI.toast(e.error || "Kode tidak valid", "error");
         }
       }
 
-      function onExamSelect(id) {
+      function onExamSelect(id, classId = null) {
         currentExamId = id;
+        currentClassId = classId;
         clearInterval(autoRefresh);
         // Selalu reset dulu — banner kepemilikan dan prompt kode tidak boleh
         // tampil bersamaan, jadi default-kan keduanya tersembunyi setiap ganti pilihan.
         document.getElementById("code-prompt").style.display = "none";
         document.getElementById("own-exam-banner").style.display = "none";
+        document.getElementById("class-context-bar").style.display = "none";
         if (!id) {
           document.getElementById("monitor-content").style.display = "none";
           return;
@@ -601,13 +750,24 @@
           document.getElementById("proctor-code-input").value = "";
           return;
         }
-        const banner = document.getElementById("own-exam-banner");
-        if (isMine) {
-          banner.textContent = "✅ Anda pembuat soal ujian ini — sudah otomatis bisa mengawasi tanpa kode";
-          banner.style.display = "block";
-        } else if (isAdminUser) {
-          banner.textContent = "👮 Anda login sebagai admin — bisa mengawasi semua ujian tanpa kode";
-          banner.style.display = "block";
+        if (classId) {
+          // Masuk lewat folder kelas — tampilkan bar konteks kelas (sudah
+          // mencakup info kepemilikan), jadi banner kepemilikan terpisah
+          // tidak perlu tampil bersamaan supaya tidak dobel.
+          const cls = (exam?.classes || []).find((c) => c.id === classId);
+          const ownerNote = isMine ? "" : isAdminUser ? " · mode admin" : ` · pengawas (kode dari ${exam.teacher_name || "guru lain"})`;
+          document.getElementById("class-context-text").textContent =
+            `📍 Memantau Kelas ${cls ? cls.name : ""} — ${exam.title}${ownerNote}`;
+          document.getElementById("class-context-bar").style.display = "flex";
+        } else {
+          const banner = document.getElementById("own-exam-banner");
+          if (isMine) {
+            banner.textContent = "✅ Anda pembuat soal ujian ini — sudah otomatis bisa mengawasi tanpa kode";
+            banner.style.display = "block";
+          } else if (isAdminUser) {
+            banner.textContent = "👮 Anda login sebagai admin — bisa mengawasi semua ujian tanpa kode";
+            banner.style.display = "block";
+          }
         }
         document.getElementById("monitor-content").style.display = "block";
         loadMonitor();
@@ -617,7 +777,8 @@
       async function loadMonitor() {
         if (!currentExamId) return;
         try {
-          const raw = await API.get(`/api/exams/${currentExamId}/monitor`);
+          const classQ = currentClassId ? `?class_id=${currentClassId}` : "";
+          const raw = await API.get(`/api/exams/${currentExamId}/monitor${classQ}`);
           // Normalisasi berbagai format response backend
           let data;
           if (raw && raw.students !== undefined) {
@@ -704,7 +865,7 @@
         document.getElementById("mon-stat").innerHTML = `
     <div class="mon-card"><div class="mon-num mon-submitted">${summary.submitted}</div><div class="mon-label">✅ Submit</div></div>
     <div class="mon-card"><div class="mon-num mon-online">${summary.online}</div><div class="mon-label">🟡 Online</div></div>
-    <div class="mon-card"><div class="mon-num mon-offline">${summary.offline}</div><div class="mon-label">⭕ Belum Masuk</div></div>
+    <div class="mon-card"><div class="mon-num mon-offline">${summary.offline}</div><div class="mon-label">⭕ Belum Login</div></div>
   `;
 
         // Timer
@@ -771,26 +932,28 @@
         ${students
           .map(
             (s, i) => `
-          <tr style="border-bottom:.5px solid #f0ede5;${i % 2 === 0 ? "" : "background:#fafaf8"}">
+          <tr style="border-bottom:.5px solid #f0ede5;${i % 2 === 0 ? "" : "background:#fafaf8"}${s.status === 'not_started' ? ';opacity:.65' : ''}">
             <td style="padding:9px 12px">${i + 1}</td>
             <td style="padding:9px 12px">
               <div style="display:flex;align-items:center;gap:8px">
-                <div class="stu-avatar ${s.status === 'ongoing' ? 'online' : s.status}">${(s.name || "?")[0]}</div>
+                <div class="stu-avatar ${s.status === 'ongoing' ? 'online' : s.status === 'not_started' ? 'offline' : s.status}">${(s.name || "?")[0]}</div>
                 <div style="font-weight:500">${s.name}</div>
               </div>
             </td>
             <td style="padding:9px 12px;font-size:12px;color:var(--muted)">${s.class_name || '—'}</td>
             <td style="padding:9px 12px">
-              <span class="status-dot dot-${s.status === 'ongoing' ? 'online' : (s.status || 'offline')}"></span>
-              ${{ submitted: 'Submit ✅', ongoing: '🟡 Online', online: '🟡 Online', offline: '⭕ Belum' }[s.status] || '—'}
+              <span class="status-dot dot-${s.status === 'ongoing' ? 'online' : s.status === 'not_started' ? 'offline' : (s.status || 'offline')}"></span>
+              ${{ submitted: 'Submit ✅', ongoing: '🟡 Online', online: '🟡 Online', not_started: '⭕ Belum Login', offline: '⭕ Belum' }[s.status] || '—'}
             </td>
             <td style="padding:9px 12px">
-              <div style="font-size:13px;font-weight:600;color:var(--green)">
+              ${s.status === 'not_started'
+                ? '<span style="color:var(--muted);font-size:12px">— belum mulai —</span>'
+                : `<div style="font-size:13px;font-weight:600;color:var(--green)">
                 ${s.answered || 0} / <span style="color:var(--muted);font-weight:400">${s.total || s.total_q || '?'}</span>
               </div>
               <div class="prog-bar">
                 <div class="prog-fill" style="width:${(s.total || s.total_q) ? ((s.answered || 0) / (s.total || s.total_q)) * 100 : 0}%"></div>
-              </div>
+              </div>`}
             </td>
             <td style="padding:9px 12px">
               ${s.tab_violations > 0 ? `<span class="violation-badge">⚠ ${s.tab_violations}x</span>` : '<span style="color:var(--muted);font-size:12px">—</span>'}
@@ -803,12 +966,14 @@
             </td>
             <td style="padding:9px 12px">
               <div style="display:flex;flex-direction:column;gap:4px">
-                ${s.status !== 'submitted'
-                  ? `<button class="btn btn-secondary btn-sm" title="Guru langsung izinkan keluar dari sini — siswa boleh keluar/offline, masuk lagi kapan saja untuk lanjutkan" onclick="allowExit('${s.session_id}','${(s.name||'').replace(/'/g,"\\'")}')">🚪 Izinkan Keluar</button>`
-                  : ''}
-                ${s.status === 'submitted'
-                  ? `<button class="btn btn-primary btn-sm" onclick="openReopenModal('${s.session_id}','${(s.name||'').replace(/'/g,"\\'")}')">🔓 Buka Ulang</button>`
-                  : ''}
+                ${s.status === 'not_started'
+                  ? '<span style="color:var(--muted);font-size:12px">—</span>'
+                  : `${s.status !== 'submitted'
+                      ? `<button class="btn btn-secondary btn-sm" title="Guru langsung izinkan keluar dari sini — siswa boleh keluar/offline, masuk lagi kapan saja untuk lanjutkan" onclick="allowExit('${s.session_id}','${(s.name||'').replace(/'/g,"\\'")}')">🚪 Izinkan Keluar</button>`
+                      : ''}
+                    ${s.status === 'submitted'
+                      ? `<button class="btn btn-primary btn-sm" onclick="openReopenModal('${s.session_id}','${(s.name||'').replace(/'/g,"\\'")}')">🔓 Buka Ulang</button>`
+                      : ''}`}
               </div>
             </td>
           </tr>
