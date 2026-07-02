@@ -4,8 +4,8 @@
 # require_admin (lihat auth.py require_super_admin) supaya admin sekolah
 # biasa tidak pernah bisa naik privilege ke sini walau ada bug di tempat
 # lain.
-from flask import Blueprint, request, jsonify
-import re, uuid
+from flask import Blueprint, request, jsonify, send_file
+import re, uuid, io
 from datetime import date, timedelta
 from db import query, delete_school_cascade
 from auth import require_super_admin
@@ -326,3 +326,119 @@ def delete_school_admin(school_id, admin_id):
         return jsonify({'error': 'Tidak bisa hapus — ini satu-satunya admin sekolah ini. Buat admin lain dulu.'}), 400
     query("DELETE FROM users WHERE id=%s", (admin_id,), fetch='none')
     return jsonify({'ok': True})
+
+
+# ── Audit Log lintas sekolah ────────────────────────────────────
+def _activity_log_filters():
+    """Bangun WHERE + params dari query string, dipakai bareng oleh endpoint
+    list (dipaginasi) dan export (tanpa limit) supaya filter selalu konsisten."""
+    where, params = ["1=1"], []
+    school_id = request.args.get('school_id', '').strip()
+    action    = request.args.get('action', '').strip()
+    role      = request.args.get('role', '').strip()
+    q         = request.args.get('q', '').strip()
+    date_from = request.args.get('date_from', '').strip()
+    date_to   = request.args.get('date_to', '').strip()
+    if school_id:
+        where.append("al.school_id=%s"); params.append(school_id)
+    if action:
+        where.append("al.action=%s"); params.append(action)
+    if role:
+        where.append("u.role=%s"); params.append(role)
+    if q:
+        where.append("(al.detail ILIKE %s OR u.name ILIKE %s OR u.email ILIKE %s)")
+        params += [f"%{q}%", f"%{q}%", f"%{q}%"]
+    if date_from:
+        where.append("al.created_at >= %s"); params.append(date_from)
+    if date_to:
+        where.append("al.created_at < (%s::date + INTERVAL '1 day')"); params.append(date_to)
+    return " AND ".join(where), params
+
+
+@super_admin_bp.route('/api/super-admin/activity-logs', methods=['GET'])
+@require_super_admin
+def list_activity_logs():
+    """Audit log lintas sekolah — bisa difilter per sekolah, aksi, peran user,
+    kata kunci, dan rentang tanggal. Dipaginasi karena bisa tumbuh besar
+    (tiap login/buat ujian/publish/dsb tercatat lewat log_activity())."""
+    where, params = _activity_log_filters()
+    page      = max(1, int(request.args.get('page', 1) or 1))
+    page_size = min(200, max(1, int(request.args.get('page_size', 50) or 50)))
+    offset    = (page - 1) * page_size
+
+    total = query(f"""
+        SELECT COUNT(*) as n FROM activity_logs al
+        LEFT JOIN users u ON u.id=al.user_id
+        WHERE {where}
+    """, params, fetch='one')['n']
+
+    rows = query(f"""
+        SELECT al.id, al.action, al.detail, al.ip_address, al.created_at,
+               al.user_id, u.name as user_name, u.email as user_email, u.role as user_role,
+               al.school_id, s.name as school_name
+        FROM activity_logs al
+        LEFT JOIN users u ON u.id=al.user_id
+        LEFT JOIN schools s ON s.id=al.school_id
+        WHERE {where}
+        ORDER BY al.created_at DESC
+        LIMIT %s OFFSET %s
+    """, params + [page_size, offset])
+
+    actions = query("SELECT DISTINCT action FROM activity_logs ORDER BY action")
+
+    return jsonify({
+        'logs': [dict(r) for r in rows],
+        'total': total,
+        'page': page,
+        'page_size': page_size,
+        'actions': [r['action'] for r in actions],
+    })
+
+
+@super_admin_bp.route('/api/super-admin/activity-logs/export', methods=['GET'])
+@require_super_admin
+def export_activity_logs():
+    """Export hasil filter yang sama persis ke Excel — dibatasi 5000 baris
+    terbaru supaya tidak membebani memori/permintaan tunggal."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment
+    where, params = _activity_log_filters()
+    rows = query(f"""
+        SELECT al.created_at, s.name as school_name, u.name as user_name,
+               u.email as user_email, u.role as user_role, al.action, al.detail, al.ip_address
+        FROM activity_logs al
+        LEFT JOIN users u ON u.id=al.user_id
+        LEFT JOIN schools s ON s.id=al.school_id
+        WHERE {where}
+        ORDER BY al.created_at DESC
+        LIMIT 5000
+    """, params)
+
+    wb = Workbook(); ws = wb.active
+    ws.title = 'Log Aktivitas'
+    header = ['Waktu', 'Sekolah', 'Nama User', 'Email', 'Peran', 'Aksi', 'Detail', 'IP Address']
+    ws.append(header)
+    for cell in ws[1]:
+        cell.font      = Font(bold=True, color='FFFFFF')
+        cell.fill      = PatternFill('solid', fgColor='0F4C35')
+        cell.alignment = Alignment(horizontal='center')
+
+    for r in rows:
+        ws.append([
+            str(r['created_at'])[:19] if r['created_at'] else '',
+            r['school_name'] or '',
+            r['user_name'] or '(terhapus)',
+            r['user_email'] or '',
+            r['user_role'] or '',
+            r['action'] or '',
+            r['detail'] or '',
+            r['ip_address'] or '',
+        ])
+
+    for col in ws.columns:
+        ws.column_dimensions[col[0].column_letter].width = min(60, max(len(str(c.value or '')) for c in col) + 4)
+
+    buf = io.BytesIO(); wb.save(buf); buf.seek(0)
+    return send_file(buf,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        as_attachment=True, download_name='log_aktivitas.xlsx')

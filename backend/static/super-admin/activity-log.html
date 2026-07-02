@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+    <title>Log Aktivitas — Super Admin CAKRA</title>
+    <link rel="icon" type="image/png" href="../assets/logo.png" />
+    <link rel="stylesheet" href="../style.css" />
+    <style>
+      .card { background:#fff; border-radius:12px; padding:1rem 1.125rem;
+        box-shadow:0 1px 4px rgba(0,0,0,.07); border:.5px solid var(--border); }
+
+      .filter-bar { display:grid; grid-template-columns:repeat(6,1fr); gap:.6rem; margin-bottom:1rem; }
+      @media(max-width:1100px){ .filter-bar{ grid-template-columns:repeat(3,1fr); } }
+      @media(max-width:700px){ .filter-bar{ grid-template-columns:repeat(2,1fr); } }
+      .filter-bar .form-group { margin-bottom:0; }
+      .filter-bar label { font-size:11px; }
+
+      table.log-table { width:100%; border-collapse:collapse; font-size:13px; }
+      table.log-table th { text-align:left; padding:.6rem .5rem; border-bottom:2px solid var(--border);
+        color:var(--muted); font-weight:700; font-size:11px; text-transform:uppercase; white-space:nowrap; }
+      table.log-table td { padding:.6rem .5rem; border-bottom:.5px solid var(--border); vertical-align:top; }
+      table.log-table tr:hover td { background:var(--light); }
+      .log-detail { color:var(--muted); font-size:12.5px; max-width:420px; }
+      .log-action { font-weight:700; font-size:11.5px; }
+    </style>
+  </head>
+  <body>
+    <div class="app-shell">
+      <nav class="sidebar">
+        <div class="sb-logo">
+          <div class="sb-logo-row"><img src="../assets/logo.png" class="sb-logo-img" alt="CAKRA" /><div class="sb-logo-title">CAKRA</div></div>
+          <div class="sb-logo-sub">Super Admin · Platform Owner</div>
+        </div>
+        <div class="sb-nav">
+          <div class="sb-section">MENU</div>
+          <a href="dashboard" class="sb-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" stroke-linecap="round"/>
+              <polyline points="9 22 9 12 15 12 15 22" stroke-linecap="round"/>
+            </svg>Sekolah
+          </a>
+          <a href="activity-log" class="sb-item active">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke-linecap="round" stroke-linejoin="round"/>
+              <polyline points="14 2 14 8 20 8" stroke-linecap="round" stroke-linejoin="round"/>
+              <line x1="9" y1="13" x2="15" y2="13" stroke-linecap="round"/>
+              <line x1="9" y1="17" x2="15" y2="17" stroke-linecap="round"/>
+            </svg>Log Aktivitas
+          </a>
+        </div>
+        <div class="sb-user">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+            <div class="sb-avatar" id="sb-avatar">S</div>
+            <div>
+              <div class="sb-user-name" id="sb-user-name">Super Admin</div>
+              <div class="sb-user-role">Platform Owner</div>
+            </div>
+          </div>
+          <button class="sb-logout" onclick="Auth.logout()">⏻ Keluar</button>
+        </div>
+      </nav>
+
+      <div class="main-wrap">
+        <div class="topbar">
+          <div class="topbar-title">Log Aktivitas</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-left:auto;">
+            <button class="btn btn-secondary btn-sm" onclick="exportLogs()">⬇ Export Excel</button>
+          </div>
+        </div>
+
+        <div class="page-main">
+          <div class="card" style="margin-bottom:1rem">
+            <div class="filter-bar">
+              <div class="form-group">
+                <label>Sekolah</label>
+                <select class="form-control" id="f-school"><option value="">Semua Sekolah</option></select>
+              </div>
+              <div class="form-group">
+                <label>Aksi</label>
+                <select class="form-control" id="f-action"><option value="">Semua Aksi</option></select>
+              </div>
+              <div class="form-group">
+                <label>Peran</label>
+                <select class="form-control" id="f-role">
+                  <option value="">Semua Peran</option>
+                  <option value="super_admin">Super Admin</option>
+                  <option value="admin">Admin</option>
+                  <option value="guru">Guru</option>
+                  <option value="siswa">Siswa</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Dari Tanggal</label>
+                <input type="date" class="form-control" id="f-date-from" />
+              </div>
+              <div class="form-group">
+                <label>Sampai Tanggal</label>
+                <input type="date" class="form-control" id="f-date-to" />
+              </div>
+              <div class="form-group">
+                <label>Cari (nama/email/detail)</label>
+                <input type="text" class="form-control" id="f-q" placeholder="mis. login, buat ujian..." />
+              </div>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-primary btn-sm" onclick="onFilterChange()">Terapkan Filter</button>
+              <button class="btn btn-secondary btn-sm" onclick="resetFilter()">Reset</button>
+            </div>
+          </div>
+
+          <div class="card" style="padding:0;overflow:hidden">
+            <div style="overflow-x:auto">
+              <table class="log-table">
+                <thead>
+                  <tr>
+                    <th>Waktu</th>
+                    <th>Sekolah</th>
+                    <th>User</th>
+                    <th>Peran</th>
+                    <th>Aksi</th>
+                    <th>Detail</th>
+                    <th>IP</th>
+                  </tr>
+                </thead>
+                <tbody id="log-rows">
+                  <tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--muted)">Memuat...</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div style="display:flex;align-items:center;padding:.75rem 1rem;border-top:.5px solid var(--border)">
+              <div id="pg-info" style="font-size:13px;color:var(--muted)"></div>
+              <div class="pagination" style="margin:0;margin-left:auto">
+                <button class="page-btn" id="pg-prev" onclick="changePage(-1)">‹ Prev</button>
+                <button class="page-btn" id="pg-next" onclick="changePage(1)">Next ›</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="../components/api.js"></script>
+    <script src="../components/auth.js"></script>
+    <script src="../components/common.js"></script>
+    <script>
+      if (!Auth.requireRole(["super_admin"])) throw new Error();
+      UI.initSidebar();
+
+      let currentPage = 1;
+      const pageSize = 50;
+      let totalCount = 0;
+      let actionsLoaded = false;
+
+      const ROLE_LABEL = { super_admin: "Super Admin", admin: "Admin", guru: "Guru", siswa: "Siswa", guru_pending: "Guru (Pending)" };
+      const ROLE_BADGE = { super_admin: "badge-purple", admin: "badge-blue", guru: "badge-green", siswa: "badge-gray", guru_pending: "badge-yellow" };
+
+      function esc(s) {
+        return (s || "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
+      async function loadSchools() {
+        try {
+          const schools = await API.get("/api/super-admin/schools");
+          const sel = document.getElementById("f-school");
+          schools.forEach((s) => {
+            const opt = document.createElement("option");
+            opt.value = s.id;
+            opt.textContent = s.name;
+            sel.appendChild(opt);
+          });
+        } catch (e) {
+          // dropdown sekolah gagal dimuat bukan blocker — filter lain tetap jalan
+        }
+      }
+
+      function buildQuery(extra) {
+        const p = new URLSearchParams();
+        const school = document.getElementById("f-school").value;
+        const action = document.getElementById("f-action").value;
+        const role = document.getElementById("f-role").value;
+        const dateFrom = document.getElementById("f-date-from").value;
+        const dateTo = document.getElementById("f-date-to").value;
+        const q = document.getElementById("f-q").value.trim();
+        if (school) p.set("school_id", school);
+        if (action) p.set("action", action);
+        if (role) p.set("role", role);
+        if (dateFrom) p.set("date_from", dateFrom);
+        if (dateTo) p.set("date_to", dateTo);
+        if (q) p.set("q", q);
+        Object.entries(extra || {}).forEach(([k, v]) => p.set(k, v));
+        return p.toString();
+      }
+
+      function onFilterChange() {
+        currentPage = 1;
+        load();
+      }
+
+      function resetFilter() {
+        document.getElementById("f-school").value = "";
+        document.getElementById("f-action").value = "";
+        document.getElementById("f-role").value = "";
+        document.getElementById("f-date-from").value = "";
+        document.getElementById("f-date-to").value = "";
+        document.getElementById("f-q").value = "";
+        onFilterChange();
+      }
+
+      function changePage(delta) {
+        const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+        const next = currentPage + delta;
+        if (next < 1 || next > totalPages) return;
+        currentPage = next;
+        load();
+      }
+
+      function fmtWaktu(iso) {
+        if (!iso) return "—";
+        const d = new Date(iso);
+        return d.toLocaleString("id-ID", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+      }
+
+      async function load() {
+        const tbody = document.getElementById("log-rows");
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--muted)">Memuat...</td></tr>';
+        try {
+          const qs = buildQuery({ page: currentPage, page_size: pageSize });
+          const res = await API.get(`/api/super-admin/activity-logs?${qs}`);
+          totalCount = res.total;
+
+          if (!actionsLoaded) {
+            const sel = document.getElementById("f-action");
+            res.actions.forEach((a) => {
+              const opt = document.createElement("option");
+              opt.value = a;
+              opt.textContent = a;
+              sel.appendChild(opt);
+            });
+            actionsLoaded = true;
+          }
+
+          if (!res.logs.length) {
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--muted)">Tidak ada log yang cocok dengan filter ini.</td></tr>';
+          } else {
+            tbody.innerHTML = res.logs
+              .map((l) => {
+                const roleBadge = ROLE_BADGE[l.user_role] || "badge-gray";
+                const roleLabel = ROLE_LABEL[l.user_role] || l.user_role || "—";
+                return `
+              <tr>
+                <td style="white-space:nowrap;color:var(--muted)">${fmtWaktu(l.created_at)}</td>
+                <td>${esc(l.school_name) || '<span style="color:var(--muted)">—</span>'}</td>
+                <td>
+                  <div style="font-weight:600">${esc(l.user_name) || "(terhapus)"}</div>
+                  <div style="font-size:11px;color:var(--muted)">${esc(l.user_email) || ""}</div>
+                </td>
+                <td><span class="badge ${roleBadge}">${roleLabel}</span></td>
+                <td class="log-action">${esc(l.action)}</td>
+                <td class="log-detail">${esc(l.detail)}</td>
+                <td style="color:var(--muted);white-space:nowrap">${esc(l.ip_address)}</td>
+              </tr>`;
+              })
+              .join("");
+          }
+
+          const start = totalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+          const end = Math.min(currentPage * pageSize, totalCount);
+          document.getElementById("pg-info").textContent = `${start}–${end} dari ${totalCount} log`;
+          document.getElementById("pg-prev").disabled = currentPage <= 1;
+          document.getElementById("pg-next").disabled = currentPage * pageSize >= totalCount;
+        } catch (e) {
+          tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--red2)">Gagal memuat log aktivitas.</td></tr>';
+        }
+      }
+
+      async function exportLogs() {
+        try {
+          UI.toast("Menyiapkan file...", "info");
+          const qs = buildQuery();
+          await API.download(`/api/super-admin/activity-logs/export?${qs}`, "log_aktivitas.xlsx");
+        } catch (e) {
+          UI.toast("Gagal export log aktivitas", "error");
+        }
+      }
+
+      loadSchools();
+      load();
+    </script>
+  </body>
+</html>
