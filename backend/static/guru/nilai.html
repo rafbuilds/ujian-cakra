@@ -358,6 +358,23 @@
             </div>
           </div>
 
+          <!-- Prompt kode — muncul kalau pilih ujian guru lain yang belum dibuka -->
+          <div class="card" id="code-prompt" style="display: none">
+            <div style="font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 0.75rem">
+              🔑 Ujian ini bukan buatan Anda — masukkan kode pengawas untuk bisa lihat nilainya
+            </div>
+            <div style="display: flex; gap: 8px">
+              <input
+                class="form-control"
+                id="proctor-code-input"
+                placeholder="Kode pengawas dari admin"
+                style="text-transform: uppercase; max-width: 220px"
+                onkeydown="if(event.key==='Enter')joinByCode()"
+              />
+              <button class="btn btn-primary btn-sm" onclick="joinByCode()">Masuk</button>
+            </div>
+          </div>
+
           <!-- Konteks kelas yang sedang dilihat -->
           <div
             id="class-context-bar"
@@ -649,7 +666,9 @@
         currentClassId = null,
         currentExamTitle = '',
         monitorData = null,
-        allExams = [];
+        allExams = [],
+        isAdminUser = false,
+        unlockedIds = new Set();
       const COLORS = [
         "#0f4c35",
         "#1a6b4a",
@@ -666,6 +685,11 @@
       const STATUS_PRIORITY = { ongoing: 0, published: 1, finished: 2 };
 
       async function init() {
+        isAdminUser = Auth.getUser()?.role === "admin";
+        try {
+          const unlocked = await API.get("/api/exams/proctoring").catch(() => []);
+          unlockedIds = new Set(Array.isArray(unlocked) ? unlocked : []);
+        } catch {}
         await loadYearSemesterFilter();
         const id = new URLSearchParams(location.search).get("id");
         if (id) {
@@ -715,11 +739,15 @@
         } catch {}
       }
 
-      // Susun folder Jenjang → Kelas dari ujian milik guru ini pada semester
-      // terpilih — guru pilih KELAS, bukan cari-cari judul ujian di dropdown.
+      const isLocked = (e) => !isAdminUser && !e.is_mine && !unlockedIds.has(e.id);
+
+      // Susun folder Jenjang → Kelas dari SEMUA ujian di semester terpilih —
+      // punya sendiri, sudah di-unlock sebagai pengawas, ATAU masih terkunci
+      // milik guru lain (tetap kelihatan bertanda 🔒, bukan hilang sampai
+      // di-unlock) — guru pilih KELAS, bukan cari-cari judul ujian.
       async function buildClassFolders() {
         const semId = document.getElementById("f-semester")?.value || "";
-        allExams = await API.get(`/api/exams${semId ? `?semester_id=${semId}` : ""}`);
+        allExams = await API.get(`/api/exams/all-for-proctor${semId ? `?semester_id=${semId}` : ""}`);
 
         const classMap = {};
         allExams.forEach((e) => {
@@ -773,15 +801,16 @@
             new Date(b.start_at || 0) - new Date(a.start_at || 0),
         );
         const single = sorted.length === 1;
+        const lockIcon = (e) => (isLocked(e) ? "🔒 " : "");
         return `
       <div style="display:flex;align-items:center;gap:10px;padding:.625rem .25rem;border-bottom:.5px solid var(--border)">
         <div style="font-weight:700;font-size:13px;width:60px;flex-shrink:0">${cls.name}</div>
         <div style="flex:1;min-width:0">
           ${
             single
-              ? `<div style="font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${STATUS_ICON[sorted[0].status] || ""} ${sorted[0].title}</div>`
+              ? `<div style="font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${lockIcon(sorted[0])}${STATUS_ICON[sorted[0].status] || ""} ${sorted[0].title}${!sorted[0].is_mine ? " · " + (sorted[0].teacher_name || "—") : ""}</div>`
               : `<select class="form-control" style="font-size:12px;padding:5px 8px" id="pick-${cls.id}">
-                 ${sorted.map((e) => `<option value="${e.id}">${STATUS_ICON[e.status] || ""} ${e.title}</option>`).join("")}
+                 ${sorted.map((e) => `<option value="${e.id}">${lockIcon(e)}${STATUS_ICON[e.status] || ""} ${e.title}${!e.is_mine ? " (" + (e.teacher_name || "—") + ")" : ""}</option>`).join("")}
                </select>`
           }
         </div>
@@ -803,7 +832,29 @@
         currentClassId = null;
         document.getElementById("nilai-content").style.display = "none";
         document.getElementById("class-context-bar").style.display = "none";
+        document.getElementById("code-prompt").style.display = "none";
         document.getElementById("export-wrap").style.display = "none";
+        document.getElementById("class-folder-view").style.display = "block";
+      }
+
+      async function joinByCode() {
+        const input = document.getElementById("proctor-code-input");
+        const code = input.value.trim();
+        if (!code) {
+          UI.toast("Masukkan kode pengawas dulu", "warn");
+          return;
+        }
+        if (!currentExamId) return;
+        try {
+          await API.post(`/api/exams/${currentExamId}/join-proctor`, { code });
+          unlockedIds.add(currentExamId);
+          UI.toast("✅ Berhasil masuk sebagai pengawas", "success");
+          document.getElementById("code-prompt").style.display = "none";
+          buildClassFolders();
+          loadNilai(currentExamId, currentClassId);
+        } catch (e) {
+          UI.toast(e.error || "Kode tidak valid", "error");
+        }
       }
 
       async function loadNilai(examId, classId) {
@@ -816,10 +867,25 @@
         const exam = allExams.find((e) => e.id === examId);
         currentExamTitle = exam?.title || "";
 
+        // Sembunyikan folder begitu masuk ke satu ujian — folder + konten
+        // tampil bersamaan cuma bikin halaman terasa penuh/ribet.
+        document.getElementById("class-folder-view").style.display = "none";
+        document.getElementById("class-context-bar").style.display = "none";
+
+        if (exam && isLocked(exam)) {
+          document.getElementById("nilai-content").style.display = "none";
+          document.getElementById("export-wrap").style.display = "none";
+          document.getElementById("code-prompt").style.display = "block";
+          document.getElementById("proctor-code-input").value = "";
+          return;
+        }
+        document.getElementById("code-prompt").style.display = "none";
+
         const cls = classId ? (exam?.classes || []).find((c) => c.id === classId) : null;
+        const ownerNote = exam && !exam.is_mine ? ` · ${exam.teacher_name || "guru lain"}` : "";
         document.getElementById("class-context-text").textContent = cls
-          ? `📍 Kelas ${cls.name} — ${currentExamTitle}`
-          : `📍 Semua Kelas — ${currentExamTitle}`;
+          ? `📍 Kelas ${cls.name} — ${currentExamTitle}${ownerNote}`
+          : `📍 Semua Kelas — ${currentExamTitle}${ownerNote}`;
         document.getElementById("class-context-bar").style.display = "flex";
 
         UI.loading(true, "Memuat...");

@@ -61,10 +61,14 @@ def get_exams_for_proctor():
     Hanya metadata, TIDAK termasuk soal/kunci jawaban.
 
     'classes' berisi daftar kelas peserta per ujian (id/name/grade) — dipakai
-    frontend Pengawas Live untuk menyusun folder Jenjang → Kelas, supaya guru
-    bisa masuk langsung ke kelas yang dia awasi alih-alih milih dari dropdown
-    ujian yang datar."""
-    active_id = _active_semester_id()
+    frontend Pengawas Live & Nilai untuk menyusun folder Jenjang → Kelas,
+    supaya guru bisa masuk langsung ke kelas yang dia awasi/nilai alih-alih
+    milih dari dropdown ujian yang datar.
+
+    Terima ?semester_id= opsional (dipakai Nilai & Rekap yang punya pemilih
+    semester sendiri) — kalau tidak dikirim, default ke semester aktif
+    seperti sebelumnya (perilaku Pengawas Live tidak berubah)."""
+    active_id = request.args.get('semester_id') or _active_semester_id()
     rows = query("""
         SELECT e.id, e.title, e.status, e.start_at, e.teacher_id,
                (e.teacher_id = %s) as is_mine,
