@@ -34,7 +34,10 @@ def get_exams():
                sem.name as semester_name, ay.name as academic_year_name
                , (SELECT COUNT(*) FROM questions q WHERE q.exam_id=e.id) as question_count,
                (SELECT STRING_AGG(c.name,', ') FROM exam_classes ec
-                JOIN classes c ON c.id=ec.class_id WHERE ec.exam_id=e.id) as class_names
+                JOIN classes c ON c.id=ec.class_id WHERE ec.exam_id=e.id) as class_names,
+               (SELECT json_agg(json_build_object('id', c.id, 'name', c.name, 'grade', c.grade)
+                                ORDER BY c.grade, LENGTH(c.id), c.id)
+                FROM exam_classes ec JOIN classes c ON c.id=ec.class_id WHERE ec.exam_id=e.id) as classes
         FROM exams e
         LEFT JOIN subjects s ON s.id=e.subject_id
         LEFT JOIN semesters sem ON sem.id=e.semester_id
@@ -42,7 +45,12 @@ def get_exams():
         WHERE e.teacher_id=%s AND e.school_id=%s{extra_where}
         ORDER BY e.created_at DESC
     """, tuple(params))
-    return jsonify([dict(r) for r in rows])
+    result = []
+    for r in rows:
+        d = dict(r)
+        d['classes'] = d['classes'] or []
+        result.append(d)
+    return jsonify(result)
 
 @exams_bp.route('/api/exams/all-for-proctor', methods=['GET'])
 @require_guru
@@ -564,7 +572,13 @@ def monitor_exam(exam_id):
 def exam_results(exam_id):
     if not query("SELECT 1 FROM exams WHERE id=%s AND school_id=%s", (exam_id, request.school_id), fetch='one'):
         return jsonify({'error': 'Ujian tidak ditemukan'}), 404
-    rows = query("""
+    # Filter opsional ke satu kelas — dipakai saat guru masuk lewat folder
+    # kelas di Nilai & Rekap (bukan pilih ujian langsung), supaya rekap yang
+    # ditampilkan cuma untuk kelas itu walau ujiannya lintas-kelas.
+    class_id = request.args.get('class_id')
+    class_filter = " AND u.class_id=%s" if class_id else ""
+    class_params = [class_id] if class_id else []
+    rows = query(f"""
         SELECT es.id as session_id, u.id as student_id, u.name, u.nisn,
                c.name as class_name, es.submitted_at, es.tab_violations,
                r.score, r.correct_count, r.wrong_count, r.empty_count
@@ -572,8 +586,8 @@ def exam_results(exam_id):
         JOIN users u ON u.id=es.student_id
         LEFT JOIN classes c ON c.id=u.class_id
         LEFT JOIN results r ON r.session_id=es.id
-        WHERE es.exam_id=%s ORDER BY c.name, u.name
-    """, (exam_id,))
+        WHERE es.exam_id=%s{class_filter} ORDER BY c.name, u.name
+    """, [exam_id] + class_params)
     all_rows = [dict(r) for r in rows]
     submitted = [r for r in all_rows if r.get('submitted_at')]
     scores = [float(r['score']) for r in submitted if r.get('score') is not None]
@@ -584,16 +598,16 @@ def exam_results(exam_id):
         elif s>=60: dist['c']+=1
         else: dist['d']+=1
     q_stats = []
-    questions = query("""
+    session_scope = f"(SELECT id FROM exam_sessions es JOIN users u ON u.id=es.student_id WHERE es.exam_id=%s{class_filter})"
+    questions = query(f"""
         SELECT q.id, q.content,
                COUNT(a.id) FILTER (WHERE o.is_correct=true) as correct,
                COUNT(a.id) as total
         FROM questions q
-        LEFT JOIN answers a ON a.question_id=q.id AND a.session_id IN
-            (SELECT id FROM exam_sessions WHERE exam_id=%s)
+        LEFT JOIN answers a ON a.question_id=q.id AND a.session_id IN {session_scope}
         LEFT JOIN options o ON o.id=a.option_id
         WHERE q.exam_id=%s GROUP BY q.id, q.content ORDER BY q.order_num
-    """, (exam_id, exam_id))
+    """, [exam_id] + class_params + [exam_id])
     for q in questions:
         total = q['total'] or 1
         pct = round((q['correct'] or 0)/total*100, 1)

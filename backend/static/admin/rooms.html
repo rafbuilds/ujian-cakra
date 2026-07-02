@@ -1088,7 +1088,10 @@
 
       const GRADE_LABEL = { 10: 'Kelas X', 11: 'Kelas XI', 12: 'Kelas XII' };
 
-      /* Kelompokkan ujian per Jenjang (X/XI/XII) lalu per Guru di dalamnya */
+      /* Kelompokkan ujian per Jenjang (X/XI/XII) lalu per KELAS di dalamnya —
+         satu ujian bisa muncul di lebih dari satu folder kelas kalau memang
+         lintas-kelas. Guru pemilik ditampilkan sebagai keterangan per ujian,
+         bukan level folder lagi. */
       function renderExamsByGrade(exams) {
         const el = document.getElementById('dp-exams');
         if (!exams.length) {
@@ -1096,13 +1099,23 @@
           return;
         }
 
-        // Grup: { gradeKey -> [exam, ...] }, urut X, XI, XII, lalu tanpa jenjang
-        const gradeOrder = [10, 11, 12, null];
-        const gradeGroups = {};
+        const classMap = {};
         exams.forEach(e => {
-          const key = e.grade && GRADE_LABEL[e.grade] ? e.grade : null;
-          if (!gradeGroups[key]) gradeGroups[key] = [];
-          gradeGroups[key].push(e);
+          const classes = (e.classes && e.classes.length)
+            ? e.classes
+            : [{ id: '_none', name: e.class_names || 'Tanpa Kelas', grade: e.grade }];
+          classes.forEach(c => {
+            if (!classMap[c.id]) classMap[c.id] = { cls: c, exams: [] };
+            classMap[c.id].exams.push(e);
+          });
+        });
+
+        const gradeOrder = [10, 11, 12, 0];
+        const gradeGroups = {};
+        Object.values(classMap).forEach(entry => {
+          const g = entry.cls.grade || 0;
+          if (!gradeGroups[g]) gradeGroups[g] = [];
+          gradeGroups[g].push(entry);
         });
 
         el.innerHTML = gradeOrder
@@ -1111,17 +1124,13 @@
           .join('');
       }
 
-      function renderGradeFolder(grade, exams) {
-        const label = grade ? GRADE_LABEL[grade] : 'Tanpa Jenjang';
-        const live  = exams.filter(e => e.status === 'ongoing').length;
-
-        // Grup per guru di dalam jenjang ini
-        const byTeacher = {};
-        exams.forEach(e => {
-          const key = e.teacher_name || '—';
-          if (!byTeacher[key]) byTeacher[key] = [];
-          byTeacher[key].push(e);
-        });
+      function renderGradeFolder(grade, classEntries) {
+        const label = GRADE_LABEL[grade] || 'Tanpa Jenjang';
+        const totalExams = new Set(classEntries.flatMap(en => en.exams.map(e => e.id))).size;
+        const live = classEntries.reduce((sum, en) => sum + en.exams.filter(e => e.status === 'ongoing').length, 0);
+        const sorted = [...classEntries].sort((a, b) =>
+          a.cls.name.localeCompare(b.cls.name, 'id', { numeric: true }),
+        );
 
         return `
           <div style="margin-bottom:1.25rem;border:.5px solid var(--border2);border-radius:14px;overflow:hidden">
@@ -1130,50 +1139,51 @@
               <div style="font-size:18px">📁</div>
               <div style="flex:1">
                 <div style="font-size:13px;font-weight:700;color:#fff">${label}</div>
-                <div style="font-size:10px;color:rgba(255,255,255,.65)">${exams.length} ujian · ${Object.keys(byTeacher).length} guru${live ? ` · 🟢 ${live} live` : ''}</div>
+                <div style="font-size:10px;color:rgba(255,255,255,.65)">${sorted.length} kelas · ${totalExams} ujian${live ? ` · 🟢 ${live} live` : ''}</div>
               </div>
             </div>
             <div style="padding:.625rem .875rem">
-              ${Object.entries(byTeacher).map(([teacher, list]) => renderTeacherFolder(teacher, list)).join('')}
+              ${sorted.map(en => renderClassFolder(en)).join('')}
             </div>
           </div>`;
       }
 
-      function renderTeacherFolder(teacher, list) {
-        const live    = list.filter(e => e.status === 'ongoing').length;
-        const initial = (teacher.trim()[0] || '?').toUpperCase();
+      function renderClassFolder(entry) {
+        const { cls, exams } = entry;
+        const live = exams.filter(e => e.status === 'ongoing').length;
         return `
           <div style="margin-bottom:.75rem;border:.5px solid var(--border);border-radius:12px;overflow:hidden">
-            <!-- Header guru -->
+            <!-- Header kelas -->
             <div style="background:var(--light);padding:.625rem .875rem;display:flex;align-items:center;gap:10px;border-bottom:.5px solid var(--border)">
-              <div style="width:32px;height:32px;border-radius:50%;background:var(--green);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:13px;flex-shrink:0">${initial}</div>
+              <div style="width:32px;height:32px;border-radius:50%;background:var(--green);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:13px;flex-shrink:0">${(cls.name || '?')[0]}</div>
               <div style="flex:1;min-width:0">
-                <div style="font-size:13px;font-weight:700">${teacher}</div>
-                <div style="font-size:10px;color:var(--muted)">${list.length} ujian${live ? ` · <span style="color:#3b6d11;font-weight:600">🟢 ${live} live</span>` : ''}</div>
+                <div style="font-size:13px;font-weight:700">${cls.name}</div>
+                <div style="font-size:10px;color:var(--muted)">${exams.length} ujian${live ? ` · <span style="color:#3b6d11;font-weight:600">🟢 ${live} live</span>` : ''}</div>
               </div>
             </div>
-            <!-- Daftar ujian guru ini -->
+            <!-- Daftar ujian kelas ini -->
             <div style="padding:.5rem .75rem">
-              ${list.map(e => renderOneExam(e)).join('')}
+              ${exams.map(e => renderOneExam(e, cls.id)).join('')}
             </div>
           </div>`;
       }
 
-      function renderOneExam(e) {
+      function renderOneExam(e, classId) {
+        const classArg = classId && classId !== '_none' ? `,'${classId}'` : '';
         return `
           <div style="padding:.625rem 0;border-bottom:.5px solid var(--border)">
             <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:5px">
               <div style="flex:1;min-width:0">
                 <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${e.title || '—'}</div>
-                <div style="font-size:11px;color:var(--muted);margin-top:1px">${e.subject_name || '—'} · ${e.duration_minutes || 90} menit · ${e.question_count || 0} soal</div>
-                ${e.class_names ? `<div style="font-size:10px;color:var(--muted)">Kelas: ${e.class_names}</div>` : ''}
+                <div style="font-size:11px;color:var(--muted);margin-top:1px">${e.subject_name || '—'} · 👤 ${e.teacher_name || '—'} · ${e.duration_minutes || 90} menit · ${e.question_count || 0} soal</div>
+                ${e.classes && e.classes.length > 1 ? `<div style="font-size:10px;color:var(--muted)">Lintas kelas: ${e.class_names}</div>` : ''}
                 ${e.semester_name ? `<div style="font-size:10px;color:var(--muted)">📅 ${e.semester_name}${e.academic_year_name ? ' ' + e.academic_year_name : ''}</div>` : ''}
               </div>
               ${SB[e.status] || e.status}
             </div>
             <div style="display:flex;gap:4px;flex-wrap:wrap">
               <button class="btn btn-secondary btn-sm" onclick="viewSoal('${e.id}')"     style="font-size:11px;padding:3px 8px">📄 Soal</button>
-              <button class="btn btn-secondary btn-sm" onclick="viewNilai('${e.id}')"   style="font-size:11px;padding:3px 8px">📊 Nilai</button>
+              <button class="btn btn-secondary btn-sm" onclick="viewNilai('${e.id}'${classArg})"   style="font-size:11px;padding:3px 8px">📊 Nilai</button>
               <button class="btn btn-secondary btn-sm" onclick="viewMonitor('${e.id}')" style="font-size:11px;padding:3px 8px">🖥 Monitor</button>
               ${e.status === 'draft' ? `<button class="btn btn-primary btn-sm" onclick="publishExam('${e.id}')" style="font-size:11px;padding:3px 8px">✅ Publish</button>` : ''}
               ${['published','ongoing'].includes(e.status) ? `<button class="btn btn-secondary btn-sm" onclick="forceFinishExam('${e.id}')" style="font-size:11px;padding:3px 8px;border-color:#e57373;color:#c62828">⏹ Stop</button>` : ''}
@@ -1466,7 +1476,7 @@
         document.getElementById('modal-monitor').style.display = 'none';
       }
 
-      async function viewNilai(examId) {
+      async function viewNilai(examId, classId) {
         // Tampilkan modal nilai tanpa pindah ke halaman guru
         const modal = document.getElementById('modal-nilai');
         modal.style.display = 'flex';
@@ -1477,7 +1487,8 @@
         ['mn-total','mn-avg','mn-pass','mn-high','mn-low'].forEach(id => document.getElementById(id).textContent = '—');
 
         try {
-          const data = await API.get('/api/exams/' + examId + '/results');
+          const classQ = classId ? '?class_id=' + classId : '';
+          const data = await API.get('/api/exams/' + examId + '/results' + classQ);
           document.getElementById('mn-loading').style.display = 'none';
 
           // Header info — API returns: { results, summary, score_distribution, question_stats }

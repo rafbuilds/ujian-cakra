@@ -627,7 +627,10 @@ def get_room_detail(room_id):
                (SELECT COUNT(*) FROM questions q WHERE q.exam_id=e.id) as question_count,
                (SELECT STRING_AGG(c.name, ', ' ORDER BY c.name)
                 FROM exam_classes ec JOIN classes c ON c.id=ec.class_id
-                WHERE ec.exam_id=e.id) as class_names
+                WHERE ec.exam_id=e.id) as class_names,
+               (SELECT json_agg(json_build_object('id', c.id, 'name', c.name, 'grade', c.grade)
+                                ORDER BY c.grade, LENGTH(c.id), c.id)
+                FROM exam_classes ec JOIN classes c ON c.id=ec.class_id WHERE ec.exam_id=e.id) as classes
         FROM exams e
         JOIN users u ON u.id=e.teacher_id
         LEFT JOIN subjects s ON s.id=e.subject_id
@@ -636,11 +639,16 @@ def get_room_detail(room_id):
         WHERE e.room_id=%s
         ORDER BY e.start_at, u.name, e.created_at DESC
     """, (room_id,))
+    exam_list = []
+    for e in exams:
+        d = dict(e)
+        d['classes'] = d['classes'] or []
+        exam_list.append(d)
     return jsonify({
         **dict(room),
         'teachers': [dict(t) for t in teachers],
         'classes': [dict(c) for c in classes],
-        'exams': [dict(e) for e in exams],
+        'exams': exam_list,
     })
 
 @admin_bp.route('/api/admin/rooms/<room_id>/teachers', methods=['POST'])

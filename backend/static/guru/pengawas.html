@@ -298,51 +298,13 @@
             </div>
           </div>
 
-          <div style="text-align: center; margin: 0.75rem 0">
-            <button class="btn btn-secondary btn-sm" onclick="toggleFlatSelect()" id="toggle-flat-btn">
-              📋 Atau pilih ujian langsung dari daftar
-            </button>
-          </div>
-
-          <!-- Pilih ujian (semua ujian, dari semua guru) — fallback lama, disembunyikan default -->
-          <div class="select-exam" id="flat-select-wrap" style="display: none">
-            <div
-              style="
-                font-size: 13px;
-                font-weight: 600;
-                color: var(--muted);
-                margin-bottom: 0.75rem;
-              "
-            >
-              Pilih Ujian yang Dipantau
-              <span style="font-weight: 400; color: var(--muted)"
-                >(ujian guru lain butuh kode pengawas dari admin)</span
-              >
-            </div>
-            <select
-              class="form-control"
-              id="exam-select"
-              onchange="onExamSelect(this.value)"
-            >
-              <option value="">— Pilih ujian —</option>
-            </select>
-          </div>
-
-          <!-- Konteks kelas yang sedang dipantau — muncul kalau masuk lewat folder kelas -->
+          <!-- Konteks kelas yang sedang dipantau -->
           <div
             id="class-context-bar"
             style="display: none; align-items: center; justify-content: space-between; background: #eaf3de; border-radius: 10px; padding: 0.75rem 1rem; margin-bottom: 1.25rem"
           >
             <div style="font-size: 13px; font-weight: 600; color: #3b6d11" id="class-context-text"></div>
             <button class="btn btn-secondary btn-sm" onclick="backToFolders()">‹ Ganti Kelas</button>
-          </div>
-
-          <!-- Banner kepemilikan — muncul kalau ujian yang dipilih buatan sendiri -->
-          <div
-            id="own-exam-banner"
-            style="display: none; background: #eaf3de; color: #3b6d11; border-radius: 10px; padding: 0.75rem 1rem; margin-bottom: 1.25rem; font-size: 13px; font-weight: 600"
-          >
-            ✅ Anda pembuat soal ujian ini — sudah otomatis bisa mengawasi tanpa kode
           </div>
 
           <!-- Prompt kode — muncul kalau pilih ujian guru lain yang belum dibuka -->
@@ -547,27 +509,16 @@
           ]);
           allExamsForProctor = Array.isArray(all) ? all : [];
           unlockedIds = new Set(Array.isArray(unlocked) ? unlocked : []);
-          renderExamSelect();
           buildClassFolders();
 
-          // URL param
+          // URL param (mis. deep link dari Daftar Ujian) — masuk langsung ke
+          // kelas pertama ujian itu kalau ada.
           const id = new URLSearchParams(location.search).get("id");
-          if (id && allExamsForProctor.find((e) => e.id === id)) {
-            document.getElementById("exam-select").value = id;
-            onExamSelect(id);
-          }
+          const exam = id && allExamsForProctor.find((e) => e.id === id);
+          if (exam) onExamSelect(id, exam.classes?.[0]?.id || null);
         } catch {
           UI.toast("Gagal memuat ujian", "error");
         }
-      }
-
-      function toggleFlatSelect() {
-        const wrap = document.getElementById("flat-select-wrap");
-        const show = wrap.style.display === "none";
-        wrap.style.display = show ? "block" : "none";
-        document.getElementById("toggle-flat-btn").textContent = show
-          ? "📁 Kembali ke tampilan folder kelas"
-          : "📋 Atau pilih ujian langsung dari daftar";
       }
 
       const GRADE_LABEL = { 10: "Kelas X", 11: "Kelas XI", 12: "Kelas XII" };
@@ -663,7 +614,6 @@
           UI.toast("Pilih ujian dulu", "warn");
           return;
         }
-        document.getElementById("exam-select").value = examId;
         onExamSelect(examId, classId);
       }
 
@@ -673,33 +623,7 @@
         clearInterval(autoRefresh);
         document.getElementById("monitor-content").style.display = "none";
         document.getElementById("class-context-bar").style.display = "none";
-        document.getElementById("own-exam-banner").style.display = "none";
-        document.getElementById("exam-select").value = "";
-      }
-
-      function renderExamSelect() {
-        const statusLabel = (e) =>
-          e.status === "ongoing" ? "🟢 Berlangsung" : e.status === "published" ? "📋 Terbuka" : "✅ Selesai";
-        const mine = allExamsForProctor.filter((e) => e.is_mine);
-        const others = allExamsForProctor.filter((e) => !e.is_mine);
-        const sel = document.getElementById("exam-select");
-        const prevValue = sel.value;
-        sel.innerHTML =
-          '<option value="">— Pilih ujian —</option>' +
-          (mine.length
-            ? `<optgroup label="Ujian Saya">${mine
-                .map((e) => `<option value="${e.id}">${e.title} — ${statusLabel(e)}</option>`)
-                .join("")}</optgroup>`
-            : "") +
-          (others.length
-            ? `<optgroup label="Ujian Guru Lain">${others
-                .map(
-                  (e) =>
-                    `<option value="${e.id}">${isAdminUser || unlockedIds.has(e.id) ? "🔓" : "🔒"} ${e.title} (${e.teacher_name || "—"}) — ${statusLabel(e)}</option>`,
-                )
-                .join("")}</optgroup>`
-            : "");
-        sel.value = prevValue;
+        document.getElementById("code-prompt").style.display = "none";
       }
 
       async function joinByCode() {
@@ -715,9 +639,7 @@
           unlockedIds.add(currentExamId);
           UI.toast("✅ Berhasil masuk sebagai pengawas", "success");
           document.getElementById("code-prompt").style.display = "none";
-          renderExamSelect();
           buildClassFolders();
-          document.getElementById("exam-select").value = currentExamId;
           // currentClassId sudah kesimpen dari sebelum prompt kode muncul —
           // dipakai lagi di sini supaya konteks kelas yang dipilih tidak hilang.
           onExamSelect(currentExamId, currentClassId);
@@ -726,14 +648,14 @@
         }
       }
 
+      // Satu-satunya jalur masuk monitor: selalu lewat folder kelas, jadi
+      // classId praktis selalu ada — bar konteks kelas mencakup info
+      // kepemilikan sekaligus, tidak ada banner terpisah lagi.
       function onExamSelect(id, classId = null) {
         currentExamId = id;
         currentClassId = classId;
         clearInterval(autoRefresh);
-        // Selalu reset dulu — banner kepemilikan dan prompt kode tidak boleh
-        // tampil bersamaan, jadi default-kan keduanya tersembunyi setiap ganti pilihan.
         document.getElementById("code-prompt").style.display = "none";
-        document.getElementById("own-exam-banner").style.display = "none";
         document.getElementById("class-context-bar").style.display = "none";
         if (!id) {
           document.getElementById("monitor-content").style.display = "none";
@@ -750,25 +672,12 @@
           document.getElementById("proctor-code-input").value = "";
           return;
         }
-        if (classId) {
-          // Masuk lewat folder kelas — tampilkan bar konteks kelas (sudah
-          // mencakup info kepemilikan), jadi banner kepemilikan terpisah
-          // tidak perlu tampil bersamaan supaya tidak dobel.
-          const cls = (exam?.classes || []).find((c) => c.id === classId);
-          const ownerNote = isMine ? "" : isAdminUser ? " · mode admin" : ` · pengawas (kode dari ${exam.teacher_name || "guru lain"})`;
-          document.getElementById("class-context-text").textContent =
-            `📍 Memantau Kelas ${cls ? cls.name : ""} — ${exam.title}${ownerNote}`;
-          document.getElementById("class-context-bar").style.display = "flex";
-        } else {
-          const banner = document.getElementById("own-exam-banner");
-          if (isMine) {
-            banner.textContent = "✅ Anda pembuat soal ujian ini — sudah otomatis bisa mengawasi tanpa kode";
-            banner.style.display = "block";
-          } else if (isAdminUser) {
-            banner.textContent = "👮 Anda login sebagai admin — bisa mengawasi semua ujian tanpa kode";
-            banner.style.display = "block";
-          }
-        }
+        const cls = classId ? (exam?.classes || []).find((c) => c.id === classId) : null;
+        const ownerNote = isMine ? "" : isAdminUser ? " · mode admin" : ` · pengawas (kode dari ${exam.teacher_name || "guru lain"})`;
+        document.getElementById("class-context-text").textContent = cls
+          ? `📍 Kelas ${cls.name} — ${exam.title}${ownerNote}`
+          : `📍 ${exam.title}${ownerNote}`;
+        document.getElementById("class-context-bar").style.display = "flex";
         document.getElementById("monitor-content").style.display = "block";
         loadMonitor();
         autoRefresh = setInterval(loadMonitor, 5000);
@@ -1069,12 +978,11 @@
           async () => {
             const r = await API.post(`/api/exams/${currentExamId}/finish`);
             UI.toast(`✅ Ujian diselesaikan${r.submitted ? ` — ${r.submitted} siswa di-auto-submit` : ""}`, "success");
-            // Update status lokal supaya dropdown ujian langsung berubah dari
+            // Update status lokal supaya folder kelas langsung berubah dari
             // "Berlangsung" jadi "Selesai" tanpa perlu reload halaman.
             const exam = allExamsForProctor.find((e) => e.id === currentExamId);
             if (exam) exam.status = "finished";
-            renderExamSelect();
-            document.getElementById("exam-select").value = currentExamId;
+            buildClassFolders();
             loadMonitor();
           },
         );
